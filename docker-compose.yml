@@ -1,11 +1,30 @@
 services:
+  # 1. Tu Aplicación Web
   mi-web-python:
     build: .
-    container_name: drpiscinas
+    container_name: mi_web_python
     ports:
-      - "5000:5000"   # Puerto PC : Puerto Contenedor
+      - "5000:5000"
     restart: unless-stopped
-    # Acá le decimos que use las variables de entorno que cargaremos en Portainer
+    depends_on:
+      - db  # Esperar a que la base de datos arranque
     environment:
-      - MI_CLAVE=${MI_CLAVE} 
-      # (Agregá acá otras variables que uses en tu app, ej: DB_HOST, API_KEY)
+      # OJO ACÁ: Cambiamos 'localhost' por 'db' (el nombre del servicio de abajo)
+      - DATABASE_URL=postgresql://drPiscinas:administrador@db:5432/drPiscinas_db
+      - SECRET_KEY=${SECRET_KEY}
+
+  # 2. La Base de Datos (PostgreSQL)
+  db:
+    image: postgres:15
+    container_name: mi_base_datos
+    restart: always
+    environment:
+      POSTGRES_USER: drPiscinas
+      POSTGRES_PASSWORD: administrador
+      POSTGRES_DB: drPiscinas_db
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+# 3. Volumen para que no se borren los datos si reiniciás
+volumes:
+  db_data:
