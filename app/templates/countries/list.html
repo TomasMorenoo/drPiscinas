@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Countries{% endblock %}
+
+{% block content %}
+<h1>Countries</h1>
+<a href="{{ url_for('country.crear_country') }}">+ Agregar Country</a>
+
+<table border="1" cellpadding="5">
+    <tr>
+        <th>ID</th>
+        <th>Nombre</th>
+    </tr>
+
+    {% for country in countries %}
+    <tr>
+        <td>{{ country.id }}</td>
+        <td>{{ country.nombre }}</td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="2">No hay countries cargados</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endblock %}

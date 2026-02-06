@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Crear Casa{% endblock %}
+
+{% block content %}
+
+<h2>Agregar Casa</h2>
+
+<form method="POST" action="{{ url_for('casas.crear_casa') }}">
+    <label>Número:</label>
+    <input type="text" name="numero" required>
+
+    <label>Precio Base:</label>
+    <input type="number" name="precio_base" step="0.01" required>
+
+    <label>Country:</label>
+<select name="country_id" id="countrySelect" required>
+    <option value="">-- Seleccionar --</option>
+    {% for country in countries %}
+        <option value="{{ country.id }}">{{ country.nombre }}</option>
+    {% endfor %}
+</select>
+
+<label>Barrio:</label>
+<select name="barrio_id" id="barrioSelect" disabled>
+    <option value="">Sin Barrio</option>
+</select>
+
+
+    <button type="submit">Crear</button>
+</form>
+
+<a href="{{ url_for('casas.listar_casas') }}">Volver a lista</a>
+
+<script>
+const countrySelect = document.getElementById('countrySelect');
+const barrioSelect = document.getElementById('barrioSelect');
+
+countrySelect.addEventListener('change', function() {
+    const countryId = this.value;
+
+    // Limpiar y deshabilitar select barrio si no hay country
+    barrioSelect.innerHTML = '<option value="">Sin Barrio</option>';
+    barrioSelect.disabled = true;
+
+    if (countryId) {
+        fetch(`/casas/barrios/${countryId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.length > 0) {
+                    barrioSelect.disabled = false;
+                    barrioSelect.innerHTML = '<option value="">-- Seleccionar Barrio --</option>';
+                    data.forEach(b => {
+                        const option = document.createElement('option');
+                        option.value = b.id;
+                        option.textContent = b.nombre;
+                        barrioSelect.appendChild(option);
+                    });
+                }
+            })
+            .catch(err => console.error(err));
+    }
+});
+</script>
+
+{% endblock %}

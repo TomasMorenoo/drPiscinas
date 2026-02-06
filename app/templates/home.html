@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Inicio{% endblock %}
+
+{% block content %}
+
+<h1>Sistema Piletero 🚿</h1>
+
+<p>Seleccioná qué querés administrar:</p>
+
+<ul>
+    <li><a href="{{ url_for('main.home') }}">Home</a></li>
+    <li><a href="{{ url_for('country.listar_countries') }}">Countries</a></li>
+    <li><a href="{{ url_for('barrio.listar_barrios') }}">Barrios</a></li>
+    <li><a href="{{ url_for('casas.listar_casas') }}">Casas</a></li>
+    <li><a href="{{ url_for('products.listar_products') }}">Productos</a></li>
+    <li><a href="{{ url_for('visits.listar_visits') }}">Visitas</a></li>
+    <li><a href="{{ url_for('promo.listar_promos') }}">Promos</a></li>
+
+    
+</ul>
+
+
+{% endblock %}

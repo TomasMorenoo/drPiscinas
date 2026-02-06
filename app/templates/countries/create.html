@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Crear Country{% endblock %}
+
+{% block content %}
+
+<h2>Agregar Country</h2>
+
+<form method="POST" action="{{ url_for('country.crear_country') }}">
+    <label>Nombre:</label>
+    <input type="text" name="nombre" required>
+    <button type="submit">Crear</button>
+</form>
+
+<a href="{{ url_for('country.listar_countries') }}">Volver a lista</a>
+
+{% endblock %}

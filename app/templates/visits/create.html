@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Nueva Visita{% endblock %}
+
+{% block content %}
+<h1>Agregar Visita</h1>
+
+<form method="POST" action="{{ url_for('visits.crear_visit') }}">
+
+    <!-- =========================
+         CASA
+    ========================== -->
+    <label>Casa:</label>
+    <select name="casa_id" required>
+        <option value="">-- Seleccionar casa --</option>
+        {% for casa in casas %}
+            <option value="{{ casa.id }}">
+                {{ casa.numero }} -
+                {{ casa.barrio.nombre if casa.barrio else "Sin barrio" }} -
+                {{ casa.country.nombre }}
+            </option>
+        {% endfor %}
+    </select>
+
+    <br><br>
+
+    <!-- =========================
+         FECHA
+    ========================== -->
+    <label>Fecha:</label>
+    <input type="date" name="fecha" required>
+
+    <br><br>
+
+    <!-- =========================
+         PROMO
+    ========================== -->
+    <label>Promoción (opcional):</label>
+    <select name="promo_id">
+        <option value="">-- Sin promo --</option>
+        {% for promo in promos %}
+            <option value="{{ promo.id }}">
+                {{ promo.nombre }} (${{ promo.precio }})
+            </option>
+        {% endfor %}
+    </select>
+
+    <br><br>
+
+    <!-- =========================
+         OBSERVACIONES
+    ========================== -->
+    <label>Observaciones:</label>
+    <input type="text" name="observaciones">
+
+    <hr>
+
+    <!-- =========================
+         PRODUCTOS MANUALES
+    ========================== -->
+    <h3>Productos usados (manual)</h3>
+
+    <div id="productos-container"></div>
+
+    <button type="button" onclick="agregarProducto()">➕ Agregar producto</button>
+
+    <br><br>
+
+    <button type="submit">💾 Guardar visita</button>
+</form>
+
+<!-- =========================
+     TEMPLATE PRODUCTO
+========================== -->
+<template id="producto-template">
+    <div class="producto-row" style="margin-bottom:6px;">
+        <select name="product_id[]" required>
+            <option value="">-- Producto --</option>
+            {% for product in products %}
+                <option value="{{ product.id }}">
+                    {{ product.nombre }} ({{ product.unidad }})
+                </option>
+            {% endfor %}
+        </select>
+
+        <input
+            type="number"
+            step="0.01"
+            min="0"
+            name="cantidad[]"
+            placeholder="Cantidad"
+            required
+        >
+
+        <button type="button" onclick="this.parentElement.remove()">❌</button>
+    </div>
+</template>
+
+<script>
+function agregarProducto() {
+    const container = document.getElementById("productos-container");
+    const template = document.getElementById("producto-template");
+    container.appendChild(template.content.cloneNode(true));
+}
+</script>
+
+{% endblock %}

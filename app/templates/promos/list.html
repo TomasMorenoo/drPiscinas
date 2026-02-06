@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>Promociones</h1>
+
+<a href="{{ url_for('promo.crear_promo') }}">
+    ➕ Crear promoción
+</a>
+
+<br><br>
+
+<table border="1" cellpadding="5">
+    <tr>
+        <th>Nombre</th>
+        <th>Precio</th>
+        <th>Productos</th>
+        <th>Estado</th>
+        <th>Acciones</th>
+    </tr>
+
+    {% for promo in promos %}
+    <tr style="{% if not promo.activo %}opacity:0.5{% endif %}">
+        <td>{{ promo.nombre }}</td>
+        <td>${{ promo.precio }}</td>
+
+        <td>
+            {% if promo.productos %}
+                <ul style="margin:0; padding-left:15px">
+                    {% for pp in promo.productos %}
+                        <li>
+                            {{ pp.product.nombre }}
+                            ({{ pp.cantidad }} {{ pp.product.unidad }})
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <em>Sin productos</em>
+            {% endif %}
+        </td>
+
+        <td>
+            {% if promo.activo %}
+                🟢 Activa
+            {% else %}
+                🔴 Inactiva
+            {% endif %}
+        </td>
+
+        <td>
+            <a href="{{ url_for('promo.editar_promo', id=promo.id) }}">
+                ✏️ Editar
+            </a>
+            |
+            <a href="{{ url_for('promo.toggle_promo', id=promo.id) }}"
+               onclick="return confirm('¿Seguro que querés cambiar el estado de esta promo?')">
+                {% if promo.activo %}
+                    🚫 Desactivar
+                {% else %}
+                    ♻️ Activar
+                {% endif %}
+            </a>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

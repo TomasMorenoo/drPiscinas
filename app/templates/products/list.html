@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Productos{% endblock %}
+
+{% block content %}
+<h1>Productos</h1>
+
+<a href="{{ url_for('products.form_crear_product') }}">+ Agregar Producto</a>
+
+<table border="1" cellpadding="5">
+    <tr>
+        <th>ID</th>
+        <th>Nombre</th>
+        <th>Unidad</th>
+        <th>Precio</th>
+        <th>Activo</th>
+        <th>Acciones</th>
+    </tr>
+
+    {% for product in products %}
+    <tr>
+        <td>{{ product.id }}</td>
+        <td>{{ product.nombre }}</td>
+        <td>{{ product.unidad }}</td>
+        <td>{{ product.precio }}</td>
+        <td>{{ "Sí" if product.activo else "No" }}</td>
+        <td>
+            <a href="{{ url_for('products.toggle_product', id=product.id) }}">Toggle Activo</a>
+        </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="6">No hay productos cargados</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endblock %}

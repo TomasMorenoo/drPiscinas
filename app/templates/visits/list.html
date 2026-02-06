@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Visitas{% endblock %}
+
+{% block content %}
+<h1>Visitas</h1>
+
+<a href="{{ url_for('visits.form_crear_visit') }}">➕ Agregar nueva visita</a>
+
+<br><br>
+
+<table border="1" cellpadding="6">
+    <tr>
+        <th>ID</th>
+        <th>Casa</th>
+        <th>Fecha</th>
+        <th>Promo</th>
+        <th>Productos</th>
+        <th>Observaciones</th>
+        <th>Total</th>
+    </tr>
+
+    {% for visit in visits %}
+    <tr>
+        <td>{{ visit.id }}</td>
+        <td>
+            {{ visit.casa.numero }} -
+            {{ visit.casa.barrio.nombre if visit.casa.barrio else "Sin barrio" }} -
+            {{ visit.casa.country.nombre }}
+        </td>
+        <td>{{ visit.fecha.strftime('%d/%m/%Y') }}</td>
+
+        <!-- PROMO -->
+        <td>
+            {% if visit.promo %}
+                {{ visit.promo.nombre }} <br>
+                <small>${{ visit.promo.precio }}</small>
+            {% else %}
+                <em>Sin promo</em>
+            {% endif %}
+        </td>
+
+        <!-- PRODUCTOS -->
+        <td>
+            {% if visit.productos %}
+                <ul style="margin:0; padding-left:15px">
+                    {% for vp in visit.productos %}
+                        <li>
+                            {{ vp.product.nombre }}
+                            ({{ vp.cantidad }} {{ vp.product.unidad }})
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <em>Sin productos</em>
+            {% endif %}
+        </td>
+
+        <td>{{ visit.observaciones }}</td>
+
+        <td>
+            ${{ visit.calcular_total() }}
+        </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="7">No hay visitas registradas</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

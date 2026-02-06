@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Crear Producto{% endblock %}
+
+{% block content %}
+<h2>Agregar Producto</h2>
+
+<form method="POST" action="{{ url_for('products.crear_product') }}">
+    <label>Nombre:</label>
+    <input type="text" name="nombre" required>
+
+    <label>Unidad:</label>
+    <input type="text" name="unidad" placeholder="kg, litro, pastilla..." required>
+
+    <label>Precio:</label>
+    <input type="number" step="0.01" name="precio" required>
+
+    <button type="submit">Crear</button>
+</form>
+
+<a href="{{ url_for('products.listar_products') }}">Volver a lista</a>
+{% endblock %}

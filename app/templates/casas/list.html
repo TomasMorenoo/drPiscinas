@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Casas{% endblock %}
+
+{% block content %}
+
+<h1>Casas</h1>
+
+<a href="{{ url_for('casas.form_crear_casa') }}">+ Agregar Casa</a>
+
+<table border="1" cellpadding="5">
+    <tr>
+        <th>ID</th>
+        <th>Numero</th>
+        <th>Precio Base</th>
+        <th>Country</th>
+        <th>Barrio</th>
+        <th>Activo</th>
+        <th>Acciones</th>
+    </tr>
+
+    {% for casa in casas %}
+    <tr>
+        <td>{{ casa.id }}</td>
+        <td>{{ casa.numero }}</td>
+        <td>{{ casa.precio_base }}</td>
+        <td>{{ casa.country.nombre }}</td>
+        <td>{{ casa.barrio.nombre if casa.barrio else "Sin Barrio" }}</td>
+        <td>{{ "Sí" if casa.activo else "No" }}</td>
+        <td>
+            <a href="{{ url_for('casas.toggle_casa', id=casa.id) }}">Toggle Activo</a>
+        </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="7">No hay casas cargadas</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Barrios{% endblock %}
+
+{% block content %}
+
+<h1>Barrios</h1>
+
+<a href="{{ url_for('barrio.form_crear_barrio') }}">+ Agregar Barrio</a>
+
+<table border="1" cellpadding="5">
+    <tr>
+        <th>ID</th>
+        <th>Nombre</th>
+        <th>Country</th>
+        <th>Activo</th>
+        <th>Acciones</th>
+    </tr>
+
+    {% for barrio in barrios %}
+    <tr>
+        <td>{{ barrio.id }}</td>
+        <td>{{ barrio.nombre }}</td>
+        <td>{{ barrio.country.nombre }}</td>
+        <td>{{ "Sí" if barrio.activo else "No" }}</td>
+        <td>
+            <a href="{{ url_for('barrio.toggle_barrio', id=barrio.id) }}">Toggle Activo</a>
+        </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="5">No hay barrios cargados</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

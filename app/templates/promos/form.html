@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-3">
+    {% if promo %}Editar promo{% else %}Crear promo{% endif %}
+</h2>
+
+<form method="POST" id="promoForm">
+
+    <!-- =========================
+         DATOS BÁSICOS
+         ========================= -->
+    <div class="mb-3">
+        <label class="form-label">Nombre de la promo</label>
+        <input type="text"
+               class="form-control"
+               name="nombre"
+               value="{{ promo.nombre if promo else '' }}"
+               required>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Precio</label>
+        <input type="number"
+               step="0.01"
+               min="0"
+               class="form-control"
+               name="precio"
+               value="{{ promo.precio if promo else '' }}"
+               required>
+    </div>
+
+    <!-- =========================
+         PRODUCTOS
+         ========================= -->
+    <h4 class="mt-4">Productos incluidos</h4>
+
+    <table class="table table-bordered table-sm align-middle">
+        <thead class="table-light">
+            <tr>
+                <th style="width:40px"></th>
+                <th>Producto</th>
+                <th style="width:200px">Cantidad</th>
+            </tr>
+        </thead>
+        <tbody>
+
+        {% for producto in productos %}
+            {% set ns = namespace(asignado=None) %}
+
+            {% if promo %}
+                {% for pp in promo.productos %}
+                    {% if pp.product_id == producto.id %}
+                        {% set ns.asignado = pp %}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+
+            <tr>
+                <!-- CHECKBOX -->
+                <td class="text-center">
+                    <input type="checkbox"
+                           class="form-check-input producto-check"
+                           data-id="{{ producto.id }}"
+                           {% if ns.asignado %}checked{% endif %}>
+                </td>
+
+                <!-- NOMBRE -->
+                <td>{{ producto.nombre }}</td>
+
+                <!-- CANTIDAD + UNIDAD -->
+                <td>
+                    <div class="input-group">
+                        <input type="number"
+                               class="form-control producto-cantidad"
+                               name="producto_{{ producto.id }}"
+                               min="0"
+                               step="1"
+                               inputmode="decimal"
+                               data-id="{{ producto.id }}"
+                               value="{{ ns.asignado.cantidad if ns.asignado else '' }}"
+                               {% if not ns.asignado %}disabled{% endif %}>
+
+                        <span class="input-group-text">
+                            {{ producto.unidad if producto.unidad else 'u' }}
+                        </span>
+                    </div>
+                </td>
+            </tr>
+        {% endfor %}
+
+        </tbody>
+    </table>
+
+    <!-- =========================
+         BOTONES
+         ========================= -->
+    <div class="mt-4">
+        <button type="submit" class="btn btn-primary">
+            {% if promo %}Guardar cambios{% else %}Crear promo{% endif %}
+        </button>
+
+        <a href="{{ url_for('promo.listar_promos') }}"
+           class="btn btn-secondary">
+            Cancelar
+        </a>
+    </div>
+</form>
+
+<!-- =========================
+     JAVASCRIPT
+     ========================= -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const checks = document.querySelectorAll(".producto-check");
+    const form   = document.getElementById("promoForm");
+
+    // habilitar / deshabilitar cantidad
+    checks.forEach(check => {
+        check.addEventListener("change", () => {
+            const id = check.dataset.id;
+            const input = document.querySelector(
+                `.producto-cantidad[data-id="${id}"]`
+            );
+
+            if (check.checked) {
+                input.disabled = false;
+                if (!input.value || parseFloat(input.value) === 0) {
+                    input.value = "1";
+                }
+                input.focus();
+            } else {
+                input.value = "";
+                input.disabled = true;
+            }
+        });
+    });
+
+    // validación antes de enviar
+    form.addEventListener("submit", function (e) {
+        let valido = true;
+        let mensaje = "";
+
+        checks.forEach(check => {
+            if (check.checked) {
+                const id = check.dataset.id;
+                const input = document.querySelector(
+                    `.producto-cantidad[data-id="${id}"]`
+                );
+
+                const valor = parseFloat(input.value);
+
+                if (isNaN(valor) || valor <= 0.1) {
+                    valido = false;
+                    mensaje = "Todos los productos seleccionados deben tener una cantidad mayor a 0.1";
+                    input.classList.add("is-invalid");
+                } else {
+                    input.classList.remove("is-invalid");
+                }
+            }
+        });
+
+        if (!valido) {
+            e.preventDefault();
+            alert(mensaje);
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Crear Barrio{% endblock %}
+
+{% block content %}
+
+<h2>Agregar Barrio</h2>
+
+<form method="POST" action="{{ url_for('barrio.crear_barrio') }}">
+    <label>Nombre:</label>
+    <input type="text" name="nombre" required>
+
+    <label>Country:</label>
+    <select name="country_id" required>
+        <option value="">-- Seleccionar --</option>
+        {% for country in countries %}
+            <option value="{{ country.id }}">{{ country.nombre }}</option>
+        {% endfor %}
+    </select>
+
+    <button type="submit">Crear</button>
+</form>
+
+<a href="{{ url_for('barrio.listar_barrios') }}">Volver a lista</a>
+
+{% endblock %}
