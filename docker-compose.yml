@@ -1,0 +1,11 @@
+services:
+  mi-web-python:
+    build: .
+    container_name: drpiscinas
+    ports:
+      - "5000:5000"   # Puerto PC : Puerto Contenedor
+    restart: unless-stopped
+    # Acá le decimos que use las variables de entorno que cargaremos en Portainer
+    environment:
+      - MI_CLAVE=${MI_CLAVE} 
+      # (Agregá acá otras variables que uses en tu app, ej: DB_HOST, API_KEY)
