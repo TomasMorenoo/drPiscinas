@@ -6,36 +6,26 @@
 
 <form method="POST" action="{{ url_for('visits.crear_visit') }}">
 
-    <!-- =========================
-         CASA
-    ========================== -->
-    <label>Casa:</label>
-    <select name="casa_id" required>
-        <option value="">-- Seleccionar casa --</option>
+    <label>Buscar Casa (Escribí Country, Barrio o Número):</label><br>
+    <input type="text" id="casa_search" placeholder="Ej: Membrillar 36..." style="width: 100%; padding: 10px; margin-bottom: 10px;" autocomplete="off">
+    
+    <input type="hidden" name="casa_id" id="casa_id_hidden" required>
+
+    <datalist id="casas_list">
         {% for casa in casas %}
-            <option value="{{ casa.id }}">
-                {{ casa.numero }} -
-                {{ casa.barrio.nombre if casa.barrio else "Sin barrio" }} -
-                {{ casa.country.nombre }}
-            </option>
+            <option data-id="{{ casa.id }}" value="{{ casa.nombre_formateado() }}">
         {% endfor %}
-    </select>
+    </datalist>
+
+    <br>
+
+    <label>Fecha:</label><br>
+    <input type="date" name="fecha" id="fecha_visita" required style="padding: 8px;">
 
     <br><br>
 
-    <!-- =========================
-         FECHA
-    ========================== -->
-    <label>Fecha:</label>
-    <input type="date" name="fecha" required>
-
-    <br><br>
-
-    <!-- =========================
-         PROMO
-    ========================== -->
-    <label>Promoción (opcional):</label>
-    <select name="promo_id">
+    <label>Promoción (opcional):</label><br>
+    <select name="promo_id" style="padding: 8px;">
         <option value="">-- Sin promo --</option>
         {% for promo in promos %}
             <option value="{{ promo.id }}">
@@ -46,17 +36,11 @@
 
     <br><br>
 
-    <!-- =========================
-         OBSERVACIONES
-    ========================== -->
-    <label>Observaciones:</label>
-    <input type="text" name="observaciones">
+    <label>Observaciones:</label><br>
+    <input type="text" name="observaciones" style="width: 100%; padding: 8px;">
 
     <hr>
 
-    <!-- =========================
-         PRODUCTOS MANUALES
-    ========================== -->
     <h3>Productos usados (manual)</h3>
 
     <div id="productos-container"></div>
@@ -65,15 +49,14 @@
 
     <br><br>
 
-    <button type="submit">💾 Guardar visita</button>
+    <button type="submit" style="padding: 10px 20px; background-color: #28a745; color: white; border: none; cursor: pointer;">
+        💾 Guardar visita
+    </button>
 </form>
 
-<!-- =========================
-     TEMPLATE PRODUCTO
-========================== -->
 <template id="producto-template">
-    <div class="producto-row" style="margin-bottom:6px;">
-        <select name="product_id[]" required>
+    <div class="producto-row" style="margin-bottom:10px; border-bottom: 1px solid #ddd; padding-bottom: 10px;">
+        <select name="product_id[]" required style="padding: 5px;">
             <option value="">-- Producto --</option>
             {% for product in products %}
                 <option value="{{ product.id }}">
@@ -87,20 +70,42 @@
             step="0.01"
             min="0"
             name="cantidad[]"
-            placeholder="Cantidad"
+            placeholder="Cant."
             required
+            style="width: 70px; padding: 5px;"
         >
 
-        <button type="button" onclick="this.parentElement.remove()">❌</button>
+        <button type="button" onclick="this.parentElement.remove()" style="color: red;">❌</button>
     </div>
 </template>
 
 <script>
-function agregarProducto() {
-    const container = document.getElementById("productos-container");
-    const template = document.getElementById("producto-template");
-    container.appendChild(template.content.cloneNode(true));
-}
+    // 1. Fecha automática (hoy)
+    document.getElementById('fecha_visita').valueAsDate = new Date();
+
+    // 2. Lógica del Buscador (Datalist dinámico)
+    const searchInput = document.getElementById('casa_search');
+    const hiddenInput = document.getElementById('casa_id_hidden');
+    const casasList = document.getElementById('casas_list');
+
+    // Vincular el input con el datalist
+    searchInput.setAttribute('list', 'casas_list');
+
+    searchInput.addEventListener('input', function() {
+        const option = Array.from(casasList.options).find(opt => opt.value === searchInput.value);
+        if (option) {
+            hiddenInput.value = option.dataset.id; // Guardamos el ID
+        } else {
+            hiddenInput.value = ""; // Si no coincide, queda vacío
+        }
+    });
+
+    // 3. Agregar productos (tu lógica original)
+    function agregarProducto() {
+        const container = document.getElementById("productos-container");
+        const template = document.getElementById("producto-template");
+        container.appendChild(template.content.cloneNode(true));
+    }
 </script>
 
 {% endblock %}

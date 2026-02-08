@@ -20,11 +20,11 @@ def listar_visits():
 
 @visit_bp.route("/create", methods=["GET"])
 def form_crear_visit():
-    casas = Casa.query.filter_by(activo=True).order_by(Casa.numero).all()
+    # Traemos las casas activas
+    casas = Casa.query.filter_by(activo=True).all()
     products = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
     promos = Promo.query.filter_by(activo=True).order_by(Promo.nombre).all()
     
-
     return render_template(
         "visits/create.html",
         casas=casas,

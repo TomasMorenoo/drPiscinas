@@ -24,8 +24,7 @@ def create_app():
     from app.routers.products_router import product_bp
     from app.routers.visit_router import visit_bp
     from app.routers.promo_router import promo_bp
-    
-    
+    from app.routers.dashboard_router import dashboard_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(country_bp)
@@ -34,5 +33,6 @@ def create_app():
     app.register_blueprint(product_bp)  
     app.register_blueprint(visit_bp)     
     app.register_blueprint(promo_bp)
+    app.register_blueprint(dashboard_bp)
 
     return app

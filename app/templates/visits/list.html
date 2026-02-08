@@ -1,71 +1,74 @@
 {% extends "base.html" %}
-{% block title %}Visitas{% endblock %}
+{% block title %}Registro de Visitas{% endblock %}
 
 {% block content %}
-<h1>Visitas</h1>
+<h1>Historial de Visitas</h1>
 
-<a href="{{ url_for('visits.form_crear_visit') }}">➕ Agregar nueva visita</a>
+<a href="{{ url_for('visits.form_crear_visit') }}">➕ Registrar Nueva Visita</a>
 
 <br><br>
 
-<table border="1" cellpadding="6">
-    <tr>
-        <th>ID</th>
-        <th>Casa</th>
-        <th>Fecha</th>
-        <th>Promo</th>
-        <th>Productos</th>
-        <th>Observaciones</th>
-        <th>Total</th>
-    </tr>
+<div style="overflow-x: auto;">
+    <table border="1" cellpadding="8" style="width: 100%; min-width: 800px; border-collapse: collapse;">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+                <th>Fecha</th>
+                <th>Casa / Cliente</th>
+                <th>Servicio / Promo</th>
+                <th>Productos Extra</th>
+                <th>Observaciones</th>
+                <th>Total Visita</th>
+            </tr>
+        </thead>
 
-    {% for visit in visits %}
-    <tr>
-        <td>{{ visit.id }}</td>
-        <td>
-            {{ visit.casa.numero }} -
-            {{ visit.casa.barrio.nombre if visit.casa.barrio else "Sin barrio" }} -
-            {{ visit.casa.country.nombre }}
-        </td>
-        <td>{{ visit.fecha.strftime('%d/%m/%Y') }}</td>
+        <tbody>
+            {% for visit in visits %}
+            <tr>
+                <td>{{ visit.fecha.strftime('%d/%m/%Y') }}</td>
 
-        <!-- PROMO -->
-        <td>
-            {% if visit.promo %}
-                {{ visit.promo.nombre }} <br>
-                <small>${{ visit.promo.precio }}</small>
+                <td>
+                    <strong>{{ visit.casa.nombre_formateado() }}</strong>
+                </td>
+
+                <td>
+                    {% if visit.promo %}
+                        {{ visit.promo.nombre }} <br>
+                        <small>(${{ visit.promo.precio }})</small>
+                    {% else %}
+                        <em>Mantenimiento Base</em>
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if visit.productos %}
+                        <ul style="margin:0; padding-left:15px">
+                            {% for vp in visit.productos %}
+                                <li>
+                                    {{ vp.product.nombre }} 
+                                    ({{ vp.cantidad }} {{ vp.product.unidad }})
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <small>Sin extras</small>
+                    {% endif %}
+                </td>
+
+                <td>{{ visit.observaciones }}</td>
+
+                <td style="background-color: #fcfcfc;">
+                    <strong>${{ visit.calcular_total() }}</strong>
+                </td>
+            </tr>
             {% else %}
-                <em>Sin promo</em>
-            {% endif %}
-        </td>
+            <tr>
+                <td colspan="6" style="text-align: center;">No hay visitas registradas aún.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 
-        <!-- PRODUCTOS -->
-        <td>
-            {% if visit.productos %}
-                <ul style="margin:0; padding-left:15px">
-                    {% for vp in visit.productos %}
-                        <li>
-                            {{ vp.product.nombre }}
-                            ({{ vp.cantidad }} {{ vp.product.unidad }})
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <em>Sin productos</em>
-            {% endif %}
-        </td>
-
-        <td>{{ visit.observaciones }}</td>
-
-        <td>
-            ${{ visit.calcular_total() }}
-        </td>
-    </tr>
-    {% else %}
-    <tr>
-        <td colspan="7">No hay visitas registradas</td>
-    </tr>
-    {% endfor %}
-</table>
+<p><a href="{{ url_for('main.home') }}">Volver al Inicio</a></p>
 
 {% endblock %}

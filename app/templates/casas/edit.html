@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        
+        <div class="card shadow border-0">
+            <div class="card-header bg-dark text-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-uppercase">
+                    <i class="bi bi-pencil-square me-2"></i> Editar Cliente
+                </h5>
+                <span class="badge bg-secondary border border-light">ID: {{ casa.id }}</span>
+            </div>
+            
+            <div class="card-body p-4 bg-light">
+                <form id="formEditar" method="POST" action="{{ url_for('casas.editar_casa', id=casa.id) }}">
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-uppercase text-muted">Country</label>
+                        <select name="country_id" id="country_select" class="form-select" required onchange="cargarBarrios()">
+                            {% for country in countries %}
+                                <option value="{{ country.id }}" {% if country.id == casa.country_id %}selected{% endif %}>
+                                    {{ country.nombre }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-uppercase text-muted">Barrio (Opcional)</label>
+                        <select name="barrio_id" id="barrio_select" class="form-select">
+                            <option value="">-- Ninguno --</option>
+                            {% for barrio in barrios %}
+                                <option value="{{ barrio.id }}" {% if barrio.id == casa.barrio_id %}selected{% endif %}>
+                                    {{ barrio.nombre }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-uppercase text-muted">Número de Lote / Casa</label>
+                        <input type="text" name="numero" class="form-control fw-bold" value="{{ casa.numero }}" required>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase text-muted">Abono Mensual Base ($)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white fw-bold">$</span>
+                            <input type="text" 
+                                   inputmode="decimal" 
+                                   name="precio_base" 
+                                   id="inputPrecio" 
+                                   class="form-control fw-bold text-dark fs-5" 
+                                   value="{{ '{:,.2f}'.format(casa.precio_base).replace(',', 'X').replace('.', ',').replace('X', '.') }}" 
+                                   oninput="formatearMoneda(this)"
+                                   placeholder="0,00"
+                                   required>
+                        </div>
+                        <div class="form-text">Use coma para los centavos (Ej: 250.000,50).</div>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('casas.listar_casas') }}" class="btn btn-outline-secondary px-4">Cancelar</a>
+                        <button type="submit" class="btn btn-dark px-4 fw-bold">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. CARGA DE BARRIOS
+    function cargarBarrios() {
+        const countryId = document.getElementById('country_select').value;
+        const barrioSelect = document.getElementById('barrio_select');
+        barrioSelect.innerHTML = '<option value="">Cargando...</option>';
+
+        if (!countryId) {
+            barrioSelect.innerHTML = '<option value="">-- Seleccione un Country --</option>';
+            return;
+        }
+
+        fetch(`/casas/barrios/${countryId}`)
+            .then(response => response.json())
+            .then(data => {
+                barrioSelect.innerHTML = '<option value="">-- Ninguno --</option>';
+                data.forEach(barrio => {
+                    const option = document.createElement('option');
+                    option.value = barrio.id;
+                    option.textContent = barrio.nombre;
+                    barrioSelect.appendChild(option);
+                });
+            })
+            .catch(error => { console.error(error); });
+    }
+
+    // 2. MAGIA DE FORMATO (ARGENTINO)
+    function formatearMoneda(input) {
+        // Guardamos la posición del cursor para que no salte al final si editás en el medio
+        let cursorPosition = input.selectionStart;
+        let originalLength = input.value.length;
+
+        // Obtenemos el valor crudo
+        let value = input.value;
+
+        // Separamos en parte Entera y Decimal usando la coma
+        // (Si escribe más de una coma, tomamos solo la primera división)
+        let parts = value.split(',');
+        
+        // --- PARTE ENTERA ---
+        // Sacamos todo lo que no sea número
+        let integerPart = parts[0].replace(/\D/g, "");
+        // Agregamos puntos de mil
+        integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+        // --- REARMADO ---
+        let newValue = integerPart;
+
+        // Si el usuario escribió una coma, procesamos los decimales
+        if (parts.length > 1) {
+            // Limpiamos decimales (solo números) y limitamos a 2 dígitos
+            let decimalPart = parts[1].replace(/\D/g, "").substring(0, 2);
+            newValue += "," + decimalPart;
+        } else if (value.includes(',')) {
+            // Si acaba de escribir la coma y no hay nada después todavía
+            newValue += ",";
+        }
+
+        input.value = newValue;
+    }
+
+    // 3. LIMPIEZA ANTES DE ENVIAR A PYTHON
+    document.getElementById('formEditar').addEventListener('submit', function(e) {
+        const input = document.getElementById('inputPrecio');
+        let valor = input.value;
+        
+        // Paso 1: Sacar los puntos de mil (Ej: "250.000,50" -> "250000,50")
+        valor = valor.replace(/\./g, "");
+        
+        // Paso 2: Cambiar la coma por punto para que Python entienda (Ej: "250000,50" -> "250000.50")
+        valor = valor.replace(",", ".");
+        
+        // Asignamos el valor limpio al input antes de que viaje al servidor
+        input.value = valor;
+    });
+</script>
+{% endblock %}
