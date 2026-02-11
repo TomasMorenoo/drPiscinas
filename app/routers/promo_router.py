@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_login import login_required # <--- 1. IMPORTAR SEGURIDAD
 from app import db
 from app.models.promo import Promo
 from app.models.products import Product
@@ -14,6 +15,7 @@ promo_bp = Blueprint(
 # LISTAR PROMOS
 # =========================
 @promo_bp.route("/")
+@login_required # <--- CANDADO PUESTO
 def listar_promos():
     promos = Promo.query.order_by(Promo.nombre).all()
     return render_template("promos/list.html", promos=promos)
@@ -23,6 +25,7 @@ def listar_promos():
 # CREAR PROMO
 # =========================
 @promo_bp.route("/create", methods=["GET", "POST"])
+@login_required # <--- CANDADO PUESTO
 def crear_promo():
     productos = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
 
@@ -86,6 +89,7 @@ def crear_promo():
 # EDITAR PROMO
 # =========================
 @promo_bp.route("/<int:id>/edit", methods=["GET", "POST"])
+@login_required # <--- CANDADO PUESTO
 def editar_promo(id):
     promo = Promo.query.get_or_404(id)
     productos = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
@@ -138,6 +142,7 @@ def editar_promo(id):
 # ACTIVAR / DESACTIVAR PROMO
 # =========================
 @promo_bp.route("/toggle/<int:id>")
+@login_required # <--- CANDADO PUESTO
 def toggle_promo(id):
     promo = Promo.query.get_or_404(id)
     promo.activo = not promo.activo

@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_login import login_required # <--- 1. IMPORTAR ESTO
 from app import db
 from app.models import Barrio, Country
 
@@ -10,18 +11,21 @@ barrio_bp = Blueprint(
 
 # Listado
 @barrio_bp.route("/")
+@login_required # <--- 2. CANDADO PUESTO
 def listar_barrios():
     barrios = Barrio.query.order_by(Barrio.nombre).all()
     return render_template("barrios/list.html", barrios=barrios)
 
 # Formulario GET
 @barrio_bp.route("/create", methods=["GET"])
+@login_required # <--- CANDADO PUESTO
 def form_crear_barrio():
     countries = Country.query.filter_by(activo=True).order_by(Country.nombre).all()
     return render_template("barrios/create.html", countries=countries)
 
 # Crear POST
 @barrio_bp.route("/create", methods=["POST"])
+@login_required # <--- CANDADO PUESTO
 def crear_barrio():
     nombre = request.form.get("nombre", "").strip()
     country_id = request.form.get("country_id")
@@ -47,6 +51,7 @@ def crear_barrio():
 
 # Activar / desactivar
 @barrio_bp.route("/toggle/<int:id>")
+@login_required # <--- CANDADO PUESTO
 def toggle_barrio(id):
     barrio = Barrio.query.get_or_404(id)
     barrio.activo = not barrio.activo

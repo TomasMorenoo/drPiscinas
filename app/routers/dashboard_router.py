@@ -1,14 +1,20 @@
 from flask import Blueprint, render_template, request
+from flask_login import login_required # <--- 1. IMPORTAR SEGURIDAD
 from app.models import Casa
 from datetime import datetime
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
 @dashboard_bp.route("/")
+@login_required # <--- CANDADO PUESTO (Nadie ve los números sin loguearse)
 def index():
     # 1. Obtener filtros
-    mes = int(request.args.get("mes", datetime.now().month))
-    anio = int(request.args.get("anio", datetime.now().year))
+    try:
+        mes = int(request.args.get("mes", datetime.now().month))
+        anio = int(request.args.get("anio", datetime.now().year))
+    except ValueError:
+        mes = datetime.now().month
+        anio = datetime.now().year
     
     # 2. Buscar datos
     casas = Casa.query.filter_by(activo=True).all()
@@ -23,6 +29,7 @@ def index():
     # 3. Procesar cada casa
     for casa in casas:
         # Usamos el método que creamos en el modelo Casa
+        # (Asegurate de que este método exista en tu modelo Casa)
         datos = casa.obtener_gastos_mensuales(mes, anio)
         
         # Agregamos al reporte individual
@@ -39,7 +46,7 @@ def index():
         total_extras += datos["extras"]
         total_general += datos["total"]
 
-    # 5. Enviamos todo a la vista (incluyendo los totales calculados)
+    # 5. Enviamos todo a la vista
     return render_template(
         "dashboard/index.html",
         reporte=reporte,

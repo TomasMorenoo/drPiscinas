@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask_login import login_required # <--- 1. IMPORTAR SEGURIDAD
 from app import db
 from app.models.visit import Visit
 from app.models.visit_product import VisitProduct
@@ -14,11 +15,13 @@ visit_bp = Blueprint(
 )
 
 @visit_bp.route("/")
+@login_required # <--- CANDADO PUESTO
 def listar_visits():
     visits = Visit.query.order_by(Visit.fecha.desc()).all()
     return render_template("visits/list.html", visits=visits)
 
 @visit_bp.route("/create", methods=["GET"])
+@login_required # <--- CANDADO PUESTO
 def form_crear_visit():
     # Traemos las casas activas
     casas = Casa.query.filter_by(activo=True).all()
@@ -33,6 +36,7 @@ def form_crear_visit():
     )
 
 @visit_bp.route("/create", methods=["POST"])
+@login_required # <--- CANDADO PUESTO
 def crear_visit():
     casa_id = request.form.get("casa_id")
     fecha = request.form.get("fecha")
@@ -86,4 +90,3 @@ def crear_visit():
 
     flash("Visita creada correctamente", "success")
     return redirect(url_for("visits.listar_visits"))
-

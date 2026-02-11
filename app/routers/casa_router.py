@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask_login import login_required # <--- 1. IMPORTAR SEGURIDAD
 from app import db
 from app.models import Casa, Country, Barrio
 import re 
@@ -18,6 +19,7 @@ def natural_sort_key(casa):
 # LISTADO
 # ==========================================
 @casa_bp.route("/")
+@login_required # <--- CANDADO PUESTO
 def listar_casas():
     casas_db = Casa.query.all()
     casas = sorted(casas_db, key=natural_sort_key)
@@ -27,6 +29,7 @@ def listar_casas():
 # HERRAMIENTA DE AUMENTOS
 # ==========================================
 @casa_bp.route("/aumento", methods=["GET", "POST"])
+@login_required # <--- CANDADO PUESTO
 def herramienta_aumento():
     if request.method == "POST":
         tipo = request.form.get("tipo")
@@ -68,7 +71,6 @@ def herramienta_aumento():
             count += 1
 
         db.session.commit()
-        # REDIRECCIÓN A LA LISTA (Pedido tuyo)
         flash(f"✅ Precios actualizados en {count} propiedades.", "success")
         return redirect(url_for("casas.listar_casas"))
 
@@ -81,6 +83,7 @@ def herramienta_aumento():
 # DESHACER (VOLVER A LISTA)
 # ==========================================
 @casa_bp.route("/deshacer_aumento")
+@login_required # <--- CANDADO PUESTO
 def deshacer_aumento():
     casas_modificadas = Casa.query.filter(Casa.precio_anterior.isnot(None)).all()
     
@@ -95,7 +98,6 @@ def deshacer_aumento():
         count += 1
         
     db.session.commit()
-    # REDIRECCIÓN A LA LISTA (Pedido tuyo)
     flash(f"⏪ Se deshicieron los cambios en {count} propiedades.", "info")
     return redirect(url_for("casas.listar_casas"))
 
@@ -103,6 +105,7 @@ def deshacer_aumento():
 # EDITAR CLIENTE (CORREGIDO ERROR DECIMAL)
 # ==========================================
 @casa_bp.route("/edit/<int:id>", methods=["GET", "POST"])
+@login_required # <--- CANDADO PUESTO
 def editar_casa(id):
     casa = Casa.query.get_or_404(id)
 
@@ -132,11 +135,10 @@ def editar_casa(id):
             return redirect(url_for("casas.editar_casa", id=id))
 
         # --- CORRECCIÓN CRÍTICA ---
-        # Convertimos explícitamente a float para evitar TypeError con PostgreSQL
         precio_actual_db = float(casa.precio_base) if casa.precio_base else 0.0
         
         if abs(precio_actual_db - nuevo_precio) > 0.01:
-            casa.precio_anterior = precio_actual_db # Guardamos como float
+            casa.precio_anterior = precio_actual_db
             casa.precio_base = nuevo_precio
 
         casa.numero = numero
@@ -156,6 +158,7 @@ def editar_casa(id):
 # CREAR
 # ==========================================
 @casa_bp.route("/create", methods=["GET", "POST"])
+@login_required # <--- CANDADO PUESTO
 def crear_casa():
     if request.method == "POST":
         numero = request.form.get("numero", "").strip()
@@ -188,6 +191,7 @@ def crear_casa():
     return render_template("casas/create.html", countries=countries, barrios=barrios)
 
 @casa_bp.route("/create_form", methods=["GET"]) 
+@login_required # <--- CANDADO PUESTO
 def form_crear_casa():
     return crear_casa()
 
@@ -195,11 +199,13 @@ def form_crear_casa():
 # UTILIDADES
 # ==========================================
 @casa_bp.route("/barrios/<int:country_id>")
+@login_required # <--- CANDADO PUESTO (Para que no espíen tu API interna)
 def barrios_por_country(country_id):
     barrios = Barrio.query.filter_by(country_id=country_id, activo=True).order_by(Barrio.nombre).all()
     return jsonify([{"id": b.id, "nombre": b.nombre} for b in barrios])
 
 @casa_bp.route("/toggle/<int:id>")
+@login_required # <--- CANDADO PUESTO
 def toggle_casa(id):
     casa = Casa.query.get_or_404(id)
     casa.activo = not casa.activo

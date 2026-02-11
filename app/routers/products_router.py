@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_login import login_required # <--- 1. IMPORTAR SEGURIDAD
 from app import db
 from app.models import Product
 
@@ -10,17 +11,20 @@ product_bp = Blueprint(
 
 # Listado de productos
 @product_bp.route("/")
+@login_required # <--- CANDADO PUESTO
 def listar_products():
     products = Product.query.order_by(Product.nombre).all()
     return render_template("products/list.html", products=products)
 
 # Formulario GET
 @product_bp.route("/create", methods=["GET"])
+@login_required # <--- CANDADO PUESTO
 def form_crear_product():
     return render_template("products/create.html")
 
 # Crear POST
 @product_bp.route("/create", methods=["POST"])
+@login_required # <--- CANDADO PUESTO
 def crear_product():
     nombre = request.form.get("nombre", "").strip()
     unidad = request.form.get("unidad", "").strip()
@@ -43,6 +47,7 @@ def crear_product():
 
 # Activar / desactivar
 @product_bp.route("/toggle/<int:id>")
+@login_required # <--- CANDADO PUESTO
 def toggle_product(id):
     product = Product.query.get_or_404(id)
     product.activo = not product.activo
