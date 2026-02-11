@@ -5,6 +5,7 @@
 <h2>Agregar Producto</h2>
 
 <form method="POST" action="{{ url_for('products.crear_product') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     <label>Nombre:</label>
     <input type="text" name="nombre" required>
 

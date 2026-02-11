@@ -6,6 +6,7 @@
 </h2>
 
 <form method="POST" id="promoForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
     <!-- =========================
          DATOS BÁSICOS

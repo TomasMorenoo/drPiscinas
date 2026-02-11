@@ -5,6 +5,7 @@
 <h1>Agregar Visita</h1>
 
 <form method="POST" action="{{ url_for('visits.crear_visit') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
     <label>Buscar Casa (Escribí Country, Barrio o Número):</label><br>
     <input type="text" id="casa_search" placeholder="Ej: Membrillar 36..." style="width: 100%; padding: 10px; margin-bottom: 10px;" autocomplete="off">

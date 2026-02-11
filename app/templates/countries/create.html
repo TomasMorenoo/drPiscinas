@@ -7,6 +7,7 @@
 <h2>Agregar Country</h2>
 
 <form method="POST" action="{{ url_for('country.crear_country') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     <label>Nombre:</label>
     <input type="text" name="nombre" required>
     <button type="submit">Crear</button>
