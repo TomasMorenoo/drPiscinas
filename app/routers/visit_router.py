@@ -6,7 +6,7 @@ from app.models.visit_product import VisitProduct
 from app.models.casa import Casa
 from app.models.products import Product
 from app.models.promo import Promo
-from sqlalchemy import extract, func # <--- Para filtros y estadísticas
+from sqlalchemy import extract, func
 from datetime import datetime
 
 visit_bp = Blueprint(
@@ -18,29 +18,29 @@ visit_bp = Blueprint(
 @visit_bp.route("/")
 @login_required
 def listar_visits():
-    # 1. Obtener parámetros de filtrado (por defecto mes y año actual)
     ahora = datetime.now()
     mes_sel = request.args.get('mes', ahora.month, type=int)
     anio_sel = request.args.get('anio', ahora.year, type=int)
 
-    # 2. Query de visitas filtrada
+    # Filtrado por mes y año
     visits = Visit.query.filter(
         extract('month', Visit.fecha) == mes_sel,
         extract('year', Visit.fecha) == anio_sel
     ).order_by(Visit.fecha.desc()).all()
 
-    # 3. Calcular total facturado en el mes seleccionado
+    # Cálculo de facturación mensual
     total_mes = sum(v.calcular_total() for v in visits)
 
-    # 4. Top 5 productos más usados en el mes
+    # Top 5 productos usados incluyendo unidad
     top_productos = db.session.query(
         Product.nombre, 
+        Product.unidad,
         func.sum(VisitProduct.cantidad).label('total_cantidad')
     ).join(VisitProduct, Product.id == VisitProduct.product_id)\
      .join(Visit, Visit.id == VisitProduct.visit_id)\
      .filter(extract('month', Visit.fecha) == mes_sel)\
      .filter(extract('year', Visit.fecha) == anio_sel)\
-     .group_by(Product.nombre)\
+     .group_by(Product.nombre, Product.unidad)\
      .order_by(func.sum(VisitProduct.cantidad).desc())\
      .limit(5).all()
 
@@ -74,7 +74,6 @@ def crear_visit():
     fecha = request.form.get("fecha")
     observaciones = request.form.get("observaciones", "").strip()
     promo_id = request.form.get("promo_id")
-
     product_ids = request.form.getlist("product_id[]")
     cantidades = request.form.getlist("cantidad[]")
 
@@ -88,27 +87,55 @@ def crear_visit():
         observaciones=observaciones,
         promo_id=promo_id if promo_id else None
     )
-
     db.session.add(visit)
     db.session.commit()
 
     for p_id, cant in zip(product_ids, cantidades):
-        if not p_id or not cant:
-            continue
+        if not p_id or not cant: continue
         try:
             cantidad = float(cant)
-        except ValueError:
-            continue
-
-        if cantidad > 0:
-            vp = VisitProduct(
-                visit_id=visit.id,
-                product_id=p_id,
-                cantidad=cantidad
-            )
-            db.session.add(vp)
+            if cantidad > 0:
+                vp = VisitProduct(visit_id=visit.id, product_id=p_id, cantidad=cantidad)
+                db.session.add(vp)
+        except ValueError: continue
 
     db.session.commit()
-
     flash("Visita creada correctamente", "success")
     return redirect(url_for("visits.listar_visits"))
+
+@visit_bp.route("/delete/<int:id>", methods=["POST"])
+@login_required
+def eliminar_visit(id):
+    visit = Visit.query.get_or_404(id)
+    VisitProduct.query.filter_by(visit_id=id).delete()
+    db.session.delete(visit)
+    db.session.commit()
+    flash("Visita eliminada correctamente", "success")
+    return redirect(url_for("visits.listar_visits"))
+
+@visit_bp.route("/edit/<int:id>", methods=["GET", "POST"])
+@login_required
+def editar_visit(id):
+    visit = Visit.query.get_or_404(id)
+    if request.method == "POST":
+        visit.casa_id = request.form.get("casa_id")
+        visit.fecha = datetime.strptime(request.form.get("fecha"), '%Y-%m-%d')
+        visit.observaciones = request.form.get("observaciones", "").strip()
+        visit.promo_id = request.form.get("promo_id") or None
+        
+        VisitProduct.query.filter_by(visit_id=id).delete()
+        product_ids = request.form.getlist("product_id[]")
+        cantidades = request.form.getlist("cantidad[]")
+        for p_id, cant in zip(product_ids, cantidades):
+            if p_id and cant:
+                vp = VisitProduct(visit_id=id, product_id=p_id, cantidad=float(cant))
+                db.session.add(vp)
+        
+        db.session.commit()
+        flash("Visita actualizada", "success")
+        return redirect(url_for("visits.listar_visits"))
+        
+    casas = Casa.query.filter_by(activo=True).all()
+    products = Product.query.filter_by(activo=True).all()
+    promos = Promo.query.filter_by(activo=True).all()
+    return render_template("visits/create.html", visit=visit, casas=casas, products=products, promos=promos)
