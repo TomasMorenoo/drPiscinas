@@ -9,14 +9,65 @@
     </a>
 </div>
 
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card border-0 shadow-sm bg-primary text-white h-100">
+            <div class="card-body">
+                <h6 class="text-uppercase small fw-bold opacity-75">Facturación del Mes</h6>
+                <h2 class="mb-0">${{ "{:,.2f}".format(total_mes | default(0)) }}</h2>
+                <i class="bi bi-cash-stack position-absolute end-0 bottom-0 m-3 opacity-25 display-4"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="text-uppercase small fw-bold text-muted mb-3">Top 5 Productos Usados</h6>
+                {% for prod, cant in top_productos | default([]) %}
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="small">{{ prod }}</span>
+                    <span class="badge bg-light text-dark">{{ cant }}</span>
+                </div>
+                {% else %}
+                <p class="text-muted small">No hay datos este mes.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="text-uppercase small fw-bold text-muted mb-3">Filtrar Período</h6>
+                <form class="row g-2" method="GET">
+                    <div class="col-6">
+                        <select name="mes" class="form-select form-select-sm">
+                            <option value="1">Enero</option>
+                            <option value="2">Febrero</option>
+                            </select>
+                    </div>
+                    <div class="col-6">
+                        <input type="number" name="anio" class="form-select form-select-sm" value="2026">
+                    </div>
+                    <div class="col-12 mt-2">
+                        <button class="btn btn-dark btn-sm w-100">Actualizar Vista</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card shadow-sm border-0">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-dark">
+            <table class="table table-hover align-middle mb-0" style="min-width: 1000px;">
+                <thead class="table-light">
                     <tr>
-                        <th class="ps-4">Fecha / Casa</th>
-                        <th>Servicio / Extras</th>
+                        <th class="ps-4">Fecha</th>
+                        <th>Casa</th>
+                        <th>Productos / Promo</th>
                         <th>Observaciones</th>
                         <th class="text-end pe-4">Total</th>
                     </tr>
@@ -24,49 +75,27 @@
                 <tbody>
                     {% for visit in visits %}
                     <tr>
-                        <td class="ps-4">
-                            <div class="fw-bold text-dark">{{ visit.fecha.strftime('%d/%m/%Y') }}</div>
-                            <div class="small text-primary fw-bold">{{ visit.casa.nombre_formateado() }}</div>
-                        </td>
-
+                        <td class="ps-4 text-nowrap">{{ visit.fecha.strftime('%d/%m/%Y') }}</td>
+                        <td class="fw-bold text-nowrap">{{ visit.casa.nombre_formateado() }}</td>
                         <td>
-                            {% if visit.promo %}
-                                <span class="badge bg-info-subtle text-info border border-info mb-1">
-                                    {{ visit.promo.nombre }}
-                                </span>
-                            {% else %}
-                                <span class="badge bg-light text-muted border mb-1">Mantenimiento Base</span>
-                            {% endif %}
-
-                            {% if visit.productos %}
-                                <div class="small mt-1">
-                                    {% for vp in visit.productos %}
-                                        <div class="text-muted">
-                                            <i class="bi bi-plus-circle small me-1"></i>
-                                            {{ vp.product.nombre }} <span class="badge bg-light text-dark p-1">{{ vp.cantidad }} {{ vp.product.unidad }}</span>
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
+                            <div class="small">
+                                {% if visit.promo %}
+                                <span class="text-primary fw-bold">{{ visit.promo.nombre }}</span>
+                                {% endif %}
+                                {% for vp in visit.productos %}
+                                <span class="badge bg-light text-muted border fw-normal">{{ vp.product.nombre }} ({{ vp.cantidad }})</span>
+                                {% endfor %}
+                            </div>
                         </td>
-
                         <td>
-                            <div class="small text-muted text-wrap" style="max-width: 200px;">
+                            <div class="text-truncate" style="max-width: 250px;" 
+                                 title="{{ visit.observaciones }}" 
+                                 data-bs-toggle="tooltip">
                                 {{ visit.observaciones if visit.observaciones else '-' }}
                             </div>
                         </td>
-
-                        <td class="text-end pe-4">
-                            <div class="h5 mb-0 fw-bold text-success">
-                                ${{ "{:,.2f}".format(visit.calcular_total()) }}
-                            </div>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="4" class="text-center py-5 text-muted">
-                            <i class="bi bi-journal-x display-4 d-block mb-3 opacity-25"></i>
-                            No hay visitas registradas aún.
+                        <td class="text-end pe-4 fw-bold text-success">
+                            ${{ "{:,.2f}".format(visit.calcular_total()) }}
                         </td>
                     </tr>
                     {% endfor %}
@@ -76,9 +105,11 @@
     </div>
 </div>
 
-<div class="mt-4 mb-5">
-    <a href="{{ url_for('dashboard.index') }}" class="btn btn-link text-muted">
-        <i class="bi bi-arrow-left"></i> Volver al Dashboard
-    </a>
-</div>
+<script>
+    // Inicializar tooltips para ver el mensaje completo de observaciones al pasar el mouse
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+</script>
 {% endblock %}
