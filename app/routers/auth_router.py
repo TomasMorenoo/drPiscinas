@@ -13,7 +13,7 @@ auth_bp = Blueprint('auth', __name__)
 def login():
     # Si ya está logueado, no tiene sentido estar acá, lo mandamos al dashboard
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard.index'))
+        return redirect(url_for('main.home'))
 
     if request.method == 'POST':
         username = request.form.get('username')
@@ -34,7 +34,7 @@ def login():
             
             # Redirección inteligente: Si venía de una página bloqueada, vuelve ahí.
             next_page = request.args.get('next')
-            return redirect(next_page or url_for('dashboard.index'))
+            return redirect(next_page or url_for('main.home'))
         else:
             flash('Usuario o contraseña incorrectos.', 'danger')
 
