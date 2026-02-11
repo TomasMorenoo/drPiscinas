@@ -1,12 +1,13 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from flask_login import login_required # <--- 1. IMPORTAR SEGURIDAD
+from flask_login import login_required
 from app import db
 from app.models.visit import Visit
 from app.models.visit_product import VisitProduct
 from app.models.casa import Casa
 from app.models.products import Product
 from app.models.promo import Promo
-
+from sqlalchemy import extract, func # <--- Para filtros y estadísticas
+from datetime import datetime
 
 visit_bp = Blueprint(
     "visits",
@@ -15,15 +16,46 @@ visit_bp = Blueprint(
 )
 
 @visit_bp.route("/")
-@login_required # <--- CANDADO PUESTO
+@login_required
 def listar_visits():
-    visits = Visit.query.order_by(Visit.fecha.desc()).all()
-    return render_template("visits/list.html", visits=visits)
+    # 1. Obtener parámetros de filtrado (por defecto mes y año actual)
+    ahora = datetime.now()
+    mes_sel = request.args.get('mes', ahora.month, type=int)
+    anio_sel = request.args.get('anio', ahora.year, type=int)
+
+    # 2. Query de visitas filtrada
+    visits = Visit.query.filter(
+        extract('month', Visit.fecha) == mes_sel,
+        extract('year', Visit.fecha) == anio_sel
+    ).order_by(Visit.fecha.desc()).all()
+
+    # 3. Calcular total facturado en el mes seleccionado
+    total_mes = sum(v.calcular_total() for v in visits)
+
+    # 4. Top 5 productos más usados en el mes
+    top_productos = db.session.query(
+        Product.nombre, 
+        func.sum(VisitProduct.cantidad).label('total_cantidad')
+    ).join(VisitProduct, Product.id == VisitProduct.product_id)\
+     .join(Visit, Visit.id == VisitProduct.visit_id)\
+     .filter(extract('month', Visit.fecha) == mes_sel)\
+     .filter(extract('year', Visit.fecha) == anio_sel)\
+     .group_by(Product.nombre)\
+     .order_by(func.sum(VisitProduct.cantidad).desc())\
+     .limit(5).all()
+
+    return render_template(
+        "visits/list.html", 
+        visits=visits,
+        total_mes=total_mes,
+        top_productos=top_productos,
+        mes_sel=mes_sel,
+        anio_sel=anio_sel
+    )
 
 @visit_bp.route("/create", methods=["GET"])
-@login_required # <--- CANDADO PUESTO
+@login_required
 def form_crear_visit():
-    # Traemos las casas activas
     casas = Casa.query.filter_by(activo=True).all()
     products = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
     promos = Promo.query.filter_by(activo=True).order_by(Promo.nombre).all()
@@ -36,7 +68,7 @@ def form_crear_visit():
     )
 
 @visit_bp.route("/create", methods=["POST"])
-@login_required # <--- CANDADO PUESTO
+@login_required
 def crear_visit():
     casa_id = request.form.get("casa_id")
     fecha = request.form.get("fecha")
@@ -46,16 +78,10 @@ def crear_visit():
     product_ids = request.form.getlist("product_id[]")
     cantidades = request.form.getlist("cantidad[]")
 
-    # =========================
-    # VALIDACIONES BÁSICAS
-    # =========================
     if not casa_id or not fecha:
         flash("Casa y fecha son obligatorios", "error")
         return redirect(url_for("visits.form_crear_visit"))
 
-    # =========================
-    # CREAR VISITA
-    # =========================
     visit = Visit(
         casa_id=casa_id,
         fecha=fecha,
@@ -64,15 +90,11 @@ def crear_visit():
     )
 
     db.session.add(visit)
-    db.session.commit()  # necesario para visit.id
+    db.session.commit()
 
-    # =========================
-    # PRODUCTOS MANUALES
-    # =========================
     for p_id, cant in zip(product_ids, cantidades):
         if not p_id or not cant:
             continue
-
         try:
             cantidad = float(cant)
         except ValueError:
