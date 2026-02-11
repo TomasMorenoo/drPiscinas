@@ -1,125 +1,136 @@
 {% extends "base.html" %}
+{% block title %}Reporte Mensual - Dr. Piscinas{% endblock %}
 
 {% block content %}
-
 {# --- DEFINICIÓN DE MESES --- #}
 {% set nombres_meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] %}
 
-{# --- 1. FILTROS (Ahora es lo primero que se ve) --- #}
-<div class="card mb-4 border-0 shadow-sm">
-    <div class="card-body bg-light rounded">
-        <form method="GET" class="row g-2 align-items-center">
-            <div class="col-auto">
-                <span class="fw-bold text-uppercase small text-muted"><i class="bi bi-filter"></i> Periodo:</span>
+<div class="container-fluid py-4">
+    {# --- 1. FILTROS --- #}
+    <div class="card mb-4 border-0 shadow-sm">
+        <div class="card-body bg-light rounded">
+            <form method="GET" class="row g-2 align-items-center">
+                <div class="col-auto">
+                    <span class="fw-bold text-uppercase small text-muted"><i class="bi bi-filter"></i> Periodo:</span>
+                </div>
+                <div class="col-auto">
+                    <select name="mes" class="form-select form-select-sm border-secondary fw-bold">
+                        {% for m in range(1, 13) %}
+                        <option value="{{ m }}" {% if m == mes %}selected{% endif %}>
+                            {{ nombres_meses[m - 1] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <input type="number" name="anio" class="form-control form-control-sm border-secondary fw-bold" value="{{ anio }}" style="width: 80px;">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-sm btn-dark px-3">Actualizar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if not reporte or kpi_clientes == 0 %}
+    {# --- MENSAJE SIN DATOS --- #}
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-6 text-center">
+            <div class="card shadow-sm border-0 py-5">
+                <div class="card-body">
+                    <i class="bi bi-calendar-x display-1 text-muted mb-4"></i>
+                    <h3 class="text-secondary">Sin movimientos registrados</h3>
+                    <p class="text-muted">No se encontraron visitas ni abonos para el período seleccionado.</p>
+                    <a href="{{ url_for('visits.form_crear_visit') }}" class="btn btn-primary mt-3">Registrar Visita</a>
+                </div>
             </div>
-            <div class="col-auto">
-                <select name="mes" class="form-select form-select-sm border-secondary fw-bold">
-                    {% for m in range(1, 13) %}
-                    <option value="{{ m }}" {% if m == mes %}selected{% endif %}>
-                        {{ nombres_meses[m - 1] }}
-                    </option>
+        </div>
+    </div>
+    {% else %}
+    {# --- 2. CARDS DE KPI --- #}
+    <div class="row mb-4 g-3">
+        <div class="col-6 col-md-3">
+            <div class="card h-100 border-0 shadow-sm border-start border-4 border-primary">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase fw-bold mb-1">Clientes</div>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h3 class="mb-0 fw-bold text-dark">{{ kpi_clientes }}</h3>
+                        <i class="bi bi-people fs-1 text-primary opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-6 col-md-3">
+            <div class="card h-100 border-0 shadow-sm border-start border-4 border-secondary">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase fw-bold mb-1">Total Abonos</div>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h4 class="mb-0 fw-bold text-secondary">${{ "{:,.0f}".format(kpi_abono) }}</h4>
+                        <i class="bi bi-patch-check fs-1 text-secondary opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+            <div class="card h-100 border-0 shadow-sm border-start border-4 border-info">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase fw-bold mb-1">Total Extras</div>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h4 class="mb-0 fw-bold text-info">${{ "{:,.0f}".format(kpi_extras) }}</h4>
+                        <i class="bi bi-box-seam fs-1 text-info opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+            <div class="card h-100 border-0 shadow-sm border-start border-4 border-success">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase fw-bold mb-1">Total a Cobrar</div>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h3 class="mb-0 fw-bold text-success">${{ "{:,.0f}".format(kpi_total) }}</h3>
+                        <i class="bi bi-wallet2 fs-1 text-success opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# --- 3. TABLA DE DETALLE --- #}
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="ps-3 text-uppercase small py-3">Cliente</th>
+                        <th class="text-end text-uppercase small py-3">Abono</th>
+                        <th class="text-end text-uppercase small py-3">Extras</th>
+                        <th class="text-end text-uppercase small pe-3 py-3">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in reporte %}
+                    <tr>
+                        <td class="ps-3 fw-bold text-dark">
+                            {{ item.casa.nombre_formateado() }}
+                        </td>
+                        <td class="text-end font-monospace text-muted">
+                            ${{ "{:,.2f}".format(item.abono) }}
+                        </td>
+                        <td class="text-end font-monospace text-muted">
+                            ${{ "{:,.2f}".format(item.extras) }}
+                        </td>
+                        <td class="text-end font-monospace fw-bold text-dark pe-3">
+                            ${{ "{:,.2f}".format(item.total) }}
+                        </td>
+                    </tr>
                     {% endfor %}
-                </select>
-            </div>
-            <div class="col-auto">
-                <input type="number" name="anio" class="form-control form-control-sm border-secondary fw-bold" value="{{ anio }}" style="width: 80px;">
-            </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-sm btn-dark px-3">Actualizar</button>
-            </div>
-        </form>
+                </tbody>
+            </table>
+        </div>
     </div>
+    {% endif %}
 </div>
-
-{# --- 2. CARDS DE KPI (Resumen Financiero) --- #}
-<div class="row mb-4 g-3">
-    <div class="col-6 col-md-3">
-        <div class="card h-100 border-0 shadow-sm border-start border-4 border-primary">
-            <div class="card-body">
-                <div class="text-muted small text-uppercase fw-bold mb-1">Clientes</div>
-                <div class="d-flex align-items-center justify-content-between">
-                    <h3 class="mb-0 fw-bold text-dark">{{ kpi_clientes }}</h3>
-                    <i class="bi bi-people fs-1 text-primary opacity-25"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-6 col-md-3">
-        <div class="card h-100 border-0 shadow-sm border-start border-4 border-secondary">
-            <div class="card-body">
-                <div class="text-muted small text-uppercase fw-bold mb-1">Total Abonos</div>
-                <div class="d-flex align-items-center justify-content-between">
-                    <h4 class="mb-0 fw-bold text-secondary">${{ "{:,.0f}".format(kpi_abono) }}</h4>
-                    <i class="bi bi-patch-check fs-1 text-secondary opacity-25"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-6 col-md-3">
-        <div class="card h-100 border-0 shadow-sm border-start border-4 border-info">
-            <div class="card-body">
-                <div class="text-muted small text-uppercase fw-bold mb-1">Total Extras</div>
-                <div class="d-flex align-items-center justify-content-between">
-                    <h4 class="mb-0 fw-bold text-info">${{ "{:,.0f}".format(kpi_extras) }}</h4>
-                    <i class="bi bi-box-seam fs-1 text-info opacity-25"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-6 col-md-3">
-        <div class="card h-100 border-0 shadow-sm border-start border-4 border-success">
-            <div class="card-body">
-                <div class="text-muted small text-uppercase fw-bold mb-1">Total a Cobrar</div>
-                <div class="d-flex align-items-center justify-content-between">
-                    <h3 class="mb-0 fw-bold text-success">${{ "{:,.0f}".format(kpi_total) }}</h3>
-                    <i class="bi bi-wallet2 fs-1 text-success opacity-25"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-{# --- 3. TABLA DE DETALLE (Sin título, pura data) --- #}
-<div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-        <table class="table table-striped table-hover align-middle mb-0">
-            <thead class="table-dark">
-                <tr>
-                    <th class="ps-3 text-uppercase small py-3">Cliente</th>
-                    <th class="text-end text-uppercase small py-3">Abono</th>
-                    <th class="text-end text-uppercase small py-3">Extras</th>
-                    <th class="text-end text-uppercase small pe-3 py-3">Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in reporte %}
-                <tr>
-                    <td class="ps-3 fw-bold text-dark">
-                        {{ item.casa.nombre_formateado() }}
-                    </td>
-                    <td class="text-end font-monospace text-muted">
-                        ${{ "{:,.2f}".format(item.abono) }}
-                    </td>
-                    <td class="text-end font-monospace text-muted">
-                        ${{ "{:,.2f}".format(item.extras) }}
-                    </td>
-                    <td class="text-end font-monospace fw-bold text-dark pe-3">
-                        ${{ "{:,.2f}".format(item.total) }}
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="4" class="text-center py-5 text-muted">
-                        No hay movimientos registrados en este periodo.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
 {% endblock %}
