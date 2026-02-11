@@ -31,7 +31,7 @@ def listar_visits():
     # Cálculo de facturación mensual
     total_mes = sum(v.calcular_total() for v in visits)
 
-    # Top 5 productos usados incluyendo unidad
+    # Top 5 productos usados incluyendo unidad y nombre
     top_productos = db.session.query(
         Product.nombre, 
         Product.unidad,
