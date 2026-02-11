@@ -2,25 +2,48 @@
 {% block title %}Crear Barrio{% endblock %}
 
 {% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-sm border-0 mt-4">
+            <div class="card-header bg-dark text-white py-3">
+                <h2 class="h5 mb-0"><i class="bi bi-geo-alt-fill me-2"></i>Agregar Nuevo Barrio</h2>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST" action="{{ url_for('barrio.crear_barrio') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Nombre del Barrio</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-tag"></i></span>
+                            <input type="text" name="nombre" class="form-control form-control-lg" placeholder="Ej: Sector 1" required>
+                        </div>
+                    </div>
 
-<h2>Agregar Barrio</h2>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Pertenece al Country:</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-tree"></i></span>
+                            <select name="country_id" class="form-select form-select-lg" required>
+                                <option value="" disabled selected>-- Seleccionar Country --</option>
+                                {% for country in countries %}
+                                    <option value="{{ country.id }}">{{ country.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
 
-<form method="POST" action="{{ url_for('barrio.crear_barrio') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-    <label>Nombre:</label>
-    <input type="text" name="nombre" required>
-
-    <label>Country:</label>
-    <select name="country_id" required>
-        <option value="">-- Seleccionar --</option>
-        {% for country in countries %}
-            <option value="{{ country.id }}">{{ country.nombre }}</option>
-        {% endfor %}
-    </select>
-
-    <button type="submit">Crear</button>
-</form>
-
-<a href="{{ url_for('barrio.listar_barrios') }}">Volver a lista</a>
-
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg shadow-sm">
+                            <i class="bi bi-check-circle-fill me-2"></i>Crear Barrio
+                        </button>
+                        <a href="{{ url_for('barrio.listar_barrios') }}" class="btn btn-link text-muted">
+                            <i class="bi bi-arrow-left"></i> Volver a la lista
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
