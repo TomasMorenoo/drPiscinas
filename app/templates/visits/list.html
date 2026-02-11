@@ -2,73 +2,83 @@
 {% block title %}Registro de Visitas{% endblock %}
 
 {% block content %}
-<h1>Historial de Visitas</h1>
-
-<a href="{{ url_for('visits.form_crear_visit') }}">➕ Registrar Nueva Visita</a>
-
-<br><br>
-
-<div style="overflow-x: auto;">
-    <table border="1" cellpadding="8" style="width: 100%; min-width: 800px; border-collapse: collapse;">
-        <thead>
-            <tr style="background-color: #f2f2f2;">
-                <th>Fecha</th>
-                <th>Casa / Cliente</th>
-                <th>Servicio / Promo</th>
-                <th>Productos Extra</th>
-                <th>Observaciones</th>
-                <th>Total Visita</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            {% for visit in visits %}
-            <tr>
-                <td>{{ visit.fecha.strftime('%d/%m/%Y') }}</td>
-
-                <td>
-                    <strong>{{ visit.casa.nombre_formateado() }}</strong>
-                </td>
-
-                <td>
-                    {% if visit.promo %}
-                        {{ visit.promo.nombre }} <br>
-                        <small>(${{ visit.promo.precio }})</small>
-                    {% else %}
-                        <em>Mantenimiento Base</em>
-                    {% endif %}
-                </td>
-
-                <td>
-                    {% if visit.productos %}
-                        <ul style="margin:0; padding-left:15px">
-                            {% for vp in visit.productos %}
-                                <li>
-                                    {{ vp.product.nombre }} 
-                                    ({{ vp.cantidad }} {{ vp.product.unidad }})
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <small>Sin extras</small>
-                    {% endif %}
-                </td>
-
-                <td>{{ visit.observaciones }}</td>
-
-                <td style="background-color: #fcfcfc;">
-                    <strong>${{ visit.calcular_total() }}</strong>
-                </td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="6" style="text-align: center;">No hay visitas registradas aún.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+    <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-calendar-check me-2"></i>Historial de Visitas</h1>
+    <a href="{{ url_for('visits.form_crear_visit') }}" class="btn btn-success shadow-sm">
+        <i class="bi bi-plus-lg"></i> <span class="d-none d-md-inline">Nueva Visita</span>
+    </a>
 </div>
 
-<p><a href="{{ url_for('main.home') }}">Volver al Inicio</a></p>
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="ps-4">Fecha / Casa</th>
+                        <th>Servicio / Extras</th>
+                        <th>Observaciones</th>
+                        <th class="text-end pe-4">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for visit in visits %}
+                    <tr>
+                        <td class="ps-4">
+                            <div class="fw-bold text-dark">{{ visit.fecha.strftime('%d/%m/%Y') }}</div>
+                            <div class="small text-primary fw-bold">{{ visit.casa.nombre_formateado() }}</div>
+                        </td>
 
+                        <td>
+                            {% if visit.promo %}
+                                <span class="badge bg-info-subtle text-info border border-info mb-1">
+                                    {{ visit.promo.nombre }}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-light text-muted border mb-1">Mantenimiento Base</span>
+                            {% endif %}
+
+                            {% if visit.productos %}
+                                <div class="small mt-1">
+                                    {% for vp in visit.productos %}
+                                        <div class="text-muted">
+                                            <i class="bi bi-plus-circle small me-1"></i>
+                                            {{ vp.product.nombre }} <span class="badge bg-light text-dark p-1">{{ vp.cantidad }} {{ vp.product.unidad }}</span>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <div class="small text-muted text-wrap" style="max-width: 200px;">
+                                {{ visit.observaciones if visit.observaciones else '-' }}
+                            </div>
+                        </td>
+
+                        <td class="text-end pe-4">
+                            <div class="h5 mb-0 fw-bold text-success">
+                                ${{ "{:,.2f}".format(visit.calcular_total()) }}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center py-5 text-muted">
+                            <i class="bi bi-journal-x display-4 d-block mb-3 opacity-25"></i>
+                            No hay visitas registradas aún.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4 mb-5">
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-link text-muted">
+        <i class="bi bi-arrow-left"></i> Volver al Dashboard
+    </a>
+</div>
 {% endblock %}

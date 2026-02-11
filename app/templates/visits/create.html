@@ -2,81 +2,108 @@
 {% block title %}Nueva Visita{% endblock %}
 
 {% block content %}
-<h1>Agregar Visita</h1>
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <div class="d-flex align-items-center mb-3 mt-2">
+            <h2 class="h4 mb-0"><i class="bi bi-clipboard-plus-fill text-primary me-2"></i>Registrar Visita</h2>
+        </div>
 
-<form method="POST" action="{{ url_for('visits.crear_visit') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <form method="POST" action="{{ url_for('visits.crear_visit') }}" id="visitForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
-    <label>Buscar Casa (Escribí Country, Barrio o Número):</label><br>
-    <input type="text" id="casa_search" placeholder="Ej: Membrillar 36..." style="width: 100%; padding: 10px; margin-bottom: 10px;" autocomplete="off">
-    
-    <input type="hidden" name="casa_id" id="casa_id_hidden" required>
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">¿Qué casa visitaste?</label>
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                            <input type="text" id="casa_search" class="form-control" 
+                                   placeholder="Escribí Country, Barrio o Número..." autocomplete="off">
+                        </div>
+                        <input type="hidden" name="casa_id" id="casa_id_hidden" required>
+                        <datalist id="casas_list">
+                            {% for casa in casas %}
+                                <option data-id="{{ casa.id }}" value="{{ casa.nombre_formateado() }}">
+                            {% endfor %}
+                        </datalist>
+                    </div>
 
-    <datalist id="casas_list">
-        {% for casa in casas %}
-            <option data-id="{{ casa.id }}" value="{{ casa.nombre_formateado() }}">
-        {% endfor %}
-    </datalist>
+                    <div class="row">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-muted">Fecha</label>
+                            <input type="date" name="fecha" id="fecha_visita" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-muted">Promo Aplicada</label>
+                            <select name="promo_id" class="form-select">
+                                <option value="">-- Sin promo --</option>
+                                {% for promo in promos %}
+                                    <option value="{{ promo.id }}">
+                                        {{ promo.nombre }} (${{ promo.precio }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-    <br>
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center py-3">
+                    <h5 class="mb-0 h6 fw-bold text-dark"><i class="bi bi-box-seam me-2"></i>Productos Adicionales</h5>
+                    <button type="button" class="btn btn-sm btn-dark rounded-pill px-3" onclick="agregarProducto()">
+                        <i class="bi bi-plus-lg"></i> Agregar
+                    </button>
+                </div>
+                <div class="card-body p-3">
+                    <div id="productos-container">
+                        </div>
+                    <div id="empty-products" class="text-center py-3 text-muted small">
+                        No se agregaron productos manuales.
+                    </div>
+                </div>
+            </div>
 
-    <label>Fecha:</label><br>
-    <input type="date" name="fecha" id="fecha_visita" required style="padding: 8px;">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-body p-3">
+                    <label class="form-label fw-bold small text-muted">Observaciones / Notas del trabajo</label>
+                    <textarea name="observaciones" class="form-control" rows="2" placeholder="Ej: Se limpió fondo y se ajustó timer..."></textarea>
+                </div>
+            </div>
 
-    <br><br>
-
-    <label>Promoción (opcional):</label><br>
-    <select name="promo_id" style="padding: 8px;">
-        <option value="">-- Sin promo --</option>
-        {% for promo in promos %}
-            <option value="{{ promo.id }}">
-                {{ promo.nombre }} (${{ promo.precio }})
-            </option>
-        {% endfor %}
-    </select>
-
-    <br><br>
-
-    <label>Observaciones:</label><br>
-    <input type="text" name="observaciones" style="width: 100%; padding: 8px;">
-
-    <hr>
-
-    <h3>Productos usados (manual)</h3>
-
-    <div id="productos-container"></div>
-
-    <button type="button" onclick="agregarProducto()">➕ Agregar producto</button>
-
-    <br><br>
-
-    <button type="submit" style="padding: 10px 20px; background-color: #28a745; color: white; border: none; cursor: pointer;">
-        💾 Guardar visita
-    </button>
-</form>
+            <div class="d-grid gap-2 mb-5">
+                <button type="submit" class="btn btn-success btn-lg shadow py-3">
+                    <i class="bi bi-save-fill me-2"></i>GUARDAR VISITA
+                </button>
+                <a href="{{ url_for('visits.listar_visits') }}" class="btn btn-link text-muted">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
 
 <template id="producto-template">
-    <div class="producto-row" style="margin-bottom:10px; border-bottom: 1px solid #ddd; padding-bottom: 10px;">
-        <select name="product_id[]" required style="padding: 5px;">
-            <option value="">-- Producto --</option>
-            {% for product in products %}
-                <option value="{{ product.id }}">
-                    {{ product.nombre }} ({{ product.unidad }})
-                </option>
-            {% endfor %}
-        </select>
-
-        <input
-            type="number"
-            step="0.01"
-            min="0"
-            name="cantidad[]"
-            placeholder="Cant."
-            required
-            style="width: 70px; padding: 5px;"
-        >
-
-        <button type="button" onclick="this.parentElement.remove()" style="color: red;">❌</button>
+    <div class="producto-row border rounded p-3 mb-2 bg-light shadow-sm">
+        <div class="row g-2 align-items-center">
+            <div class="col-7">
+                <select name="product_id[]" class="form-select form-select-sm" required>
+                    <option value="">-- Producto --</option>
+                    {% for product in products %}
+                        <option value="{{ product.id }}">
+                            {{ product.nombre }} ({{ product.unidad }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-3">
+                <input type="number" step="0.01" min="0" name="cantidad[]" 
+                       class="form-control form-control-sm" placeholder="Cant." required>
+            </div>
+            <div class="col-2 text-end">
+                <button type="button" class="btn btn-outline-danger btn-sm border-0" onclick="quitarProducto(this)">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -84,29 +111,38 @@
     // 1. Fecha automática (hoy)
     document.getElementById('fecha_visita').valueAsDate = new Date();
 
-    // 2. Lógica del Buscador (Datalist dinámico)
+    // 2. Lógica del Buscador
     const searchInput = document.getElementById('casa_search');
     const hiddenInput = document.getElementById('casa_id_hidden');
     const casasList = document.getElementById('casas_list');
 
-    // Vincular el input con el datalist
     searchInput.setAttribute('list', 'casas_list');
 
     searchInput.addEventListener('input', function() {
         const option = Array.from(casasList.options).find(opt => opt.value === searchInput.value);
         if (option) {
-            hiddenInput.value = option.dataset.id; // Guardamos el ID
+            hiddenInput.value = option.dataset.id;
+            searchInput.classList.add('is-valid');
         } else {
-            hiddenInput.value = ""; // Si no coincide, queda vacío
+            hiddenInput.value = "";
+            searchInput.classList.remove('is-valid');
         }
     });
 
-    // 3. Agregar productos (tu lógica original)
+    // 3. Manejo de Productos
     function agregarProducto() {
+        document.getElementById("empty-products").classList.add("d-none");
         const container = document.getElementById("productos-container");
         const template = document.getElementById("producto-template");
         container.appendChild(template.content.cloneNode(true));
     }
-</script>
 
+    function quitarProducto(btn) {
+        btn.closest('.producto-row').remove();
+        const container = document.getElementById("productos-container");
+        if (container.children.length === 0) {
+            document.getElementById("empty-products").classList.remove("d-none");
+        }
+    }
+</script>
 {% endblock %}
