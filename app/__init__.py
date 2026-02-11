@@ -1,19 +1,19 @@
-from flask import Flask
+from flask import Flask, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
-from flask_wtf.csrf import CSRFProtect # <--- 1. ANTI-HACKEO FORMULARIOS
-from flask_limiter import Limiter      # <--- 2. LIMITADOR DE TRÁFICO
+from flask_wtf.csrf import CSRFProtect 
+from flask_limiter import Limiter 
 from flask_limiter.util import get_remote_address
-from datetime import timedelta         # <--- 3. PARA EL TIEMPO DE SESIÓN
+from datetime import timedelta 
 from dotenv import load_dotenv
 import os
 
+# Inicialización de extensiones
 db = SQLAlchemy()
 login_manager = LoginManager()
 csrf = CSRFProtect()
 
-# Configuración del Limitador (Acepta aprox 100 usuarios activos dándole caña)
-# "200 per minute" significa que una sola persona no puede hacer más de 3 clicks por segundo constante.
+# Configuración del Limitador de tráfico (Anti-Fuerza Bruta)
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200 per minute"] 
@@ -31,26 +31,35 @@ def create_app():
     # --- CONFIGURACIÓN DE SEGURIDAD (CRÍTICO) ---
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
     
-    # 1. Cookies Blindadas (Solo viajan por HTTPS y JS no las toca)
+    # 1. Cookies Blindadas (Seguridad en HTTPS)
     app.config["SESSION_COOKIE_SECURE"] = True 
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = 'Lax'
     
-    # 2. Timeout de 1 Hora (Si no tocás nada, te saca)
+    # 2. Timeout de Sesión (1 Hora de inactividad)
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)
 
-    # --- INICIALIZAR EXTENSIONES ---
+    # --- INICIALIZAR EXTENSIONES EN LA APP ---
     db.init_app(app)
+    csrf.init_app(app)
+    limiter.init_app(app)
     
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
     login_manager.login_message = "Sesión expirada o acceso denegado."
     login_manager.login_message_category = "warning"
 
-    csrf.init_app(app)    # Activamos escudo en formularios
-    limiter.init_app(app) # Activamos escudo de tráfico
+    # --- REGISTRO DE MANEJADORES DE ERROR (404 y 500) ---
+    @app.errorhandler(404)
+    def not_found_error(error):
+        return render_template('errors/404.html'), 404
 
-    # --- IMPORTAR RUTAS ---
+    @app.errorhandler(500)
+    def internal_error(error):
+        db.session.rollback() # Evita que la DB quede trabada tras un error
+        return render_template('errors/500.html'), 500
+
+    # --- REGISTRO DE BLUEPRINTS (RUTAS) ---
     from app.routers.main_router import main_bp
     from app.routers.country_router import country_bp    
     from app.routers.barrio_router import barrio_bp
@@ -73,6 +82,7 @@ def create_app():
 
     return app
 
+# --- CARGA DE USUARIO PARA FLASK-LOGIN ---
 from app.models.user import User
 
 @login_manager.user_loader

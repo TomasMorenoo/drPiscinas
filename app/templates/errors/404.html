@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}404 - No Encontrado{% endblock %}
+
+{% block content %}
+<div class="container text-center py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 card shadow-sm p-5 border-0">
+            <i class="bi bi-droplet-slash text-info display-1 mb-4"></i>
+            <h1 class="fw-bold text-dark">404</h1>
+            <h2 class="h4 mb-4">¡Piscina vacía!</h2>
+            <p class="text-muted mb-4">La página que buscás no existe o fue movida a otra ubicación.</p>
+            <hr class="my-4">
+            <a href="{{ url_for('main.home') }}" class="btn btn-dark btn-lg px-4">
+                <i class="bi bi-house-door me-2"></i>Volver al Inicio
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
