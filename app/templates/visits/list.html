@@ -1,109 +1,121 @@
 {% extends "base.html" %}
-{% block title %}Registro de Visitas{% endblock %}
+{% block title %}Historial de Visitas{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 mt-2">
-    <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-calendar-check me-2"></i>Historial de Visitas</h1>
-    <a href="{{ url_for('visits.form_crear_visit') }}" class="btn btn-success shadow-sm">
-        <i class="bi bi-plus-lg"></i> <span class="d-none d-md-inline">Nueva Visita</span>
-    </a>
+<div class="row mb-4 mt-2 align-items-center">
+    <div class="col-md-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-calendar-check me-2"></i>Visitas</h1>
+    </div>
+    <div class="col-md-8 text-md-end mt-3 mt-md-0">
+        <a href="{{ url_for('visits.crear_visit') }}" class="btn btn-primary shadow-sm">
+            <i class="bi bi-plus-lg"></i> Nueva Visita
+        </a>
+    </div>
 </div>
 
-<div class="row mb-4">
-    <div class="col-md-4 mb-3">
-        <div class="card border-0 shadow-sm bg-primary text-white h-100">
-            <div class="card-body d-flex flex-column justify-content-center text-center">
-                <h6 class="text-uppercase small fw-bold opacity-75">Facturación del Mes</h6>
-                <h2 class="mb-0 fw-bold">${{ "{:,.2f}".format(total_mes) }}</h2>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-4 mb-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <h6 class="text-uppercase small fw-bold text-muted mb-2 text-center">Top 5 Productos Usados</h6>
-                {% for nombre, unidad, cantidad in top_productos %}
-                <div class="d-flex justify-content-between small border-bottom mb-1 pb-1">
-                    <span class="text-truncate" style="max-width: 120px;">{{ nombre }}</span>
-                    <span class="badge bg-light text-dark border">
-                        {% if cantidad % 1 == 0 %}{{ cantidad | int }}{% else %}{{ cantidad }}{% endif %} {{ unidad }}
-                    </span>
+<div class="row g-3 mb-4">
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm p-3 h-100">
+            <h6 class="fw-bold mb-3"><i class="bi bi-filter"></i> Período</h6>
+            <form method="GET" action="{{ url_for('visits.listar_visits') }}" class="row g-2">
+                <div class="col-7">
+                    <select name="mes" class="form-select form-select-sm">
+                        {% for m in range(1, 13) %}
+                        <option value="{{ m }}" {% if m == mes_sel %}selected{% endif %}>
+                            {{ ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][m-1] }}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </div>
-                {% else %}
-                <p class="text-muted small text-center my-3">Sin consumos este mes.</p>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-4 mb-3">
-        <div class="card border-0 shadow-sm h-100 p-3">
-            <form method="GET" action="{{ url_for('visits.listar_visits') }}">
-                <div class="row g-2">
-                    <div class="col-7">
-                        <select name="mes" class="form-select form-select-sm">
-                            {% for m in range(1, 13) %}
-                            <option value="{{ m }}" {% if m == mes_sel %}selected{% endif %}>
-                                {{ ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][m-1] }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-5">
-                        <input type="number" name="anio" class="form-control form-control-sm" value="{{ anio_sel }}">
-                    </div>
-                    <button type="submit" class="btn btn-dark btn-sm w-100 mt-2">Actualizar Filtro</button>
+                <div class="col-5">
+                    <input type="number" name="anio" class="form-control form-control-sm" value="{{ anio_sel }}">
                 </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-dark btn-sm w-100 mt-1">Ver Mes</button>
+                </div>
+            </form>
+
+            <hr>
+
+            <form method="POST" action="{{ url_for('visits.sync_prices') }}" onsubmit="return confirm('¿Actualizar todos los precios de este mes a los valores de hoy?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="mes" value="{{ mes_sel }}">
+                <input type="hidden" name="anio" value="{{ anio_sel }}">
+                <button type="submit" class="btn btn-outline-warning btn-sm w-100">
+                    <i class="bi bi-arrow-repeat me-1"></i> Sincronizar Precios del Mes
+                </button>
             </form>
         </div>
     </div>
+
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm bg-primary text-white p-3 h-100">
+            <h6 class="fw-bold"><i class="bi bi-cash-stack"></i> Facturación del Mes</h6>
+            <h2 class="mb-0 mt-2">$ {{ "{:,.2f}".format(total_mes) }}</h2>
+            <p class="small opacity-75 mb-0">Total calculado con precios capturados.</p>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm p-3 h-100">
+            <h6 class="fw-bold mb-2"><i class="bi bi-graph-up"></i> Consumo del Mes</h6>
+            {% for nombre, unidad, total in top_productos %}
+            <div class="d-flex justify-content-between border-bottom py-1">
+                <small>{{ nombre }}</small>
+                <small class="fw-bold text-primary">{{ total }} {{ unidad }}</small>
+            </div>
+            {% else %}
+            <small class="text-muted">Sin datos de consumo.</small>
+            {% endfor %}
+        </div>
+    </div>
 </div>
 
-<div class="card shadow-sm border-0">
+<div class="card border-0 shadow-sm">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0" style="min-width: 1000px;">
-                <thead class="table-dark text-nowrap">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
                     <tr>
                         <th class="ps-4">Fecha</th>
                         <th>Casa</th>
-                        <th>Productos / Promo</th>
-                        <th>Observaciones</th>
-                        <th>Total</th>
+                        <th>Detalle</th>
+                        <th class="text-center">Total</th>
                         <th class="text-end pe-4">Acciones</th>
                     </tr>
                 </thead>
-                <tbody class="text-nowrap">
+                <tbody>
                     {% for visit in visits %}
                     <tr>
-                        <td class="ps-4">{{ visit.fecha.strftime('%d/%m/%Y') }}</td>
-                        <td class="fw-bold">{{ visit.casa.nombre_formateado() }}</td>
+                        <td class="ps-4">
+                            <div class="fw-bold">{{ visit.fecha.strftime('%d/%m') }}</div>
+                            <small class="text-muted">{{ visit.fecha.strftime('%Y') }}</small>
+                        </td>
                         <td>
-                            <div class="small">
-                                {% if visit.promo %}<span class="badge bg-info-subtle text-info border border-info me-1">{{ visit.promo.nombre }}</span>{% endif %}
+                            <div class="fw-bold text-dark">{{ visit.casa.nombre }}</div>
+                            <small class="text-muted">{{ visit.casa.country.nombre }}</small>
+                        </td>
+                        <td>
+                            <small class="d-block">
+                                {% if visit.promo %}
+                                <span class="badge bg-info text-dark">{{ visit.promo.nombre }}</span>
+                                {% endif %}
                                 {% for vp in visit.productos %}
-                                <span class="badge bg-light text-muted border fw-normal">
-                                    {{ vp.product.nombre }} 
-                                    ({% if vp.cantidad % 1 == 0 %}{{ vp.cantidad | int }}{% else %}{{ vp.cantidad }}{% endif %} {{ vp.product.unidad }})
-                                </span>
+                                {{ vp.product.nombre }} ({{ vp.cantidad }}){{ "," if not loop.last }}
                                 {% endfor %}
-                            </div>
+                            </small>
                         </td>
-                        <td>
-                            <div class="text-truncate" style="max-width: 250px;" title="{{ visit.observaciones }}" data-bs-toggle="tooltip">
-                                {{ visit.observaciones or '-' }}
-                            </div>
+                        <td class="text-center fw-bold text-success">
+                            $ {{ "{:,.2f}".format(visit.calcular_total()) }}
                         </td>
-                        <td class="fw-bold text-success">${{ "{:,.2f}".format(visit.calcular_total()) }}</td>
                         <td class="text-end pe-4">
-                            <div class="btn-group btn-group-sm">
-                                <a href="{{ url_for('visits.editar_visit', id=visit.id) }}" class="btn btn-outline-primary border-0" title="Editar">
+                            <div class="btn-group">
+                                <a href="{{ url_for('visits.editar_visit', id=visit.id) }}" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                <form action="{{ url_for('visits.eliminar_visit', id=visit.id) }}" method="POST" onsubmit="return confirm('¿Borrar visita?');" style="display:inline;">
+                                <form action="{{ url_for('visits.eliminar_visit', id=visit.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Borrar visita?');">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                    <button type="submit" class="btn btn-outline-danger border-0">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
@@ -112,10 +124,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" class="text-center py-5 text-muted">
-                            <i class="bi bi-calendar-x display-4 d-block mb-3 opacity-25"></i>
-                            Todavía no hubo visitas registradas en este período.
-                        </td>
+                        <td colspan="5" class="text-center py-5 text-muted">No hay visitas en este período.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -123,13 +132,4 @@
         </div>
     </div>
 </div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-        tooltipTriggerList.map(function (el) {
-            return new bootstrap.Tooltip(el)
-        })
-    });
-</script>
 {% endblock %}

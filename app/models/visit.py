@@ -35,16 +35,20 @@ class Visit(db.Model):
         return f"<Visit casa={self.casa_id} fecha={self.fecha}>"
     
     def calcular_total(self):
-        total = 0
+        total = 0.0
 
-        # sumar promo (si existe)
+        # 1. Sumar promo (si existe)
+        # Nota: Si también cambias mucho los precios de las promos, 
+        # lo ideal sería aplicar la misma lógica de "precio_capturado" aquí.
         if self.promo and self.promo.precio:
             total += float(self.promo.precio)
 
-        # sumar productos
+        # 2. Sumar productos usando el precio CONGELADO
         for vp in self.productos:
-            if vp.product and vp.product.precio:
-                total += float(vp.cantidad) * float(vp.product.precio)
+            # Usamos vp.precio_unitario (el que guardamos al crear la visita)
+            # y NO vp.product.precio (que es el precio actual del mercado)
+            if vp.precio_unitario:
+                total += float(vp.cantidad) * float(vp.precio_unitario)
 
         return round(total, 2)
 
