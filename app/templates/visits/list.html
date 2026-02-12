@@ -7,7 +7,7 @@
         <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-calendar-check me-2"></i>Visitas</h1>
     </div>
     <div class="col-md-8 text-md-end mt-3 mt-md-0">
-        <a href="{{ url_for('visits.crear_visit') }}" class="btn btn-primary shadow-sm">
+        <a href="{{ url_for('visits.crear_visit') }}" class="btn btn-success shadow-sm fw-bold">
             <i class="bi bi-plus-lg"></i> Nueva Visita
         </a>
     </div>
@@ -16,10 +16,10 @@
 <div class="row g-3 mb-4">
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm p-3 h-100">
-            <h6 class="fw-bold mb-3"><i class="bi bi-filter"></i> Período</h6>
+            <h6 class="fw-bold mb-3 small text-uppercase text-muted"><i class="bi bi-filter"></i> Período</h6>
             <form method="GET" action="{{ url_for('visits.listar_visits') }}" class="row g-2">
                 <div class="col-7">
-                    <select name="mes" class="form-select form-select-sm">
+                    <select name="mes" class="form-select form-select-sm border-secondary">
                         {% for m in range(1, 13) %}
                         <option value="{{ m }}" {% if m == mes_sel %}selected{% endif %}>
                             {{ ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][m-1] }}
@@ -28,41 +28,40 @@
                     </select>
                 </div>
                 <div class="col-5">
-                    <input type="number" name="anio" class="form-control form-control-sm" value="{{ anio_sel }}">
+                    <input type="number" name="anio" class="form-control form-control-sm border-secondary" value="{{ anio_sel }}">
                 </div>
                 <div class="col-12">
                     <button type="submit" class="btn btn-dark btn-sm w-100 mt-1">Ver Mes</button>
                 </div>
             </form>
-
             <hr>
-
-            <form method="POST" action="{{ url_for('visits.sync_prices') }}" onsubmit="return confirm('¿Actualizar todos los precios de este mes a los valores de hoy?');">
+            <form method="POST" action="{{ url_for('visits.sync_prices') }}" onsubmit="return confirm('¿Actualizar todos los precios de este mes a los valores actuales?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="mes" value="{{ mes_sel }}">
                 <input type="hidden" name="anio" value="{{ anio_sel }}">
                 <button type="submit" class="btn btn-outline-warning btn-sm w-100">
-                    <i class="bi bi-arrow-repeat me-1"></i> Sincronizar Precios del Mes
+                    <i class="bi bi-arrow-repeat me-1"></i> Sincronizar Precios
                 </button>
             </form>
         </div>
     </div>
 
     <div class="col-lg-4">
-        <div class="card border-0 shadow-sm bg-primary text-white p-3 h-100">
-            <h6 class="fw-bold"><i class="bi bi-cash-stack"></i> Facturación del Mes</h6>
-            <h2 class="mb-0 mt-2">$ {{ "{:,.2f}".format(total_mes) }}</h2>
-            <p class="small opacity-75 mb-0">Total calculado con precios capturados.</p>
+        <div class="card border-0 shadow-sm bg-primary text-white p-3 h-100 d-flex flex-column justify-content-center">
+            <h6 class="fw-bold small text-uppercase opacity-75">Facturación del Mes</h6>
+            <h2 class="mb-0 fw-bold">$ {{ "{:,.2f}".format(total_mes) }}</h2>
         </div>
     </div>
 
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm p-3 h-100">
-            <h6 class="fw-bold mb-2"><i class="bi bi-graph-up"></i> Consumo del Mes</h6>
+            <h6 class="fw-bold mb-2 small text-uppercase text-muted">Consumo del Mes</h6>
             {% for nombre, unidad, total in top_productos %}
             <div class="d-flex justify-content-between border-bottom py-1">
-                <small>{{ nombre }}</small>
-                <small class="fw-bold text-primary">{{ total }} {{ unidad }}</small>
+                <span class="small text-truncate">{{ nombre }}</span>
+                <span class="small fw-bold text-primary">
+                    {% if total % 1 == 0 %}{{ total | int }}{% else %}{{ total }}{% endif %} {{ unidad }}
+                </span>
             </div>
             {% else %}
             <small class="text-muted">Sin datos de consumo.</small>
@@ -74,48 +73,58 @@
 <div class="card border-0 shadow-sm">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+            <table class="table table-hover align-middle mb-0" style="min-width: 1100px;">
+                <thead class="table-dark text-nowrap">
                     <tr>
                         <th class="ps-4">Fecha</th>
-                        <th>Casa</th>
-                        <th>Detalle</th>
+                        <th>Casa / Ubicación</th>
+                        <th>Productos / Promo</th>
+                        <th>Observaciones</th>
                         <th class="text-center">Total</th>
                         <th class="text-end pe-4">Acciones</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody class="text-nowrap">
                     {% for visit in visits %}
                     <tr>
-                        <td class="ps-4">
-                            <div class="fw-bold">{{ visit.fecha.strftime('%d/%m') }}</div>
-                            <small class="text-muted">{{ visit.fecha.strftime('%Y') }}</small>
+                        <td class="ps-4">{{ visit.fecha.strftime('%d/%m/%Y') }}</td>
+                        
+                        <td class="fw-bold text-dark">
+                            {{ visit.casa.nombre_formateado() }}
                         </td>
+
                         <td>
-                            <div class="fw-bold text-dark">{{ visit.casa.nombre }}</div>
-                            <small class="text-muted">{{ visit.casa.country.nombre }}</small>
-                        </td>
-                        <td>
-                            <small class="d-block">
+                            <div class="small">
                                 {% if visit.promo %}
-                                <span class="badge bg-info text-dark">{{ visit.promo.nombre }}</span>
+                                <span class="badge bg-info-subtle text-info border border-info me-1">{{ visit.promo.nombre }}</span>
                                 {% endif %}
                                 {% for vp in visit.productos %}
-                                {{ vp.product.nombre }} ({{ vp.cantidad }}){{ "," if not loop.last }}
+                                <span class="badge bg-light text-muted border fw-normal">
+                                    {{ vp.product.nombre }} ({% if vp.cantidad % 1 == 0 %}{{ vp.cantidad | int }}{% else %}{{ vp.cantidad }}{% endif %} {{ vp.product.unidad }})
+                                </span>
                                 {% endfor %}
-                            </small>
+                            </div>
                         </td>
+
+                        <td>
+                            <div class="text-truncate text-muted small" style="max-width: 200px; cursor: help;" 
+                                 title="{{ visit.observaciones }}" data-bs-toggle="tooltip">
+                                {{ visit.observaciones if visit.observaciones else '-' }}
+                            </div>
+                        </td>
+
                         <td class="text-center fw-bold text-success">
                             $ {{ "{:,.2f}".format(visit.calcular_total()) }}
                         </td>
+
                         <td class="text-end pe-4">
-                            <div class="btn-group">
-                                <a href="{{ url_for('visits.editar_visit', id=visit.id) }}" class="btn btn-sm btn-outline-primary">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('visits.editar_visit', id=visit.id) }}" class="btn btn-outline-primary border-0">
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 <form action="{{ url_for('visits.eliminar_visit', id=visit.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Borrar visita?');">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <button type="submit" class="btn btn-outline-danger border-0">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
@@ -124,7 +133,9 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="5" class="text-center py-5 text-muted">No hay visitas en este período.</td>
+                        <td colspan="6" class="text-center py-5 text-muted fst-italic">
+                            Todavía no hubo visitas registradas en este período.
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -132,4 +143,14 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Inicializar tooltips para ver observaciones completas
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        tooltipTriggerList.map(function (el) {
+            return new bootstrap.Tooltip(el)
+        })
+    });
+</script>
 {% endblock %}
