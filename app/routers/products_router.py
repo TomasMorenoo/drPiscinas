@@ -1,55 +1,55 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required # <--- 1. IMPORTAR SEGURIDAD
+from flask_login import login_required
 from app import db
-from app.models import Product
+from app.models.products import Product
 
-product_bp = Blueprint(
-    "products",
-    __name__,
-    url_prefix="/products"
-)
+products_bp = Blueprint("products", __name__, url_prefix="/products")
 
-# Listado de productos
-@product_bp.route("/")
-@login_required # <--- CANDADO PUESTO
+@products_bp.route("/")
+@login_required
 def listar_products():
-    products = Product.query.order_by(Product.nombre).all()
+    # Solo mostramos productos activos en la lista principal
+    products = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
     return render_template("products/list.html", products=products)
 
-# Formulario GET
-@product_bp.route("/create", methods=["GET"])
-@login_required # <--- CANDADO PUESTO
-def form_crear_product():
+@products_bp.route("/create", methods=["GET", "POST"])
+@login_required
+def crear_product():
+    if request.method == "POST":
+        nombre = request.form.get("nombre")
+        unidad = request.form.get("unidad")
+        precio = request.form.get("precio")
+
+        if not nombre or not precio:
+            flash("Nombre y precio son obligatorios", "danger")
+            return redirect(url_for("products.crear_product"))
+
+        nuevo_p = Product(nombre=nombre, unidad=unidad, precio=float(precio))
+        db.session.add(nuevo_p)
+        db.session.commit()
+        flash("Producto creado con éxito", "success")
+        return redirect(url_for("products.listar_products"))
+    
     return render_template("products/create.html")
 
-# Crear POST
-@product_bp.route("/create", methods=["POST"])
-@login_required # <--- CANDADO PUESTO
-def crear_product():
-    nombre = request.form.get("nombre", "").strip()
-    unidad = request.form.get("unidad", "").strip()
-    precio = request.form.get("precio", "").strip()
-
-    if not nombre or not unidad or not precio:
-        flash("Todos los campos son obligatorios", "error")
-        return redirect(url_for("products.listar_products"))
-
-    existe = Product.query.filter_by(nombre=nombre).first()
-    if existe:
-        flash("Ese producto ya existe", "error")
-        return redirect(url_for("products.listar_products"))
-
-    product = Product(nombre=nombre, unidad=unidad, precio=precio)
-    db.session.add(product)
+@products_bp.route("/edit/<int:id>", methods=["POST"])
+@login_required
+def editar_product(id):
+    producto = Product.query.get_or_404(id)
+    producto.nombre = request.form.get("nombre")
+    producto.unidad = request.form.get("unidad")
+    producto.precio = float(request.form.get("precio"))
+    
     db.session.commit()
-    flash("Producto creado correctamente", "success")
+    flash("Producto actualizado correctamente", "success")
     return redirect(url_for("products.listar_products"))
 
-# Activar / desactivar
-@product_bp.route("/toggle/<int:id>")
-@login_required # <--- CANDADO PUESTO
-def toggle_product(id):
-    product = Product.query.get_or_404(id)
-    product.activo = not product.activo
+@products_bp.route("/delete/<int:id>", methods=["POST"])
+@login_required
+def eliminar_product(id):
+    producto = Product.query.get_or_404(id)
+    # En lugar de borrar, desactivamos para no romper el historial de visitas
+    producto.activo = False 
     db.session.commit()
+    flash("Producto eliminado de la lista", "success")
     return redirect(url_for("products.listar_products"))

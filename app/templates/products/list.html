@@ -3,9 +3,9 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 mt-2">
-    <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-box-seam me-2"></i>Lista de Productos</h1>
-    <a href="{{ url_for('products.form_crear_product') }}" class="btn btn-primary shadow-sm">
-        <i class="bi bi-plus-lg"></i> <span class="d-none d-md-inline">Agregar Producto</span>
+    <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-box-seam me-2"></i>Productos</h1>
+    <a href="{{ url_for('products.crear_product') }}" class="btn btn-primary shadow-sm">
+        <i class="bi bi-plus-lg"></i> <span class="d-none d-md-inline">Nuevo Producto</span>
     </a>
 </div>
 
@@ -13,11 +13,10 @@
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+                <thead class="table-dark">
                     <tr>
                         <th class="ps-4">Nombre / Unidad</th>
                         <th class="text-center">Precio</th>
-                        <th class="text-center">Estado</th>
                         <th class="text-end pe-4">Acciones</th>
                     </tr>
                 </thead>
@@ -26,44 +25,68 @@
                     <tr>
                         <td class="ps-4">
                             <span class="fw-bold text-dark">{{ product.nombre }}</span>
-                            <div class="small text-muted">Unidad: {{ product.unidad }}</div>
+                            <div class="small text-muted">{{ product.unidad }}</div>
                         </td>
                         <td class="text-center">
                             <span class="fw-bold text-primary">$ {{ "{:,.2f}".format(product.precio) }}</span>
                         </td>
-                        <td class="text-center">
-                            {% if product.activo %}
-                                <span class="badge rounded-pill bg-success-subtle text-success border border-success">Disponible</span>
-                            {% else %}
-                                <span class="badge rounded-pill bg-danger-subtle text-danger border border-danger">Pausado</span>
-                            {% endif %}
-                        </td>
                         <td class="text-end pe-4">
-                            <a href="{{ url_for('products.toggle_product', id=product.id) }}" 
-                               class="btn btn-sm {{ 'btn-outline-danger' if product.activo else 'btn-outline-success' }}"
-                               title="Cambiar Disponibilidad">
-                                <i class="bi {{ 'bi-pause-fill' if product.activo else 'bi-play-fill' }}"></i>
-                                <span class="d-none d-md-inline ms-1">{{ 'Pausar' if product.activo else 'Activar' }}</span>
-                            </a>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-outline-primary" 
+                                        data-bs-toggle="modal" data-bs-target="#editModal{{ product.id }}">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                
+                                <form action="{{ url_for('products.eliminar_product', id=product.id) }}" method="POST" 
+                                      onsubmit="return confirm('¿Seguro que querés eliminar este producto?');" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
+
+                    <div class="modal fade" id="editModal{{ product.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <form action="{{ url_for('products.editar_product', id=product.id) }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <div class="modal-content">
+                                    <div class="modal-header bg-dark text-white">
+                                        <h5 class="modal-title">Editar Producto</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold">Nombre</label>
+                                            <input type="text" name="nombre" class="form-control" value="{{ product.nombre }}" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold">Unidad</label>
+                                            <input type="text" name="unidad" class="form-control" value="{{ product.unidad }}" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold">Precio ($)</label>
+                                            <input type="number" step="0.01" name="precio" class="form-control" value="{{ product.precio }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                     {% else %}
                     <tr>
-                        <td colspan="4" class="text-center py-5 text-muted">
-                            <i class="bi bi-cart-x display-4 d-block mb-3 opacity-50"></i>
-                            No tenés productos cargados en el inventario.
-                        </td>
+                        <td colspan="3" class="text-center py-5 text-muted">No hay productos cargados.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
-</div>
-
-<div class="mt-3">
-    <a href="{{ url_for('dashboard.index') }}" class="btn btn-link text-muted">
-        <i class="bi bi-arrow-left"></i> Volver al Dashboard
-    </a>
 </div>
 {% endblock %}
