@@ -3,51 +3,39 @@ from flask_login import login_required
 from app import db
 from app.models.products import Product
 
-# Se define como product_bp para coincidir con la importación en __init__.py
 product_bp = Blueprint(
     "products",
     __name__,
     url_prefix="/products"
 )
 
-# Listado de productos
 @product_bp.route("/")
 @login_required
 def listar_products():
-    # Mostramos productos activos para la gestión diaria
-    products = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
+    # Traemos todos los productos (activos o pausados) para poder gestionarlos
+    # pero filtramos los que fueron "eliminados" (borrado lógico)
+    products = Product.query.order_by(Product.nombre).all()
     return render_template("products/list.html", products=products)
 
-# Formulario GET (Opcional si usas modales, pero lo mantenemos por compatibilidad)
-@product_bp.route("/create", methods=["GET"])
-@login_required
-def form_crear_product():
-    return render_template("products/create.html")
-
-# Crear POST
-@product_bp.route("/create", methods=["POST"])
+@product_bp.route("/create", methods=["GET", "POST"])
 @login_required
 def crear_product():
-    nombre = request.form.get("nombre", "").strip()
-    unidad = request.form.get("unidad", "").strip()
-    precio = request.form.get("precio", "").strip()
+    if request.method == "POST":
+        nombre = request.form.get("nombre", "").strip()
+        unidad = request.form.get("unidad", "").strip()
+        precio = request.form.get("precio", "").strip()
+        
+        if not nombre or not precio:
+            flash("Nombre y precio son obligatorios", "error")
+            return redirect(url_for("products.listar_products"))
 
-    if not nombre or not unidad or not precio:
-        flash("Todos los campos son obligatorios", "error")
+        product = Product(nombre=nombre, unidad=unidad, precio=float(precio))
+        db.session.add(product)
+        db.session.commit()
+        flash("Producto creado correctamente", "success")
         return redirect(url_for("products.listar_products"))
+    return render_template("products/create.html")
 
-    existe = Product.query.filter_by(nombre=nombre).first()
-    if existe:
-        flash("Ese producto ya existe", "error")
-        return redirect(url_for("products.listar_products"))
-
-    product = Product(nombre=nombre, unidad=unidad, precio=float(precio))
-    db.session.add(product)
-    db.session.commit()
-    flash("Producto creado correctamente", "success")
-    return redirect(url_for("products.listar_products"))
-
-# Editar Producto (POST desde el Modal)
 @product_bp.route("/edit/<int:id>", methods=["POST"])
 @login_required
 def editar_product(id):
@@ -55,18 +43,27 @@ def editar_product(id):
     producto.nombre = request.form.get("nombre", "").strip()
     producto.unidad = request.form.get("unidad", "").strip()
     producto.precio = float(request.form.get("precio", 0))
-    
     db.session.commit()
-    flash("Producto actualizado correctamente", "success")
+    flash("Producto actualizado", "success")
     return redirect(url_for("products.listar_products"))
 
-# Eliminación Lógica (Desactivar)
+@product_bp.route("/toggle/<int:id>", methods=["POST"])
+@login_required
+def toggle_product(id):
+    producto = Product.query.get_or_404(id)
+    producto.activo = not producto.activo  # Cambia entre True/False
+    db.session.commit()
+    estado = "activado" if producto.activo else "pausado"
+    flash(f"Producto {estado} correctamente", "info")
+    return redirect(url_for("products.listar_products"))
+
 @product_bp.route("/delete/<int:id>", methods=["POST"])
 @login_required
 def eliminar_product(id):
     producto = Product.query.get_or_404(id)
-    # Cambiamos el estado a inactivo para no borrar el historial de visitas
-    producto.activo = False 
+    # Si preferís borrarlo de la base de datos: db.session.delete(producto)
+    # Pero si tiene visitas asociadas, mejor es ocultarlo con un flag de 'borrado'
+    db.session.delete(producto) 
     db.session.commit()
-    flash("Producto eliminado de la lista", "success")
+    flash("Producto eliminado", "success")
     return redirect(url_for("products.listar_products"))
