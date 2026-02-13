@@ -14,6 +14,7 @@
             
             <div class="card-body p-4 bg-light">
                 <form id="formEditar" method="POST" action="{{ url_for('casas.editar_casa', id=casa.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     
                     <div class="mb-3">
                         <label class="form-label fw-bold small text-uppercase text-muted">Country</label>
@@ -73,7 +74,7 @@
 </div>
 
 <script>
-    // 1. CARGA DE BARRIOS
+    // 1. CARGA DE BARRIOS DINÁMICA
     function cargarBarrios() {
         const countryId = document.getElementById('country_select').value;
         const barrioSelect = document.getElementById('barrio_select');
@@ -98,53 +99,29 @@
             .catch(error => { console.error(error); });
     }
 
-    // 2. MAGIA DE FORMATO (ARGENTINO)
+    // 2. FORMATEO DE MONEDA ARGENTINA (Puntos para mil, coma para decimal)
     function formatearMoneda(input) {
-        // Guardamos la posición del cursor para que no salte al final si editás en el medio
-        let cursorPosition = input.selectionStart;
-        let originalLength = input.value.length;
-
-        // Obtenemos el valor crudo
         let value = input.value;
-
-        // Separamos en parte Entera y Decimal usando la coma
-        // (Si escribe más de una coma, tomamos solo la primera división)
         let parts = value.split(',');
-        
-        // --- PARTE ENTERA ---
-        // Sacamos todo lo que no sea número
         let integerPart = parts[0].replace(/\D/g, "");
-        // Agregamos puntos de mil
         integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 
-        // --- REARMADO ---
         let newValue = integerPart;
-
-        // Si el usuario escribió una coma, procesamos los decimales
         if (parts.length > 1) {
-            // Limpiamos decimales (solo números) y limitamos a 2 dígitos
             let decimalPart = parts[1].replace(/\D/g, "").substring(0, 2);
             newValue += "," + decimalPart;
         } else if (value.includes(',')) {
-            // Si acaba de escribir la coma y no hay nada después todavía
             newValue += ",";
         }
-
         input.value = newValue;
     }
 
-    // 3. LIMPIEZA ANTES DE ENVIAR A PYTHON
+    // 3. LIMPIEZA PARA PYTHON (Quitar puntos, cambiar coma por punto)
     document.getElementById('formEditar').addEventListener('submit', function(e) {
         const input = document.getElementById('inputPrecio');
         let valor = input.value;
-        
-        // Paso 1: Sacar los puntos de mil (Ej: "250.000,50" -> "250000,50")
         valor = valor.replace(/\./g, "");
-        
-        // Paso 2: Cambiar la coma por punto para que Python entienda (Ej: "250000,50" -> "250000.50")
         valor = valor.replace(",", ".");
-        
-        // Asignamos el valor limpio al input antes de que viaje al servidor
         input.value = valor;
     });
 </script>
