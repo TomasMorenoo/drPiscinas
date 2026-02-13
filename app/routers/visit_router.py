@@ -22,13 +22,16 @@ def listar_visits():
     mes_sel = request.args.get('mes', ahora.month, type=int)
     anio_sel = request.args.get('anio', ahora.year, type=int)
 
+    # Filtrado por mes y año
     visits = Visit.query.filter(
         extract('month', Visit.fecha) == mes_sel,
         extract('year', Visit.fecha) == anio_sel
     ).order_by(Visit.fecha.desc()).all()
 
+    # Cálculo de facturación mensual usando los precios capturados
     total_mes = sum(v.calcular_total() for v in visits)
 
+    # Top 5 productos usados
     top_productos = db.session.query(
         Product.nombre, 
         Product.unidad,
@@ -72,7 +75,7 @@ def sync_prices():
                 vp.precio_unitario = prod_actual.precio
     
     db.session.commit()
-    flash(f"Precios actualizados para {mes}/{anio}", "success")
+    flash(f"Precios actualizados para todo el mes {mes}/{anio}", "success")
     return redirect(url_for('visits.listar_visits', mes=mes, anio=anio))
 
 @visit_bp.route("/create", methods=["GET", "POST"])
@@ -86,7 +89,7 @@ def crear_visit():
         cantidades = request.form.getlist("cantidad[]")
 
         if not casa_id or not fecha_str:
-            flash("Casa y fecha obligatorios", "error")
+            flash("Casa y fecha son obligatorios", "error")
             return redirect(url_for("visits.crear_visit"))
 
         visit = Visit(
@@ -111,13 +114,23 @@ def crear_visit():
                     db.session.add(vp)
         
         db.session.commit()
-        flash("Visita creada", "success")
+        flash("Visita registrada correctamente", "success")
         return redirect(url_for("visits.listar_visits"))
         
     casas = Casa.query.filter_by(activo=True).all()
     products = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
     promos = Promo.query.filter_by(activo=True).order_by(Promo.nombre).all()
     return render_template("visits/create.html", casas=casas, products=products, promos=promos)
+
+@visit_bp.route("/delete/<int:id>", methods=["POST"])
+@login_required
+def eliminar_visit(id):
+    visit = Visit.query.get_or_404(id)
+    VisitProduct.query.filter_by(visit_id=id).delete()
+    db.session.delete(visit)
+    db.session.commit()
+    flash("Visita eliminada", "success")
+    return redirect(url_for("visits.listar_visits"))
 
 @visit_bp.route("/edit/<int:id>", methods=["GET", "POST"])
 @login_required
@@ -148,13 +161,3 @@ def editar_visit(id):
     products = Product.query.filter_by(activo=True).all()
     promos = Promo.query.filter_by(activo=True).all()
     return render_template("visits/create.html", visit=visit, casas=casas, products=products, promos=promos)
-
-@visit_bp.route("/delete/<int:id>", methods=["POST"])
-@login_required
-def eliminar_visit(id):
-    visit = Visit.query.get_or_404(id)
-    VisitProduct.query.filter_by(visit_id=id).delete()
-    db.session.delete(visit)
-    db.session.commit()
-    flash("Visita eliminada", "success")
-    return redirect(url_for("visits.listar_visits"))

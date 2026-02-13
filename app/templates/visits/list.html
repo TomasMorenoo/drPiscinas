@@ -19,7 +19,7 @@
             <h6 class="fw-bold mb-3 small text-uppercase text-muted"><i class="bi bi-filter"></i> Período</h6>
             <form method="GET" action="{{ url_for('visits.listar_visits') }}" class="row g-2">
                 <div class="col-7">
-                    <select name="mes" class="form-select form-select-sm border-secondary">
+                    <select name="mes" class="form-select form-select-sm">
                         {% for m in range(1, 13) %}
                         <option value="{{ m }}" {% if m == mes_sel %}selected{% endif %}>
                             {{ ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][m-1] }}
@@ -28,14 +28,14 @@
                     </select>
                 </div>
                 <div class="col-5">
-                    <input type="number" name="anio" class="form-control form-control-sm border-secondary" value="{{ anio_sel }}">
+                    <input type="number" name="anio" class="form-control form-control-sm" value="{{ anio_sel }}">
                 </div>
                 <div class="col-12">
                     <button type="submit" class="btn btn-dark btn-sm w-100 mt-1">Ver Mes</button>
                 </div>
             </form>
             <hr>
-            <form method="POST" action="{{ url_for('visits.sync_prices') }}" onsubmit="return confirm('¿Actualizar todos los precios de este mes a los valores actuales?');">
+            <form method="POST" action="{{ url_for('visits.sync_prices') }}" onsubmit="return confirm('¿Aplicar precios actuales a todas las visitas de este mes?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="mes" value="{{ mes_sel }}">
                 <input type="hidden" name="anio" value="{{ anio_sel }}">
@@ -134,7 +134,7 @@
                     {% else %}
                     <tr>
                         <td colspan="6" class="text-center py-5 text-muted fst-italic">
-                            Todavía no hubo visitas registradas en este período.
+                            No hay visitas registradas para este período.
                         </td>
                     </tr>
                     {% endfor %}
