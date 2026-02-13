@@ -58,7 +58,7 @@
             <h6 class="fw-bold mb-2 small text-uppercase text-muted">Consumo del Mes</h6>
             {% for nombre, unidad, total in top_productos %}
             <div class="d-flex justify-content-between border-bottom py-1">
-                <span class="small text-truncate">{{ nombre }}</span>
+                <span class="small text-truncate" style="max-width: 150px;">{{ nombre }}</span>
                 <span class="small fw-bold text-primary">
                     {% if total % 1 == 0 %}{{ total | int }}{% else %}{{ total }}{% endif %} {{ unidad }}
                 </span>
@@ -107,7 +107,7 @@
                         </td>
 
                         <td>
-                            <div class="text-truncate text-muted small" style="max-width: 200px; cursor: help;" 
+                            <div class="text-truncate text-muted small" style="max-width: 250px; cursor: help;" 
                                  title="{{ visit.observaciones }}" data-bs-toggle="tooltip">
                                 {{ visit.observaciones if visit.observaciones else '-' }}
                             </div>
@@ -146,7 +146,6 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Inicializar tooltips para ver observaciones completas
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
         tooltipTriggerList.map(function (el) {
             return new bootstrap.Tooltip(el)

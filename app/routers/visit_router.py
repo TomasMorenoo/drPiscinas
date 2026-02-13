@@ -60,7 +60,6 @@ def sync_prices():
         flash("Período no válido", "error")
         return redirect(url_for('visits.listar_visits'))
 
-    # Buscamos visitas del mes y año seleccionados
     visits = Visit.query.filter(
         extract('month', Visit.fecha) == mes,
         extract('year', Visit.fecha) == anio
@@ -68,13 +67,12 @@ def sync_prices():
 
     for v in visits:
         for vp in v.productos:
-            # Sincronizamos con el precio actual del catálogo
             prod_actual = Product.query.get(vp.product_id)
             if prod_actual:
                 vp.precio_unitario = prod_actual.precio
     
     db.session.commit()
-    flash(f"Precios actualizados para todo el mes {mes}/{anio}", "success")
+    flash(f"Precios actualizados para {mes}/{anio}", "success")
     return redirect(url_for('visits.listar_visits', mes=mes, anio=anio))
 
 @visit_bp.route("/create", methods=["GET", "POST"])
@@ -108,7 +106,7 @@ def crear_visit():
                         visit_id=visit.id, 
                         product_id=p_id, 
                         cantidad=float(cant),
-                        precio_unitario=prod.precio # CONGELAMOS PRECIO
+                        precio_unitario=prod.precio
                     )
                     db.session.add(vp)
         
@@ -139,12 +137,7 @@ def editar_visit(id):
             if p_id and cant:
                 prod = Product.query.get(p_id)
                 if prod:
-                    vp = VisitProduct(
-                        visit_id=id, 
-                        product_id=p_id, 
-                        cantidad=float(cant),
-                        precio_unitario=prod.precio
-                    )
+                    vp = VisitProduct(visit_id=id, product_id=p_id, cantidad=float(cant), precio_unitario=prod.precio)
                     db.session.add(vp)
         
         db.session.commit()
