@@ -72,6 +72,7 @@ def create_app():
     from app.routers.promo_router import promo_bp
     from app.routers.dashboard_router import dashboard_bp
     from app.routers.auth_router import auth_bp
+    from app.models.abono_historico import AbonoHistorico
 
     app.register_blueprint(main_bp)
     app.register_blueprint(country_bp)
@@ -82,6 +83,7 @@ def create_app():
     app.register_blueprint(promo_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(AbonoHistorico)
 
     return app
 
