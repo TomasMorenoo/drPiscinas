@@ -3,10 +3,13 @@
 
 {% block content %}
 <div class="row mb-4 mt-2 align-items-center">
-    <div class="col-md-4">
+    <div class="col-md-6 d-flex align-items-center">
         <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-calendar-check me-2"></i>Visitas</h1>
+        <span class="badge bg-primary ms-3 fs-6 fw-normal shadow-sm">
+            <i class="bi bi-calendar-event me-1"></i> Viendo: {{ ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][mes_sel - 1] }} {{ anio_sel }}
+        </span>
     </div>
-    <div class="col-md-8 text-md-end mt-3 mt-md-0">
+    <div class="col-md-6 text-md-end mt-3 mt-md-0">
         <a href="{{ url_for('visits.crear_visit') }}" class="btn btn-success shadow-sm fw-bold">
             <i class="bi bi-plus-lg"></i> Nueva Visita
         </a>

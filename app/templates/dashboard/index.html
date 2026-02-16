@@ -7,6 +7,16 @@
 
 <div class="container-fluid py-4">
     
+    {# --- TÍTULO Y VISOR DE MES ACTIVO --- #}
+    <div class="d-flex align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800 fw-bold">
+            <i class="bi bi-speedometer2 me-2"></i>Reporte Financiero
+        </h1>
+        <span class="badge bg-primary ms-3 fs-6 fw-normal shadow-sm">
+            <i class="bi bi-calendar-check me-1"></i> Viendo: {{ nombres_meses[mes - 1] }} {{ anio }}
+        </span>
+    </div>
+
     {# --- 1. FILTROS Y CONTROLES --- #}
     <div class="card mb-4 border-0 shadow-sm {% if mes_congelado %}border-start border-4 border-warning{% endif %}">
         <div class="card-body bg-light rounded d-flex justify-content-between align-items-center flex-wrap gap-3">
