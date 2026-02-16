@@ -21,21 +21,22 @@ def index():
     reporte = []
 
     total_clientes = 0
-    total_abono = 0
-    total_extras = 0
-    total_general = 0
+    total_abono = 0.0
+    total_extras = 0.0
+    total_general = 0.0
 
     for casa in casas:
-        # Obtenemos los extras del mes
+        # Obtenemos los extras del mes y FORZAMOS a float
         datos = casa.obtener_gastos_mensuales(mes, anio)
-        extras = datos.get("extras", 0)
+        extras = float(datos.get("extras", 0))
 
         # Buscamos si hay un abono congelado para esta casa en este mes/año
         historial = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
         
-        # Si existe el historial, usamos ese monto. Si no, mostramos el precio actual.
-        abono_mes = historial.monto if historial else (casa.precio_base or 0)
+        # FORZAMOS a float el abono (Esto soluciona el error del Decimal)
+        abono_mes = float(historial.monto) if historial else float(casa.precio_base or 0)
         
+        # Ahora sí, los dos son float y se pueden sumar
         total_cliente = abono_mes + extras
 
         reporte.append({
@@ -78,13 +79,13 @@ def sync_abonos():
         historial = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
         
         if historial:
-            historial.monto = casa.precio_base or 0
+            historial.monto = float(casa.precio_base or 0)
         else:
             nuevo_historial = AbonoHistorico(
                 casa_id=casa.id, 
                 mes=mes, 
                 anio=anio, 
-                monto=casa.precio_base or 0
+                monto=float(casa.precio_base or 0)
             )
             db.session.add(nuevo_historial)
 
