@@ -7,8 +7,8 @@
 
 <div class="container-fluid py-4">
     
-    {# --- 1. FILTROS Y SINCRONIZACIÓN --- #}
-    <div class="card mb-4 border-0 shadow-sm">
+    {# --- 1. FILTROS Y CONTROLES --- #}
+    <div class="card mb-4 border-0 shadow-sm {% if mes_congelado %}border-start border-4 border-warning{% endif %}">
         <div class="card-body bg-light rounded d-flex justify-content-between align-items-center flex-wrap gap-3">
             
             <form method="GET" class="row g-2 align-items-center m-0">
@@ -30,8 +30,25 @@
                 <div class="col-auto">
                     <button type="submit" class="btn btn-sm btn-dark px-3">Actualizar</button>
                 </div>
+                
+                {% if mes_congelado %}
+                <div class="col-auto ms-2">
+                    <span class="badge bg-warning text-dark"><i class="bi bi-lock-fill"></i> Mes Cerrado</span>
+                </div>
+                {% endif %}
             </form>
 
+            {# --- BOTONES DINÁMICOS: CONGELAR O DESCONGELAR --- #}
+            {% if mes_congelado %}
+            <form method="POST" action="{{ url_for('dashboard.unsync_abonos') }}" class="m-0" onsubmit="return confirm('¿Estás seguro de descongelar? El reporte volverá a mostrar los precios actuales de los clientes en lugar de lo que cobraste ese mes.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="mes" value="{{ mes }}">
+                <input type="hidden" name="anio" value="{{ anio }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger fw-bold shadow-sm">
+                    <i class="bi bi-unlock-fill me-1"></i> Descongelar Abonos
+                </button>
+            </form>
+            {% else %}
             <form method="POST" action="{{ url_for('dashboard.sync_abonos') }}" class="m-0" onsubmit="return confirm('¿Congelar los abonos de este mes con los valores actuales de los clientes?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="mes" value="{{ mes }}">
@@ -40,6 +57,7 @@
                     <i class="bi bi-lock-fill me-1"></i> Congelar Abonos del Mes
                 </button>
             </form>
+            {% endif %}
 
         </div>
     </div>

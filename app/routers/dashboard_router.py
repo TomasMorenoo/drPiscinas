@@ -17,6 +17,10 @@ def index():
         mes = datetime.now().month
         anio = datetime.now().year
     
+    # Verificamos si este mes ya tiene algún registro congelado para mostrar el botón correcto
+    registro_congelado = AbonoHistorico.query.filter_by(mes=mes, anio=anio).first()
+    mes_congelado = True if registro_congelado else False
+
     casas = Casa.query.filter_by(activo=True).all()
     reporte = []
 
@@ -26,17 +30,12 @@ def index():
     total_general = 0.0
 
     for casa in casas:
-        # Obtenemos los extras del mes y FORZAMOS a float
         datos = casa.obtener_gastos_mensuales(mes, anio)
         extras = float(datos.get("extras", 0))
 
-        # Buscamos si hay un abono congelado para esta casa en este mes/año
         historial = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
-        
-        # FORZAMOS a float el abono (Esto soluciona el error del Decimal)
         abono_mes = float(historial.monto) if historial else float(casa.precio_base or 0)
         
-        # Ahora sí, los dos son float y se pueden sumar
         total_cliente = abono_mes + extras
 
         reporte.append({
@@ -56,6 +55,7 @@ def index():
         reporte=reporte,
         mes=mes,
         anio=anio,
+        mes_congelado=mes_congelado, # <-- Pasamos la variable al HTML
         kpi_clientes=total_clientes,
         kpi_abono=total_abono,
         kpi_extras=total_extras,
@@ -91,4 +91,21 @@ def sync_abonos():
 
     db.session.commit()
     flash(f"Abonos congelados exitosamente para el mes {mes}/{anio}", "success")
+    return redirect(url_for('dashboard.index', mes=mes, anio=anio))
+
+@dashboard_bp.route("/unsync-abonos", methods=["POST"])
+@login_required
+def unsync_abonos():
+    mes = request.form.get("mes", type=int)
+    anio = request.form.get("anio", type=int)
+
+    if not mes or not anio:
+        flash("Período no válido", "error")
+        return redirect(url_for('dashboard.index'))
+
+    # Borramos todos los registros de abonos guardados para ese mes
+    AbonoHistorico.query.filter_by(mes=mes, anio=anio).delete()
+    db.session.commit()
+
+    flash(f"Abonos descongelados para el mes {mes}/{anio}. Se volvieron a tomar los valores actuales.", "info")
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
