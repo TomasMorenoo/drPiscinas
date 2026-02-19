@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from flask_login import login_required # <--- 1. IMPORTAR SEGURIDAD
+from flask_login import login_required
 from app import db
 from app.models import Casa, Country, Barrio
 import re 
@@ -7,29 +7,77 @@ import re
 casa_bp = Blueprint("casas", __name__, url_prefix="/casas")
 
 # ==========================================
-# LÓGICA DE ORDENAMIENTO
+# LÓGICA DE ORDENAMIENTO (NATURAL)
 # ==========================================
 def natural_sort_key(casa):
     k_country = casa.country.nombre.lower() if casa.country else "zzz"
     k_barrio = casa.barrio.nombre.lower() if casa.barrio else ""
-    k_numero = [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', casa.numero)]
+    # Aseguramos que numero sea string por si viene vacío o raro
+    k_numero = [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', str(casa.numero))]
     return (k_country, k_barrio, k_numero)
 
 # ==========================================
 # LISTADO
 # ==========================================
-@casa_bp.route("/")
-@login_required # <--- CANDADO PUESTO
+@casa_bp.route("/", methods=["GET"])
+@login_required
 def listar_casas():
-    casas_db = Casa.query.all()
-    casas = sorted(casas_db, key=natural_sort_key)
-    return render_template("casas/list.html", casas=casas)
+    # 1. Atrapamos los parámetros
+    buscar = request.args.get("buscar", "").strip()
+    estado = request.args.get("estado", "todo")
+    country_id = request.args.get("country_id", "")
+    barrio_id = request.args.get("barrio_id", "")
+
+    # 2. Empezamos a armar la consulta
+    query = Casa.query
+
+    # Filtro de texto libre (Lote/Número)
+    if buscar:
+        query = query.filter(Casa.numero.ilike(f"%{buscar}%"))
+
+    # Filtro por Estado
+    if estado == "activos":
+        query = query.filter(Casa.activo == True)
+    elif estado == "pausados":
+        query = query.filter(Casa.activo == False)
+
+    # Filtro por Country
+    if country_id:
+        query = query.filter(Casa.country_id == country_id)
+
+    # Filtro por Barrio
+    if barrio_id:
+        query = query.filter(Casa.barrio_id == barrio_id)
+
+    # Ejecutamos la búsqueda Y ORDENAMOS
+    casas = query.all()
+    casas.sort(key=natural_sort_key)
+
+    # 3. Traemos datos para los Selects
+    countries = Country.query.filter_by(activo=True).order_by(Country.nombre).all()
+    
+    barrios = []
+    if country_id:
+        from app.models.country import Barrio 
+        barrios = Barrio.query.filter_by(country_id=country_id, activo=True).order_by(Barrio.nombre).all()
+
+    # Le pasamos todo al HTML
+    return render_template(
+        "casas/list.html", 
+        casas=casas, 
+        countries=countries, 
+        barrios=barrios,
+        buscar_actual=buscar,
+        estado_actual=estado,
+        country_actual=country_id,
+        barrio_actual=barrio_id
+    )
 
 # ==========================================
 # HERRAMIENTA DE AUMENTOS
 # ==========================================
 @casa_bp.route("/aumento", methods=["GET", "POST"])
-@login_required # <--- CANDADO PUESTO
+@login_required 
 def herramienta_aumento():
     if request.method == "POST":
         tipo = request.form.get("tipo")
@@ -53,13 +101,11 @@ def herramienta_aumento():
         count = 0
 
         for casa in casas_afectadas:
-            # 1. SNAPSHOT (Convertimos a float para evitar conflictos)
             try:
                 casa.precio_anterior = float(casa.precio_base) if casa.precio_base else 0.0
             except:
                 casa.precio_anterior = 0.0
             
-            # 2. CALCULAR
             precio_actual = float(casa.precio_base)
             
             if tipo == "porcentaje":
@@ -83,7 +129,7 @@ def herramienta_aumento():
 # DESHACER (VOLVER A LISTA)
 # ==========================================
 @casa_bp.route("/deshacer_aumento")
-@login_required # <--- CANDADO PUESTO
+@login_required
 def deshacer_aumento():
     casas_modificadas = Casa.query.filter(Casa.precio_anterior.isnot(None)).all()
     
@@ -102,10 +148,10 @@ def deshacer_aumento():
     return redirect(url_for("casas.listar_casas"))
 
 # ==========================================
-# EDITAR CLIENTE (CORREGIDO ERROR DECIMAL)
+# EDITAR CLIENTE
 # ==========================================
 @casa_bp.route("/edit/<int:id>", methods=["GET", "POST"])
-@login_required # <--- CANDADO PUESTO
+@login_required 
 def editar_casa(id):
     casa = Casa.query.get_or_404(id)
 
@@ -134,7 +180,6 @@ def editar_casa(id):
             flash("Ya existe otra casa con esa dirección.", "error")
             return redirect(url_for("casas.editar_casa", id=id))
 
-        # --- CORRECCIÓN CRÍTICA ---
         precio_actual_db = float(casa.precio_base) if casa.precio_base else 0.0
         
         if abs(precio_actual_db - nuevo_precio) > 0.01:
@@ -158,7 +203,7 @@ def editar_casa(id):
 # CREAR (CON CARGA MÚLTIPLE)
 # ==========================================
 @casa_bp.route("/create", methods=["GET", "POST"])
-@login_required # <--- CANDADO PUESTO
+@login_required 
 def crear_casa():
     if request.method == "POST":
         numeros_input = request.form.get("numero", "").strip()
@@ -170,14 +215,12 @@ def crear_casa():
             flash("Faltan datos obligatorios.", "error")
             return redirect(url_for("casas.crear_casa"))
 
-        # Separamos el texto por comas y limpiamos los espacios
         numeros_lista = [n.strip() for n in numeros_input.split(",") if n.strip()]
         
         creados = 0
         omitidos = 0
         
         for num in numeros_lista:
-            # Chequeamos si ESTA casa en particular ya existe
             query = Casa.query.filter_by(numero=num, country_id=country_id)
             if barrio_id:
                 query = query.filter_by(barrio_id=barrio_id)
@@ -186,9 +229,8 @@ def crear_casa():
                 
             if query.first():
                 omitidos += 1
-                continue # Si ya existe, la saltea y sigue con la próxima
+                continue 
 
-            # Si no existe, la preparamos para guardar
             nueva_casa = Casa(
                 numero=num, 
                 precio_base=precio_base, 
@@ -200,7 +242,6 @@ def crear_casa():
 
         db.session.commit()
         
-        # Mensajes dinámicos según el resultado de la carga
         if creados > 0 and omitidos == 0:
             flash(f"✅ Se crearon {creados} clientes correctamente.", "success")
         elif creados > 0 and omitidos > 0:
@@ -215,7 +256,7 @@ def crear_casa():
     return render_template("casas/create.html", countries=countries, barrios=barrios)
 
 @casa_bp.route("/create_form", methods=["GET"]) 
-@login_required # <--- CANDADO PUESTO
+@login_required
 def form_crear_casa():
     return crear_casa()
 
@@ -223,13 +264,13 @@ def form_crear_casa():
 # UTILIDADES
 # ==========================================
 @casa_bp.route("/barrios/<int:country_id>")
-@login_required # <--- CANDADO PUESTO (Para que no espíen tu API interna)
+@login_required
 def barrios_por_country(country_id):
     barrios = Barrio.query.filter_by(country_id=country_id, activo=True).order_by(Barrio.nombre).all()
     return jsonify([{"id": b.id, "nombre": b.nombre} for b in barrios])
 
 @casa_bp.route("/toggle/<int:id>")
-@login_required # <--- CANDADO PUESTO
+@login_required
 def toggle_casa(id):
     casa = Casa.query.get_or_404(id)
     casa.activo = not casa.activo

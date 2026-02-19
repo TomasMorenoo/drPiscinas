@@ -2,11 +2,25 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
 from app import db
 from app.models.casa import Casa
+from app.models.country import Country, Barrio
 from app.models.abono_historico import AbonoHistorico
 from datetime import datetime
+import re
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
+# ==========================================
+# LÓGICA DE ORDENAMIENTO (NATURAL)
+# ==========================================
+def natural_sort_key(casa):
+    k_country = casa.country.nombre.lower() if casa.country else "zzz"
+    k_barrio = casa.barrio.nombre.lower() if casa.barrio else ""
+    k_numero = [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', str(casa.numero))]
+    return (k_country, k_barrio, k_numero)
+
+# ==========================================
+# DASHBOARD PRINCIPAL
+# ==========================================
 @dashboard_bp.route("/")
 @login_required
 def index():
@@ -17,13 +31,15 @@ def index():
         mes = datetime.now().month
         anio = datetime.now().year
     
-    # Verificamos si este mes ya tiene algún registro congelado para mostrar el botón correcto
+    # Verificamos si este mes ya tiene algún registro congelado
     registro_congelado = AbonoHistorico.query.filter_by(mes=mes, anio=anio).first()
     mes_congelado = True if registro_congelado else False
 
+    # Traemos las casas y APLICAMOS LA MAGIA DEL ORDENAMIENTO
     casas = Casa.query.filter_by(activo=True).all()
-    reporte = []
+    casas.sort(key=natural_sort_key)
 
+    reporte = []
     total_clientes = 0
     total_abono = 0.0
     total_extras = 0.0
@@ -55,7 +71,7 @@ def index():
         reporte=reporte,
         mes=mes,
         anio=anio,
-        mes_congelado=mes_congelado, # <-- Pasamos la variable al HTML
+        mes_congelado=mes_congelado,
         kpi_clientes=total_clientes,
         kpi_abono=total_abono,
         kpi_extras=total_extras,

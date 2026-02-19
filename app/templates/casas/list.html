@@ -28,6 +28,60 @@
     </div>
 </div>
 
+{# --- TARJETA DE FILTROS --- #}
+<div class="card border-0 shadow-sm mb-4 bg-light">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('casas.listar_casas') }}" class="row g-3 align-items-end">
+            
+            <div class="col-md-2">
+                <label class="form-label fw-bold text-secondary small text-uppercase">Buscar Lote</label>
+                <div class="input-group shadow-sm">
+                    <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-search"></i></span>
+                    <input type="text" name="buscar" class="form-control border-0" placeholder="Ej: 43" value="{{ buscar_actual }}">
+                </div>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label fw-bold text-secondary small text-uppercase">Estado</label>
+                <select name="estado" class="form-select border-0 shadow-sm">
+                    <option value="todo" {% if estado_actual == 'todo' %}selected{% endif %}>🟢🔴 Todos</option>
+                    <option value="activos" {% if estado_actual == 'activos' %}selected{% endif %}>🟢 Activos</option>
+                    <option value="pausados" {% if estado_actual == 'pausados' %}selected{% endif %}>🔴 Pausados</option>
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label fw-bold text-secondary small text-uppercase">Country</label>
+                <select name="country_id" id="filtroCountry" class="form-select border-0 shadow-sm">
+                    <option value="">Todos los Countries</option>
+                    {% for c in countries %}
+                    <option value="{{ c.id }}" {% if country_actual == c.id|string %}selected{% endif %}>{{ c.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label fw-bold text-secondary small text-uppercase">Barrio</label>
+                <select name="barrio_id" id="filtroBarrio" class="form-select border-0 shadow-sm" {% if not country_actual %}disabled{% endif %}>
+                    <option value="">Todos los Barrios</option>
+                    {% for b in barrios %}
+                    <option value="{{ b.id }}" {% if barrio_actual == b.id|string %}selected{% endif %}>{{ b.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2 d-grid gap-2 d-md-flex justify-content-md-end">
+                <a href="{{ url_for('casas.listar_casas') }}" class="btn btn-outline-secondary shadow-sm" title="Limpiar Filtros">
+                    <i class="bi bi-eraser"></i>
+                </a>
+                <button type="submit" class="btn btn-primary shadow-sm fw-bold w-100">
+                    Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 {# --- TABLA DE CLIENTES --- #}
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
@@ -85,7 +139,7 @@
                 <tr>
                     <td colspan="4" class="text-center py-5 text-muted">
                         <i class="bi bi-house-door fs-1 d-block mb-3 opacity-25"></i>
-                        No hay clientes registrados.<br>
+                        No hay clientes registrados o no coinciden con los filtros.<br>
                         <small>Utilice el botón "Nuevo" para agregar propiedades.</small>
                     </td>
                 </tr>
@@ -95,4 +149,35 @@
     </div>
 </div>
 
-{% endblock %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const countrySelect = document.getElementById('filtroCountry');
+    const barrioSelect = document.getElementById('filtroBarrio');
+
+    countrySelect.addEventListener('change', function() {
+        const countryId = this.value;
+
+        // Limpiar y bloquear barrio por defecto
+        barrioSelect.innerHTML = '<option value="">Todos los Barrios</option>';
+        barrioSelect.disabled = true;
+
+        if (countryId) {
+            // Buscamos los barrios de este country
+            fetch(`/casas/barrios/${countryId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        barrioSelect.disabled = false;
+                        data.forEach(b => {
+                            const option = document.createElement('option');
+                            option.value = b.id;
+                            option.textContent = b.nombre;
+                            barrioSelect.appendChild(option);
+                        });
+                    }
+                })
+                .catch(err => console.error('Error al cargar barrios:', err));
+        }
+    });
+});
+</script>
