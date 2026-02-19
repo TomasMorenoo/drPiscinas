@@ -44,9 +44,9 @@
             <div class="col-md-2">
                 <label class="form-label fw-bold text-secondary small text-uppercase">Estado</label>
                 <select name="estado" class="form-select border-0 shadow-sm">
-                    <option value="todo" {% if estado_actual == 'todo' %}selected{% endif %}>🟢🔴 Todos</option>
-                    <option value="activos" {% if estado_actual == 'activos' %}selected{% endif %}>🟢 Activos</option>
-                    <option value="pausados" {% if estado_actual == 'pausados' %}selected{% endif %}>🔴 Pausados</option>
+                    <option value="todo" {% if estado_actual == 'todo' %}selected{% endif %}>Todos</option>
+                    <option value="activos" {% if estado_actual == 'activos' %}selected{% endif %}>Activos</option>
+                    <option value="inactivos" {% if estado_actual == 'inactivos' %}selected{% endif %}>Inactivos</option>
                 </select>
             </div>
 
@@ -113,7 +113,7 @@
                             </span>
                         {% else %}
                             <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill text-uppercase" style="font-size: 0.7rem;">
-                                Pausado
+                                Inactivo
                             </span>
                         {% endif %}
                     </td>
@@ -181,3 +181,4 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+{% endblock %}

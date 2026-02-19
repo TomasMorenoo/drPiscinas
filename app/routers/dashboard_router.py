@@ -1,8 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
 from app import db
-from app.models.casa import Casa
-from app.models.country import Country, Barrio
+from app.models import Casa, Country, Barrio
 from app.models.abono_historico import AbonoHistorico
 from datetime import datetime
 import re

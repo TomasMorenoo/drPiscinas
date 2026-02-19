@@ -38,7 +38,7 @@ def listar_casas():
     # Filtro por Estado
     if estado == "activos":
         query = query.filter(Casa.activo == True)
-    elif estado == "pausados":
+    elif estado == "inactivos":
         query = query.filter(Casa.activo == False)
 
     # Filtro por Country
