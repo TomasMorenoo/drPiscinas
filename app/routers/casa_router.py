@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required
 from app import db
 from app.models import Casa, Country, Barrio
-import re 
+import re
 
 casa_bp = Blueprint("casas", __name__, url_prefix="/casas")
 
@@ -58,7 +58,6 @@ def listar_casas():
     
     barrios = []
     if country_id:
-        from app.models.country import Barrio 
         barrios = Barrio.query.filter_by(country_id=country_id, activo=True).order_by(Barrio.nombre).all()
 
     # Le pasamos todo al HTML
