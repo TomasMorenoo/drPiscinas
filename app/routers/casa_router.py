@@ -155,35 +155,59 @@ def editar_casa(id):
     return render_template("casas/edit.html", casa=casa, countries=countries, barrios=barrios)
 
 # ==========================================
-# CREAR
+# CREAR (CON CARGA MÚLTIPLE)
 # ==========================================
 @casa_bp.route("/create", methods=["GET", "POST"])
 @login_required # <--- CANDADO PUESTO
 def crear_casa():
     if request.method == "POST":
-        numero = request.form.get("numero", "").strip()
+        numeros_input = request.form.get("numero", "").strip()
         precio_base = request.form.get("precio_base", "").strip()
         country_id = request.form.get("country_id")
         barrio_id = request.form.get("barrio_id") or None
 
-        if not numero or not precio_base or not country_id:
+        if not numeros_input or not precio_base or not country_id:
             flash("Faltan datos obligatorios.", "error")
             return redirect(url_for("casas.crear_casa"))
 
-        query = Casa.query.filter_by(numero=numero, country_id=country_id)
-        if barrio_id:
-            query = query.filter_by(barrio_id=barrio_id)
-        else:
-            query = query.filter_by(barrio_id=None)
-            
-        if query.first():
-            flash("Esa casa ya existe.", "error")
-            return redirect(url_for("casas.listar_casas"))
+        # Separamos el texto por comas y limpiamos los espacios
+        numeros_lista = [n.strip() for n in numeros_input.split(",") if n.strip()]
+        
+        creados = 0
+        omitidos = 0
+        
+        for num in numeros_lista:
+            # Chequeamos si ESTA casa en particular ya existe
+            query = Casa.query.filter_by(numero=num, country_id=country_id)
+            if barrio_id:
+                query = query.filter_by(barrio_id=barrio_id)
+            else:
+                query = query.filter_by(barrio_id=None)
+                
+            if query.first():
+                omitidos += 1
+                continue # Si ya existe, la saltea y sigue con la próxima
 
-        nueva_casa = Casa(numero=numero, precio_base=precio_base, country_id=country_id, barrio_id=barrio_id)
-        db.session.add(nueva_casa)
+            # Si no existe, la preparamos para guardar
+            nueva_casa = Casa(
+                numero=num, 
+                precio_base=precio_base, 
+                country_id=country_id, 
+                barrio_id=barrio_id
+            )
+            db.session.add(nueva_casa)
+            creados += 1
+
         db.session.commit()
-        flash("Cliente creado.", "success")
+        
+        # Mensajes dinámicos según el resultado de la carga
+        if creados > 0 and omitidos == 0:
+            flash(f"✅ Se crearon {creados} clientes correctamente.", "success")
+        elif creados > 0 and omitidos > 0:
+            flash(f"⚠️ Se crearon {creados} clientes. {omitidos} se omitieron porque ya existían.", "warning")
+        elif creados == 0 and omitidos > 0:
+            flash(f"❌ No se creó ningún cliente. Los {omitidos} ingresados ya existían.", "error")
+
         return redirect(url_for("casas.listar_casas"))
 
     countries = Country.query.filter_by(activo=True).order_by(Country.nombre).all()
