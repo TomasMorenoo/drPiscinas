@@ -39,7 +39,11 @@
                                 <option value="">-- Sin promo --</option>
                                 {% for promo in promos %}
                                     <option value="{{ promo.id }}">
-                                        {{ promo.nombre }} (${{ promo.precio }})
+                                        {% if current_user.is_admin() %}
+                                            {{ promo.nombre }} (${{ promo.precio }})
+                                        {% else %}
+                                            {{ promo.nombre }}
+                                        {% endif %}
                                     </option>
                                 {% endfor %}
                             </select>

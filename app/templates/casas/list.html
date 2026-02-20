@@ -98,8 +98,10 @@
                 {% for casa in casas %}
                 <tr class="{{ '' if casa.activo else 'opacity-50' }}">
                     
-                    <td class="ps-4 fw-bold text-dark">
-                        {{ casa.nombre_formateado() }}
+                    <td class="fw-bold text-dark">
+                        <a href="{{ url_for('casas.perfil', id=casa.id) }}" class="text-reset text-decoration-none d-block" title="Ver Ficha del Cliente">
+                            {{ casa.nombre_formateado() }}
+                        </a>
                     </td>
 
                     <td class="text-end font-monospace text-secondary">

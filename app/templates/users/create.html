@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Crear Usuario{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-sm border-0 mt-4">
+            <div class="card-header bg-dark text-white py-3">
+                <h2 class="h5 mb-0"><i class="bi bi-person-plus-fill me-2"></i>Dar de alta nuevo usuario</h2>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-uppercase">Nombre de Usuario</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
+                            <input type="text" name="username" class="form-control" placeholder="Ej: pablo_op" required autofocus>
+                        </div>
+                        <div class="form-text">Sin espacios, lo usará para iniciar sesión.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-uppercase">Contraseña Inicial</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-lock"></i></span>
+                            <input type="text" name="password" class="form-control" placeholder="Ej: 1234" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase">Permisos (Rol)</label>
+                        <select name="rol" class="form-select border-primary bg-primary border-opacity-25 bg-opacity-10 fw-bold">
+                            <option value="empleado" selected>👷‍♂️ EMPLEADO (Solo carga visitas, no ve plata)</option>
+                            <option value="admin">👑 ADMINISTRADOR (Acceso total al negocio)</option>
+                        </select>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary shadow-sm fw-bold py-2">
+                            Crear Cuenta
+                        </button>
+                        <a href="{{ url_for('users.listar_usuarios') }}" class="btn btn-link text-muted">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

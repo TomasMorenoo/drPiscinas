@@ -22,7 +22,7 @@
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="col-lg-4">
+    <div class="{% if current_user.is_admin() %}col-lg-4{% else %}col-lg-6{% endif %}">
         <div class="card border-0 shadow-sm p-3 h-100 {% if mes_congelado %}border-start border-4 border-warning{% endif %}">
             <h6 class="fw-bold mb-3 small text-uppercase text-muted"><i class="bi bi-filter"></i> Período</h6>
             <form method="GET" action="{{ url_for('visits.listar_visits') }}" class="row g-2">
@@ -51,14 +51,16 @@
         </div>
     </div>
 
+    {% if current_user.is_admin() %}
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm bg-primary text-white p-3 h-100 d-flex flex-column justify-content-center">
             <h6 class="fw-bold small text-uppercase opacity-75">Facturación Extras del Mes</h6>
             <h2 class="mb-0 fw-bold">$ {{ "{:,.2f}".format(total_mes) }}</h2>
         </div>
     </div>
+    {% endif %}
 
-    <div class="col-lg-4">
+    <div class="{% if current_user.is_admin() %}col-lg-4{% else %}col-lg-6{% endif %}">
         <div class="card border-0 shadow-sm p-3 h-100">
             <h6 class="fw-bold mb-2 small text-uppercase text-muted">Consumo del Mes</h6>
             {% for nombre, unidad, total in top_productos %}
@@ -85,7 +87,11 @@
                         <th>Casa / Ubicación</th>
                         <th>Productos / Promo</th>
                         <th>Observaciones</th>
+                        
+                        {% if current_user.is_admin() %}
                         <th class="text-center">Total</th>
+                        {% endif %}
+                        
                         <th class="text-end pe-4">Acciones</th>
                     </tr>
                 </thead>
@@ -95,7 +101,9 @@
                         <td class="ps-4">{{ visit.fecha.strftime('%d/%m/%Y') }}</td>
                         
                         <td class="fw-bold text-dark">
-                            {{ visit.casa.nombre_formateado() }}
+                            <a href="{{ url_for('casas.perfil', id=visit.casa.id) }}" class="text-reset text-decoration-none">
+                                {{ visit.casa.nombre_formateado() }}
+                            </a>
                         </td>
 
                         <td>
@@ -118,9 +126,11 @@
                             </div>
                         </td>
 
+                        {% if current_user.is_admin() %}
                         <td class="text-center fw-bold text-success">
                             $ {{ "{:,.2f}".format(visit.calcular_total()) }}
                         </td>
+                        {% endif %}
 
                         <td class="text-end pe-4">
                             {% if not mes_congelado %}
@@ -142,7 +152,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" class="text-center py-5 text-muted fst-italic">
+                        <td colspan="{% if current_user.is_admin() %}6{% else %}5{% endif %}" class="text-center py-5 text-muted fst-italic">
                             No hay visitas registradas para este período.
                         </td>
                     </tr>

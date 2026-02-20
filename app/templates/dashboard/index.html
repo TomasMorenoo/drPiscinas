@@ -48,23 +48,23 @@
                 {% endif %}
             </form>
 
-            {# --- BOTONES DINÁMICOS: CONGELAR O DESCONGELAR --- #}
+            {# --- BOTONES DINÁMICOS: CERRAR O REABRIR MES --- #}
             {% if mes_congelado %}
-            <form method="POST" action="{{ url_for('dashboard.unsync_abonos') }}" class="m-0" onsubmit="return confirm('¿Estás seguro de descongelar? El reporte volverá a mostrar los precios actuales de los clientes en lugar de lo que cobraste ese mes.');">
+            <form method="POST" action="{{ url_for('dashboard.unsync_abonos') }}" class="m-0" onsubmit="return confirm('¿Seguro que querés reabrir este mes? Se permitirán editar visitas y los abonos volverán a ser los actuales.');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="mes" value="{{ mes }}">
                 <input type="hidden" name="anio" value="{{ anio }}">
                 <button type="submit" class="btn btn-sm btn-outline-danger fw-bold shadow-sm">
-                    <i class="bi bi-unlock-fill me-1"></i> Descongelar Abonos
+                    <i class="bi bi-unlock-fill me-1"></i> REABRIR MES
                 </button>
             </form>
             {% else %}
-            <form method="POST" action="{{ url_for('dashboard.sync_abonos') }}" class="m-0" onsubmit="return confirm('¿Congelar los abonos de este mes con los valores actuales de los clientes?');">
+            <form method="POST" action="{{ url_for('dashboard.sync_abonos') }}" class="m-0" onsubmit="return confirm('¿Estás seguro de cerrar el mes? Se sellarán los abonos actuales y se bloqueará la edición de visitas para este período.');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="mes" value="{{ mes }}">
                 <input type="hidden" name="anio" value="{{ anio }}">
                 <button type="submit" class="btn btn-sm btn-warning fw-bold shadow-sm">
-                    <i class="bi bi-lock-fill me-1"></i> Congelar Abonos del Mes
+                    <i class="bi bi-lock-fill me-1"></i> CERRAR MES
                 </button>
             </form>
             {% endif %}
@@ -88,7 +88,7 @@
     </div>
     {% else %}
     
-    {# --- 2. CARDS DE KPI --- #}
+    {# --- 2. CARDS DE KPI (LOS ORIGINALES) --- #}
     <div class="row mb-4 g-3">
         <div class="col-6 col-md-3">
             <div class="card h-100 border-0 shadow-sm border-start border-4 border-primary">
@@ -139,23 +139,26 @@
         </div>
     </div>
 
-    {# --- 3. TABLA DE DETALLE --- #}
+    {# --- 3. TABLA DE DETALLE CON ESTADO DE PAGO Y WHATSAPP --- #}
     <div class="card border-0 shadow-sm">
         <div class="table-responsive">
             <table class="table table-striped table-hover align-middle mb-0">
                 <thead class="table-dark">
                     <tr>
                         <th class="ps-3 text-uppercase small py-3">Cliente</th>
-                        <th class="text-end text-uppercase small py-3">Abono</th>
-                        <th class="text-end text-uppercase small py-3">Extras</th>
-                        <th class="text-end text-uppercase small pe-3 py-3">Total</th>
+                        <th class="text-end text-uppercase small py-3">Abono Base</th>
+                        <th class="text-end text-uppercase small py-3">Extras / Promos</th>
+                        <th class="text-end text-uppercase small py-3">Total a Cobrar</th>
+                        <th class="text-center text-uppercase small pe-3 py-3" style="width: 140px;">Acción / Estado</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in reporte %}
                     <tr>
-                        <td class="ps-3 fw-bold text-dark">
-                            {{ item.casa.nombre_formateado() }}
+                        <td class="ps-3 fw-bold">
+                            <a href="{{ url_for('casas.perfil', id=item.casa.id) }}" class="text-decoration-none text-dark d-block" title="Ver Ficha del Cliente">
+                                {{ item.casa.nombre_formateado() }}
+                            </a>
                         </td>
                         <td class="text-end font-monospace text-muted">
                             ${{ "{:,.2f}".format(item.abono) }}
@@ -163,8 +166,45 @@
                         <td class="text-end font-monospace text-muted">
                             ${{ "{:,.2f}".format(item.extras) }}
                         </td>
-                        <td class="text-end font-monospace fw-bold text-dark pe-3">
+                        <td class="text-end font-monospace fw-bold text-dark fs-6">
                             ${{ "{:,.2f}".format(item.total) }}
+                        </td>
+                        <td class="text-center pe-3" style="width: 140px;">
+                            {% if mes_congelado and item.id_historial %}
+                                <div class="d-flex justify-content-center gap-1">
+                                    
+                                    {% if item.url_wa %}
+                                    <a href="{{ item.url_wa }}" target="_blank"
+                                       onclick="marcarEnviado({{ item.id_historial }})"
+                                       class="btn btn-sm btn-success border shadow-sm py-0 px-2"
+                                       title="Enviar WhatsApp al cliente">
+                                        <i class="bi bi-whatsapp fs-5"></i>
+                                    </a>
+                                    {% else %}
+                                    <button class="btn btn-sm btn-secondary opacity-50 border shadow-sm py-0 px-2" disabled title="Falta agregar Teléfono en el Perfil">
+                                        <i class="bi bi-whatsapp fs-5"></i>
+                                    </button>
+                                    {% endif %}
+
+                                    <button onclick="togglePago({{ item.id_historial }}, this)" 
+                                            class="btn btn-sm border shadow-sm py-0 px-2 flex-grow-1
+                                            {% if item.pagado %}btn-success{% elif item.mensaje_enviado %}btn-primary{% else %}btn-light{% endif %}"
+                                            title="Cambiar a Pagado / Pendiente">
+                                        
+                                        {% if item.pagado %}
+                                            <i class="bi bi-check-circle-fill fs-5 text-white"></i>
+                                        {% elif item.mensaje_enviado %}
+                                            <i class="bi bi-send-check-fill fs-5 text-white" title="Mensaje Enviado"></i>
+                                        {% else %}
+                                            <i class="bi bi-clock-fill fs-5 text-danger"></i>
+                                        {% endif %}
+                                    </button>
+                                </div>
+                            {% else %}
+                                <button class="btn btn-light btn-sm w-100 border opacity-50 fs-5 py-0" disabled title="Esperando Cierre">
+                                    <i class="bi bi-lock-fill text-secondary"></i>
+                                </button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -174,4 +214,52 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+// Función para avisarle al servidor que tocaste el botón de WhatsApp
+function marcarEnviado(id) {
+    fetch(`/dashboard/marcar-mensaje/${id}`, {
+        method: 'POST',
+        headers: { 
+            'X-CSRFToken': '{{ csrf_token() }}',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(() => {
+        // Recargamos la página después de 1.5 segundos (da tiempo a que se abra WhatsApp Web)
+        setTimeout(() => location.reload(), 1500);
+    });
+}
+
+// Función para cambiar el estado de Pagado a Pendiente y viceversa
+function togglePago(id, btn) {
+    const contenidoOriginal = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm text-secondary my-1" role="status" aria-hidden="true"></span>';
+    btn.disabled = true;
+
+    fetch(`/dashboard/toggle-pago/${id}`, {
+        method: 'POST',
+        headers: { 
+            'X-CSRFToken': '{{ csrf_token() }}',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload(); 
+        } else {
+            alert("Error al actualizar el pago.");
+            btn.innerHTML = contenidoOriginal;
+            btn.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error("Error:", error);
+        alert("Ocurrió un error de conexión.");
+        btn.innerHTML = contenidoOriginal;
+        btn.disabled = false;
+    });
+}
+</script>
 {% endblock %}

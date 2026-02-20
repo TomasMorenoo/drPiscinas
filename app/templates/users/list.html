@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Gestión de Usuarios{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+    <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-shield-lock me-2"></i>Gestión de Accesos</h1>
+    <a href="{{ url_for('users.crear_usuario') }}" class="btn btn-primary shadow-sm fw-bold">
+        <i class="bi bi-person-plus-fill"></i> <span class="d-none d-md-inline ms-1">Nuevo Usuario</span>
+    </a>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="ps-4">Usuario</th>
+                        <th>Rol / Jerarquía</th>
+                        <th class="text-end pe-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in usuarios %}
+                    <tr class="{% if u.id == current_user.id %}table-primary{% endif %}">
+                        <td class="ps-4 fw-bold">
+                            {{ u.username }}
+                            {% if u.id == current_user.id %}
+                                <span class="badge bg-primary ms-2">Vos</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if u.is_admin() %}
+                                <span class="badge bg-dark"><i class="bi bi-star-fill text-warning me-1"></i> Administrador</span>
+                            {% else %}
+                                <span class="badge bg-secondary border border-secondary bg-opacity-10 text-secondary"><i class="bi bi-person-badge me-1"></i> Empleado</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end pe-4">
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#resetModal{{ u.id }}" title="Cambiar Contraseña">
+                                    <i class="bi bi-key-fill"></i>
+                                </button>
+                                
+                                <form action="{{ url_for('users.eliminar_usuario', id=u.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Seguro que querés borrar este acceso? No podrá volver a entrar.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" {% if u.id == current_user.id %}disabled{% endif %} title="Borrar Usuario">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <div class="modal fade" id="resetModal{{ u.id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <form action="{{ url_for('users.reset_password', id=u.id) }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <div class="modal-content">
+                                    <div class="modal-header bg-dark text-white">
+                                        <h5 class="modal-title"><i class="bi bi-key me-2"></i>Nueva clave para: {{ u.username }}</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <label class="form-label fw-bold">Escribí la nueva contraseña:</label>
+                                        <input type="password" name="nueva_password" class="form-control form-control-lg" placeholder="***" required>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="submit" class="btn btn-primary w-100 fw-bold">Actualizar Contraseña</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

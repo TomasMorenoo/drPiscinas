@@ -44,6 +44,24 @@
                         <input type="text" name="numero" class="form-control fw-bold" value="{{ casa.numero }}" required>
                     </div>
 
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold small text-uppercase text-muted">Nombre del Cliente</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="bi bi-person"></i></span>
+                                <input type="text" name="nombre_cliente" class="form-control fw-bold" value="{{ casa.nombre_cliente if casa.nombre_cliente else '' }}" placeholder="Ej: Juan Pérez">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold small text-uppercase text-muted">Teléfono <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="bi bi-whatsapp text-success"></i></span>
+                                <input type="text" name="telefono" class="form-control fw-bold" value="{{ casa.telefono if casa.telefono else '' }}" placeholder="Ej: 1122334455" required>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="mb-4">
                         <label class="form-label fw-bold small text-uppercase text-muted">Abono Mensual Base ($)</label>
                         <div class="input-group">

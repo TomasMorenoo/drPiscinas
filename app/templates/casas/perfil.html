@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Perfil: {{ casa.nombre_formateado() }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800 fw-bold">
+            <i class="bi bi-house-door me-2"></i>{{ casa.nombre_formateado() }}
+        </h1>
+        <a href="{{ url_for('casas.listar_casas') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Volver</a>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm border-top border-4 border-primary h-100">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-4"><i class="bi bi-person-badge text-primary me-2"></i>Datos del Cliente</h5>
+                    
+                    <div class="mb-3">
+                        <small class="text-muted d-block text-uppercase fw-bold">Nombre</small>
+                        <span class="fs-5">{{ casa.nombre_cliente if casa.nombre_cliente else 'No registrado' }}</span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <small class="text-muted d-block text-uppercase fw-bold">WhatsApp</small>
+                        {% if casa.telefono %}
+                            <span class="fs-5"><i class="bi bi-whatsapp text-success me-1"></i> {{ casa.telefono }}</span>
+                        {% else %}
+                            <span class="fs-5 text-danger"><i class="bi bi-exclamation-triangle me-1"></i> Faltante</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <small class="text-muted d-block text-uppercase fw-bold">Abono Base Actual</small>
+                        <span class="fs-5 text-success fw-bold">${{ "{:,.2f}".format(casa.precio_base) }}</span>
+                    </div>
+
+                    <div class="mt-4">
+                        <a href="{{ url_for('casas.editar_casa', id=casa.id) }}" class="btn btn-warning w-100 fw-bold">
+                            <i class="bi bi-pencil"></i> Editar Datos
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom-0 pt-3 pb-0">
+                    <ul class="nav nav-tabs border-0" id="perfilTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active fw-bold border-0 text-dark" id="visitas-tab" data-bs-toggle="tab" data-bs-target="#visitas" type="button" role="tab"><i class="bi bi-calendar-check me-1"></i> Últimas Visitas</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link fw-bold border-0 text-muted" id="pagos-tab" data-bs-toggle="tab" data-bs-target="#pagos" type="button" role="tab"><i class="bi bi-receipt me-1"></i> Historial de Pagos</button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body bg-light rounded-bottom">
+                    <div class="tab-content" id="perfilTabsContent">
+                        
+                        <div class="tab-pane fade show active" id="visitas" role="tabpanel">
+                            <ul class="list-group list-group-flush rounded shadow-sm">
+                                {% for visit in visitas %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center p-3">
+                                    <div>
+                                        <h6 class="mb-0 fw-bold">{{ visit.fecha.strftime('%d/%m/%Y') }}</h6>
+                                        <small class="text-muted">
+                                            {% for vp in visit.productos %}{{ vp.product.nombre }} ({{ vp.cantidad }}) {% endfor %}
+                                        </small>
+                                    </div>
+                                    <span class="badge bg-primary rounded-pill fs-6">${{ "{:,.0f}".format(visit.calcular_total()) }}</span>
+                                </li>
+                                {% else %}
+                                <li class="list-group-item text-center text-muted p-4">No hay visitas registradas.</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+
+                        <div class="tab-pane fade" id="pagos" role="tabpanel">
+                            <ul class="list-group list-group-flush rounded shadow-sm">
+                                {% for pago in historial_pagos %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center p-3">
+                                    <div>
+                                        <h6 class="mb-0 fw-bold">{{ ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][pago.mes - 1] }} {{ pago.anio }}</h6>
+                                        <small class="text-muted">Monto Base Sellado</small>
+                                    </div>
+                                    <div>
+                                        <span class="badge {{ 'bg-success' if pago.pagado else 'bg-danger' }} rounded-pill fs-6 me-2">
+                                            {{ 'PAGADO' if pago.pagado else 'PENDIENTE' }}
+                                        </span>
+                                        <span class="fw-bold">${{ "{:,.0f}".format(pago.monto) }}</span>
+                                    </div>
+                                </li>
+                                {% else %}
+                                <li class="list-group-item text-center text-muted p-4">No hay pagos registrados.</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Estilo para las pestañas */
+    .nav-tabs .nav-link.active { background-color: #f8f9fa; border-bottom: 3px solid #0d6efd !important; }
+</style>
+{% endblock %}

@@ -41,6 +41,7 @@
 
 <div class="row g-4">
     
+    {% if current_user.is_admin() %}
     <div class="col-md-6 col-xl-3">
         <a href="{{ url_for('dashboard.index') }}" class="text-decoration-none text-dark">
             <div class="card h-100 border shadow-sm hover-card">
@@ -82,6 +83,7 @@
             </div>
         </a>
     </div>
+    {% endif %}
 
     <div class="col-md-6 col-xl-3">
         <a href="{{ url_for('visits.listar_visits') }}" class="text-decoration-none text-dark">
@@ -104,6 +106,7 @@
         </a>
     </div>
 
+    {% if current_user.is_admin() %}
     <div class="col-md-6 col-xl-3">
         <div class="card h-100 border shadow-sm bg-light" style="opacity: 0.8; cursor: not-allowed;">
             <div class="card-body p-4">
@@ -124,6 +127,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
 </div>
 

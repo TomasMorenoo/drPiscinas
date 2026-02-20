@@ -69,10 +69,12 @@
         <div class="collapse navbar-collapse" id="navbarMain">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                 <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('dashboard.index') }}"><i class="bi bi-speedometer2"></i> Panel de Control</a>
-                </li>
-                <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('visits.listar_visits') }}"><i class="bi bi-calendar-check"></i> Visitas</a>
+                </li>
+                
+                {% if current_user.is_admin() %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('dashboard.index') }}"><i class="bi bi-speedometer2"></i> Panel de Control</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('casas.listar_casas') }}"><i class="bi bi-house-door"></i> Clientes</a>
@@ -82,6 +84,8 @@
                         Configuración
                     </a>
                     <ul class="dropdown-menu">
+                        <li><a class="dropdown-item fw-bold text-primary" href="{{ url_for('users.listar_usuarios') }}"><i class="bi bi-person-badge-fill me-1"></i> Empleados</a></li>
+                        <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="{{ url_for('products.listar_products') }}">Productos</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('promo.listar_promos') }}">Promociones</a></li>
                         <li><hr class="dropdown-divider"></li>
@@ -89,6 +93,7 @@
                         <li><a class="dropdown-item" href="{{ url_for('barrio.listar_barrios') }}">Barrios</a></li>
                     </ul>
                 </li>
+                {% endif %}
             </ul>
 
             <ul class="navbar-nav ms-auto mb-2 mb-lg-0">

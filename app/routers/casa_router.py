@@ -2,6 +2,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required
 from app import db
 from app.models import Casa, Country, Barrio
+from app.models.visit import Visit
+from app.models.abono_historico import AbonoHistorico
 import re
 
 casa_bp = Blueprint("casas", __name__, url_prefix="/casas")
@@ -156,6 +158,9 @@ def editar_casa(id):
 
     if request.method == "POST":
         numero = request.form.get("numero", "").strip()
+        nombre_cliente = request.form.get("nombre_cliente", "").strip()
+        telefono = request.form.get("telefono", "").strip()
+        
         try:
             nuevo_precio = float(request.form.get("precio_base", 0))
         except ValueError:
@@ -165,8 +170,8 @@ def editar_casa(id):
         country_id = request.form.get("country_id")
         barrio_id = request.form.get("barrio_id") or None
 
-        if not numero or not country_id or nuevo_precio < 0:
-            flash("Datos inválidos.", "error")
+        if not numero or not country_id or not telefono or nuevo_precio < 0:
+            flash("Datos inválidos. Asegurate de completar el Teléfono.", "error")
             return redirect(url_for("casas.editar_casa", id=id))
 
         query = Casa.query.filter(Casa.id != id).filter_by(numero=numero, country_id=country_id)
@@ -188,6 +193,8 @@ def editar_casa(id):
         casa.numero = numero
         casa.country_id = country_id
         casa.barrio_id = barrio_id
+        casa.nombre_cliente = nombre_cliente
+        casa.telefono = telefono
         
         db.session.commit()
         flash("Cliente actualizado.", "success")
@@ -209,9 +216,11 @@ def crear_casa():
         precio_base = request.form.get("precio_base", "").strip()
         country_id = request.form.get("country_id")
         barrio_id = request.form.get("barrio_id") or None
+        nombre_cliente = request.form.get("nombre_cliente", "").strip()
+        telefono = request.form.get("telefono", "").strip()
 
-        if not numeros_input or not precio_base or not country_id:
-            flash("Faltan datos obligatorios.", "error")
+        if not numeros_input or not precio_base or not country_id or not telefono:
+            flash("Faltan datos obligatorios (incluyendo el Teléfono).", "error")
             return redirect(url_for("casas.crear_casa"))
 
         numeros_lista = [n.strip() for n in numeros_input.split(",") if n.strip()]
@@ -234,7 +243,9 @@ def crear_casa():
                 numero=num, 
                 precio_base=precio_base, 
                 country_id=country_id, 
-                barrio_id=barrio_id
+                barrio_id=barrio_id,
+                nombre_cliente=nombre_cliente,
+                telefono=telefono
             )
             db.session.add(nueva_casa)
             creados += 1
@@ -275,3 +286,15 @@ def toggle_casa(id):
     casa.activo = not casa.activo
     db.session.commit()
     return redirect(url_for("casas.listar_casas"))
+
+# ==========================================
+# PERFIL DEL CLIENTE
+# ==========================================
+@casa_bp.route("/perfil/<int:id>")
+@login_required
+def perfil(id):
+    casa = Casa.query.get_or_404(id)
+    visitas = Visit.query.filter_by(casa_id=id).order_by(Visit.fecha.desc()).all()
+    historial_pagos = AbonoHistorico.query.filter_by(casa_id=id).order_by(AbonoHistorico.anio.desc(), AbonoHistorico.mes.desc()).all()
+    
+    return render_template("casas/perfil.html", casa=casa, visitas=visitas, historial_pagos=historial_pagos)

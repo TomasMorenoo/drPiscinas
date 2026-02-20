@@ -18,6 +18,8 @@ class Casa(db.Model):
     precio_base = db.Column(db.Numeric(10, 2), nullable=False)
     precio_anterior = db.Column(db.Float, nullable=True)
     activo = db.Column(db.Boolean, default=True)
+    nombre_cliente = db.Column(db.String(100), nullable=True) # Opcional
+    telefono = db.Column(db.String(50), nullable=True)
     
     country_id = db.Column(
         db.Integer,
