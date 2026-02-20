@@ -6,6 +6,7 @@ from app.models.visit_product import VisitProduct
 from app.models.casa import Casa
 from app.models.products import Product
 from app.models.promo import Promo
+from app.models.abono_historico import AbonoHistorico  # <-- IMPORTAMOS EL CANDADO
 from sqlalchemy import extract, func
 from datetime import datetime
 
@@ -15,12 +16,19 @@ visit_bp = Blueprint(
     url_prefix="/visits"
 )
 
+# --- FUNCIÓN DE AYUDA PARA SABER SI EL MES ESTÁ CERRADO ---
+def is_mes_cerrado(mes, anio):
+    return AbonoHistorico.query.filter_by(mes=mes, anio=anio).first() is not None
+
 @visit_bp.route("/")
 @login_required
 def listar_visits():
     ahora = datetime.now()
     mes_sel = request.args.get('mes', ahora.month, type=int)
     anio_sel = request.args.get('anio', ahora.year, type=int)
+
+    # Revisamos si este mes tiene el candado puesto
+    mes_congelado = is_mes_cerrado(mes_sel, anio_sel)
 
     # Filtrado por mes y año
     visits = Visit.query.filter(
@@ -50,40 +58,25 @@ def listar_visits():
         total_mes=total_mes,
         top_productos=top_productos,
         mes_sel=mes_sel,
-        anio_sel=anio_sel
+        anio_sel=anio_sel,
+        mes_congelado=mes_congelado  # <-- LO MANDAMOS AL HTML
     )
 
-@visit_bp.route("/sync-prices", methods=["POST"])
-@login_required
-def sync_prices():
-    mes = request.form.get('mes', type=int)
-    anio = request.form.get('anio', type=int)
-
-    if not mes or not anio:
-        flash("Período no válido", "error")
-        return redirect(url_for('visits.listar_visits'))
-
-    visits = Visit.query.filter(
-        extract('month', Visit.fecha) == mes,
-        extract('year', Visit.fecha) == anio
-    ).all()
-
-    for v in visits:
-        for vp in v.productos:
-            prod_actual = Product.query.get(vp.product_id)
-            if prod_actual:
-                vp.precio_unitario = prod_actual.precio
-    
-    db.session.commit()
-    flash(f"Precios actualizados para todo el mes {mes}/{anio}", "success")
-    return redirect(url_for('visits.listar_visits', mes=mes, anio=anio))
+# ❌ SE ELIMINÓ LA RUTA DE SINCRONIZAR PRECIOS ❌
 
 @visit_bp.route("/create", methods=["GET", "POST"])
 @login_required
 def crear_visit():
     if request.method == "POST":
-        casa_id = request.form.get("casa_id")
         fecha_str = request.form.get("fecha")
+        fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d')
+
+        # VALIDACIÓN: No se puede crear en un mes cerrado
+        if is_mes_cerrado(fecha_obj.month, fecha_obj.year):
+            flash("❌ No podés cargar una visita en un mes que ya está cerrado y facturado. Descongelalo desde el Dashboard primero.", "error")
+            return redirect(url_for("visits.listar_visits"))
+
+        casa_id = request.form.get("casa_id")
         promo_id = request.form.get("promo_id")
         product_ids = request.form.getlist("product_id[]")
         cantidades = request.form.getlist("cantidad[]")
@@ -94,7 +87,7 @@ def crear_visit():
 
         visit = Visit(
             casa_id=casa_id,
-            fecha=datetime.strptime(fecha_str, '%Y-%m-%d'),
+            fecha=fecha_obj,
             observaciones=request.form.get("observaciones", "").strip(),
             promo_id=promo_id if promo_id else None
         )
@@ -126,6 +119,12 @@ def crear_visit():
 @login_required
 def eliminar_visit(id):
     visit = Visit.query.get_or_404(id)
+    
+    # VALIDACIÓN
+    if is_mes_cerrado(visit.fecha.month, visit.fecha.year):
+        flash("❌ No podés eliminar una visita de un mes cerrado.", "error")
+        return redirect(url_for("visits.listar_visits"))
+
     VisitProduct.query.filter_by(visit_id=id).delete()
     db.session.delete(visit)
     db.session.commit()
@@ -136,9 +135,22 @@ def eliminar_visit(id):
 @login_required
 def editar_visit(id):
     visit = Visit.query.get_or_404(id)
+    
+    # VALIDACIÓN GET
+    if is_mes_cerrado(visit.fecha.month, visit.fecha.year):
+        flash("🔒 Este mes está cerrado. No se puede editar la visita.", "warning")
+        return redirect(url_for("visits.listar_visits"))
+
     if request.method == "POST":
+        nueva_fecha = datetime.strptime(request.form.get("fecha"), '%Y-%m-%d')
+        
+        # VALIDACIÓN POST (por si intenta mover la visita a un mes cerrado)
+        if is_mes_cerrado(nueva_fecha.month, nueva_fecha.year):
+            flash("❌ No podés mover la visita a un mes que ya está cerrado.", "error")
+            return redirect(url_for("visits.listar_visits"))
+
         visit.casa_id = request.form.get("casa_id")
-        visit.fecha = datetime.strptime(request.form.get("fecha"), '%Y-%m-%d')
+        visit.fecha = nueva_fecha
         visit.observaciones = request.form.get("observaciones", "").strip()
         visit.promo_id = request.form.get("promo_id") or None
         
