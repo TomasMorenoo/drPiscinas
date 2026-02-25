@@ -97,11 +97,11 @@
                 </thead>
                 <tbody class="text-nowrap">
                     {% for visit in visits %}
-                    <tr>
+                    <tr style="cursor: pointer;" onclick="window.location.href='{{ url_for('visits.detalle_visit', id=visit.id) }}';">
                         <td class="ps-4">{{ visit.fecha.strftime('%d/%m/%Y') }}</td>
                         
                         <td class="fw-bold text-dark">
-                            <a href="{{ url_for('casas.perfil', id=visit.casa.id) }}" class="text-reset text-decoration-none">
+                            <a href="{{ url_for('casas.perfil', id=visit.casa.id) }}" class="text-reset text-decoration-none" onclick="event.stopPropagation();">
                                 {{ visit.casa.nombre_formateado() }}
                             </a>
                         </td>
@@ -135,12 +135,12 @@
                         <td class="text-end pe-4">
                             {% if not mes_congelado %}
                             <div class="btn-group btn-group-sm">
-                                <a href="{{ url_for('visits.editar_visit', id=visit.id) }}" class="btn btn-outline-primary border-0">
+                                <a href="{{ url_for('visits.editar_visit', id=visit.id) }}" class="btn btn-outline-primary border-0" onclick="event.stopPropagation();">
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 <form action="{{ url_for('visits.eliminar_visit', id=visit.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Borrar visita?');">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                    <button type="submit" class="btn btn-outline-danger border-0">
+                                    <button type="submit" class="btn btn-outline-danger border-0" onclick="event.stopPropagation();">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>

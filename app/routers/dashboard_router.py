@@ -141,25 +141,46 @@ def toggle_pago(id):
     pagado = getattr(registro, 'pagado', False)
     enviado = getattr(registro, 'mensaje_enviado', False)
     
-    casa = registro.casa
-    
+    url_wa = None # Variable para la URL de WhatsApp
+
+    # 1. De Pendiente -> Pasa a Enviado
     if not pagado and not enviado:
         registro.mensaje_enviado = True
         registro.pagado = False
+        
+        # --- GENERAMOS LA URL PARA EL JAVASCRIPT ---
+        casa = registro.casa
+        if casa.telefono:
+            datos = casa.obtener_gastos_mensuales(registro.mes, registro.anio)
+            total_mes = datos['total']
+            saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
+            
+            nombre_wa = casa.nombre_cliente if casa.nombre_cliente else casa.nombre_formateado()
+            texto_wa = f"Hola! {nombre_wa} Te paso el resumen: Total a pagar ${format_money(total_mes + saldo_ant)}. Gracias"
+            
+            texto_codificado = urllib.parse.quote(texto_wa)
+            tel = re.sub(r'\D', '', casa.telefono)
+            if len(tel) == 10: tel = "549" + tel
+            url_wa = f"https://wa.me/{tel}?text={texto_codificado}"
+
+    # 2. De Enviado -> Pasa a Pagado
     elif not pagado and enviado:
         registro.pagado = True
         registro.mensaje_enviado = True
-        # Si le da al tilde, asume que canceló el mes y toda la deuda anterior
+        casa = registro.casa
         total_mes = float(registro.monto) + float(casa.obtener_gastos_mensuales(registro.mes, registro.anio)['extras'])
         saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
         registro.monto_pagado = total_mes + saldo_ant
+
+    # 3. De Pagado -> Resetea a Pendiente
     else:
         registro.pagado = False
         registro.mensaje_enviado = False
-        registro.monto_pagado = 0.0 # Resetea
+        registro.monto_pagado = 0.0
         
     db.session.commit()
-    return jsonify({"success": True})
+    # Devolvemos la URL si existe
+    return jsonify({"success": True, "url_wa": url_wa})
 
 @dashboard_bp.route("/sync-abonos", methods=["POST"])
 @login_required

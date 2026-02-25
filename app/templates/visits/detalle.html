@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Detalle de Visita - Dr. Piscinas{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h4 mb-0 fw-bold text-dark">
+                    <i class="bi bi-file-earmark-text text-primary me-2"></i>Detalle de Visita
+                </h1>
+                <a href="{{ url_for('visits.listar_visits') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i> Volver
+                </a>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-dark text-white p-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-house-door me-2"></i>{{ visit.casa.nombre_formateado() }}</h5>
+                    <span class="badge bg-light text-dark fs-6">{{ visit.fecha.strftime('%d/%m/%Y') }}</span>
+                </div>
+
+                <div class="card-body p-4">
+                    
+                    {% if visit.promo %}
+                    <div class="mb-4">
+                        <span class="text-uppercase small fw-bold text-muted d-block mb-1">Promo Aplicada</span>
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-star-fill text-warning me-2 fs-5"></i>
+                            <span class="fw-bold fs-5">{{ visit.promo.nombre }}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if visit.productos %}
+                    <div class="mb-4">
+                        <span class="text-uppercase small fw-bold text-muted d-block mb-2">Productos Extras Utilizados</span>
+                        <ul class="list-group list-group-flush border rounded">
+                            {% for vp in visit.productos %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center py-2 bg-light">
+                                <span><i class="bi bi-box-seam me-2 text-secondary"></i>{{ vp.product.nombre }}</span>
+                                <span class="badge bg-secondary rounded-pill fs-6">{{ vp.cantidad }} {{ vp.product.unidad }}</span>
+                            </div>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    {% if visit.observaciones %}
+                    <div class="mb-4">
+                        <span class="text-uppercase small fw-bold text-muted d-block mb-1">Observaciones / Notas</span>
+                        <p class="p-3 bg-light rounded border text-dark mb-0" style="font-style: italic;">
+                            "{{ visit.observaciones }}"
+                        </p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if not visit.promo and not visit.productos and not visit.observaciones %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-clipboard-check display-4 opacity-25 d-block mb-2"></i>
+                        Visita de control estándar. Sin adicionales.
+                    </div>
+                    {% endif %}
+
+                </div>
+                
+                <div class="card-footer bg-white border-top text-end py-3">
+                    <small class="text-muted" style="font-size: 0.75rem;">
+                        <i class="bi bi-person-circle me-1"></i>
+                        Visita registrada por: 
+                        <strong class="text-dark">
+                            {% if visit.usuario %}
+                                {{ visit.usuario.username }}
+                            {% else %}
+                                Sistema (Anterior)
+                            {% endif %}
+                        </strong>
+                    </small>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <a href="{{ url_for('visits.editar_visit', id=visit.id) }}" class="btn btn-outline-primary shadow-sm rounded-pill px-4">
+                    <i class="bi bi-pencil-fill me-2"></i> Editar Visita
+                </a>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
