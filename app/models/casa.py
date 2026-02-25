@@ -21,9 +21,6 @@ class Casa(db.Model):
     nombre_cliente = db.Column(db.String(100), nullable=True) # Opcional
     telefono = db.Column(db.String(50), nullable=True)
     
-    # NUEVA COLUMNA: LA BILLETERA (Positivo = Debe / Negativo = A favor)
-    saldo_acumulado = db.Column(db.Float, default=0.0) 
-    
     country_id = db.Column(
         db.Integer,
         db.ForeignKey("countries.id"),
