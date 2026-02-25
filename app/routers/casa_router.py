@@ -294,7 +294,36 @@ def toggle_casa(id):
 @login_required
 def perfil(id):
     casa = Casa.query.get_or_404(id)
-    visitas = Visit.query.filter_by(casa_id=id).order_by(Visit.fecha.desc()).all()
-    historial_pagos = AbonoHistorico.query.filter_by(casa_id=id).order_by(AbonoHistorico.anio.desc(), AbonoHistorico.mes.desc()).all()
     
-    return render_template("casas/perfil.html", casa=casa, visitas=visitas, historial_pagos=historial_pagos)
+    # Obtenemos las visitas ordenadas por fecha (las más nuevas primero)
+    visitas = sorted(casa.visitas, key=lambda v: v.fecha, reverse=True)
+    
+    # Buscamos todo el historial ordenado de viejo a nuevo para calcular la cuenta corriente
+    historial_asc = AbonoHistorico.query.filter_by(casa_id=casa.id).order_by(AbonoHistorico.anio.asc(), AbonoHistorico.mes.asc()).all()
+    
+    detalles_pagos = []
+    saldo_acumulado = 0.0
+    nombres_meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+    
+    for h in historial_asc:
+        gastos = casa.obtener_gastos_mensuales(h.mes, h.anio)
+        total_mes = gastos['total']
+        pagado = float(getattr(h, 'monto_pagado', 0) or 0)
+        
+        # Corrección: si se tocó el tilde verde (pago total) pero el monto está en 0
+        if getattr(h, 'pagado', False) and pagado == 0:
+            pagado = total_mes
+            
+        saldo_acumulado += (total_mes - pagado)
+        
+        detalles_pagos.append({
+            "periodo": f"{nombres_meses[h.mes - 1]} {h.anio}",
+            "costo_mes": total_mes,
+            "pagado": pagado,
+            "saldo": saldo_acumulado
+        })
+        
+    # Invertimos para que el mes más nuevo quede arriba en la tabla
+    detalles_pagos.reverse()
+    
+    return render_template("casas/perfil.html", casa=casa, visitas=visitas, detalles_pagos=detalles_pagos)

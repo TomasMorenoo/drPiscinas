@@ -21,6 +21,9 @@ class Casa(db.Model):
     nombre_cliente = db.Column(db.String(100), nullable=True) # Opcional
     telefono = db.Column(db.String(50), nullable=True)
     
+    # NUEVA COLUMNA: LA BILLETERA (Positivo = Debe / Negativo = A favor)
+    saldo_acumulado = db.Column(db.Float, default=0.0) 
+    
     country_id = db.Column(
         db.Integer,
         db.ForeignKey("countries.id"),
@@ -63,3 +66,22 @@ class Casa(db.Model):
         
         # Si no tiene barrio, usamos el nombre del country
         return f"{self.country.nombre} {self.numero}"
+    
+    def obtener_saldo_anterior(self, mes, anio):
+        """Calcula la deuda o saldo a favor acumulado revisando el historial mes a mes"""
+        saldo = 0.0
+        for hist in self.historial_abonos:
+            # Solo evaluamos los meses ANTERIORES al que estamos consultando en pantalla
+            if hist.anio < anio or (hist.anio == anio and hist.mes < mes):
+                gastos = self.obtener_gastos_mensuales(hist.mes, hist.anio)
+                total_hist = gastos['total']
+                pagado_hist = float(getattr(hist, 'monto_pagado', 0) or 0)
+                
+                # Si tiene el Tilde Verde pero el monto dice 0, asumimos que pagó el 100%
+                if getattr(hist, 'pagado', False) and pagado_hist == 0:
+                    pagado_hist = total_hist
+                    
+                # Si el mes salía $10.000 y pagó $15.000, la resta da -$5.000 (a favor).
+                saldo += (total_hist - pagado_hist)
+                
+        return round(saldo, 2)

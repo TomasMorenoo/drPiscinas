@@ -10,5 +10,7 @@ class AbonoHistorico(db.Model):
     pagado = db.Column(db.Boolean, default=False)
     # NUEVO ESTADO: Para saber si ya le mandaste el WhatsApp
     mensaje_enviado = db.Column(db.Boolean, default=False)
+    
+    monto_pagado = db.Column(db.Float, default=0.0)
 
     casa = db.relationship('Casa', backref=db.backref('historial_abonos', lazy=True))

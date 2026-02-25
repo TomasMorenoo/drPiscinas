@@ -1,11 +1,12 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required
+from app.decorators import admin_required
 from app import db
 from app.models import Casa, Country, Barrio
 from app.models.abono_historico import AbonoHistorico
 from datetime import datetime
 import re
-import urllib.parse # Necesario para codificar el texto de WhatsApp
+import urllib.parse
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
@@ -15,12 +16,12 @@ def natural_sort_key(casa):
     k_numero = [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', str(casa.numero))]
     return (k_country, k_barrio, k_numero)
 
-# Funcioncita para formatear la plata ej: 35000 -> 35.000
 def format_money(value):
     return f"{value:,.0f}".replace(",", ".")
 
 @dashboard_bp.route("/")
 @login_required
+@admin_required
 def index():
     try:
         mes = int(request.args.get("mes", datetime.now().month))
@@ -48,27 +49,38 @@ def index():
         historial = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
         abono_mes = float(historial.monto) if historial else float(casa.precio_base or 0)
         
-        total_cliente = abono_mes + extras
+        # 1. Total de ESTE mes (Abono + Extras)
+        total_mes = abono_mes + extras
         
-        # Leemos los estados de la base de datos
-        esta_pagado = getattr(historial, 'pagado', False) if historial else False 
+        # 2. Arrastre de meses anteriores
+        saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
+        
+        # 3. Lo que pagó este mes
+        monto_pagado = float(getattr(historial, 'monto_pagado', 0) or 0)
+        
+        # 4. Saldo resultante final (Lo que debe HOY)
+        saldo_restante = (total_mes + saldo_anterior) - monto_pagado
+
+        esta_pagado = getattr(historial, 'pagado', False) if historial else False
         mensaje_enviado = getattr(historial, 'mensaje_enviado', False) if historial else False
 
-        # --- LÓGICA DEL MENSAJE DE WHATSAPP ---
         url_wa = ""
         if casa.telefono:
-            # 1. Definimos a quién le hablamos
             nombre_wa = casa.nombre_cliente if casa.nombre_cliente else casa.nombre_formateado()
             
-            # 2. Armamos el texto exacto que pediste
-            texto_wa = f"Hola! {nombre_wa} Te paso el resumen del mes: Abono ${format_money(abono_mes)} + Productos ${format_money(extras)}. Total ${format_money(total_cliente)}. Gracias"
-            texto_codificado = urllib.parse.quote(texto_wa)
+            # WSP Inteligente
+            texto_wa = f"Hola! {nombre_wa} Te paso el resumen: Abono ${format_money(abono_mes)} + Productos ${format_money(extras)}."
+            if saldo_anterior > 0:
+                texto_wa += f" Deuda anterior: ${format_money(saldo_anterior)}."
+            elif saldo_anterior < 0:
+                texto_wa += f" Saldo a favor: ${format_money(abs(saldo_anterior))}."
             
-            # 3. Limpiamos el teléfono (para que WhatsApp lo entienda)
+            texto_wa += f" Total a pagar: ${format_money(total_mes + saldo_anterior)}. Gracias"
+            
+            texto_codificado = urllib.parse.quote(texto_wa)
             tel = re.sub(r'\D', '', casa.telefono)
-            if len(tel) == 10: # Si puso 1122334455, le clavamos el 549 de Argentina
+            if len(tel) == 10: 
                 tel = "549" + tel
-                
             url_wa = f"https://wa.me/{tel}?text={texto_codificado}"
 
         reporte.append({
@@ -76,7 +88,10 @@ def index():
             "casa": casa,
             "abono": abono_mes,
             "extras": extras,
-            "total": total_cliente,
+            "total_mes": total_mes, # Columna Total (Negro)
+            "saldo_anterior": saldo_anterior,
+            "saldo_restante": saldo_restante, # Columna Saldo
+            "monto_pagado": monto_pagado,
             "pagado": esta_pagado,
             "mensaje_enviado": mensaje_enviado,
             "url_wa": url_wa
@@ -85,8 +100,12 @@ def index():
         total_clientes += 1
         total_abono += abono_mes
         total_extras += extras
-        if esta_pagado:
-            total_recaudado += total_cliente
+        
+        # KPI Recaudado
+        if esta_pagado and monto_pagado == 0:
+            total_recaudado += total_mes
+        else:
+            total_recaudado += monto_pagado
 
     total_general = total_abono + total_extras
 
@@ -105,9 +124,9 @@ def index():
         now=datetime.now()
     )
 
-# --- NUEVA RUTA PARA MARCAR MENSAJE COMO ENVIADO ---
 @dashboard_bp.route("/marcar-mensaje/<int:id>", methods=["POST"])
 @login_required
+@admin_required
 def marcar_mensaje(id):
     registro = AbonoHistorico.query.get_or_404(id)
     registro.mensaje_enviado = True
@@ -116,60 +135,75 @@ def marcar_mensaje(id):
 
 @dashboard_bp.route("/toggle-pago/<int:id>", methods=["POST"])
 @login_required
+@admin_required
 def toggle_pago(id):
     registro = AbonoHistorico.query.get_or_404(id)
-    
-    # Obtenemos los estados actuales
     pagado = getattr(registro, 'pagado', False)
     enviado = getattr(registro, 'mensaje_enviado', False)
     
-    # CICLO DE 3 ESTADOS: Pendiente -> Enviado -> Pagado -> Vuelve a Pendiente
+    casa = registro.casa
+    
     if not pagado and not enviado:
-        # 1. Estaba Pendiente -> Pasa a Enviado
         registro.mensaje_enviado = True
         registro.pagado = False
     elif not pagado and enviado:
-        # 2. Estaba Enviado -> Pasa a Pagado
         registro.pagado = True
         registro.mensaje_enviado = True
+        # Si le da al tilde, asume que canceló el mes y toda la deuda anterior
+        total_mes = float(registro.monto) + float(casa.obtener_gastos_mensuales(registro.mes, registro.anio)['extras'])
+        saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
+        registro.monto_pagado = total_mes + saldo_ant
     else:
-        # 3. Estaba Pagado -> Vuelve a Pendiente (resetea todo)
         registro.pagado = False
         registro.mensaje_enviado = False
+        registro.monto_pagado = 0.0 # Resetea
         
     db.session.commit()
     return jsonify({"success": True})
 
 @dashboard_bp.route("/sync-abonos", methods=["POST"])
 @login_required
+@admin_required
 def sync_abonos():
     mes = request.form.get("mes", type=int)
     anio = request.form.get("anio", type=int)
-    if not mes or not anio:
-        flash("Período no válido", "error")
-        return redirect(url_for('dashboard.index'))
-    casas_activas = Casa.query.filter_by(activo=True).all()
-    for casa in casas_activas:
-        historial = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
-        if historial:
-            historial.monto = float(casa.precio_base or 0)
-        else:
-            db.session.add(AbonoHistorico(
-                casa_id=casa.id, mes=mes, anio=anio, monto=float(casa.precio_base or 0)
-            ))
+    if not mes or not anio: return redirect(url_for('dashboard.index'))
+    for casa in Casa.query.filter_by(activo=True).all():
+        if not AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first():
+            db.session.add(AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=float(casa.precio_base or 0)))
     db.session.commit()
-    flash(f"✅ El mes {mes}/{anio} se ha CERRADO correctamente.", "success")
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
 
 @dashboard_bp.route("/unsync-abonos", methods=["POST"])
 @login_required
+@admin_required
 def unsync_abonos():
     mes = request.form.get("mes", type=int)
     anio = request.form.get("anio", type=int)
-    if not mes or not anio:
-        flash("Período no válido", "error")
-        return redirect(url_for('dashboard.index'))
-    AbonoHistorico.query.filter_by(mes=mes, anio=anio).delete()
-    db.session.commit()
-    flash(f"🔓 El mes {mes}/{anio} ha sido REABIERTO.", "info")
+    if mes and anio:
+        AbonoHistorico.query.filter_by(mes=mes, anio=anio).delete()
+        db.session.commit()
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
+
+@dashboard_bp.route("/registrar-pago-especial/<int:id_historial>", methods=["POST"])
+@login_required
+@admin_required
+def registrar_pago_especial(id_historial):
+    registro = AbonoHistorico.query.get_or_404(id_historial)
+    monto_ingresado = float(request.json.get("monto", 0))
+    
+    registro.monto_pagado += monto_ingresado
+    
+    casa = registro.casa
+    total_mes = float(registro.monto) + float(casa.obtener_gastos_mensuales(registro.mes, registro.anio)['extras'])
+    saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
+    
+    # Si con lo que puso, la deuda llegó a 0 o quedó a favor
+    if registro.monto_pagado >= ((total_mes + saldo_ant) - 0.1): 
+        registro.pagado = True
+        registro.mensaje_enviado = True
+    else:
+        registro.pagado = False
+        
+    db.session.commit()
+    return jsonify({"success": True})
