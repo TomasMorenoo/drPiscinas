@@ -107,7 +107,10 @@
                         </td>
 
                         <td>
-                            <div class="small">
+                            <div class="text-truncate small" style="max-width: 200px; cursor: help;" 
+                                 title="{% if visit.promo %}{{ visit.promo.nombre }}{% endif %}{% for vp in visit.productos %} • {{ vp.product.nombre }} ({% if vp.cantidad % 1 == 0 %}{{ vp.cantidad | int }}{% else %}{{ vp.cantidad }}{% endif %} {{ vp.product.unidad }}){% endfor %}" 
+                                 data-bs-toggle="tooltip">
+                                
                                 {% if visit.promo %}
                                 <span class="badge bg-info-subtle text-info border border-info me-1">{{ visit.promo.nombre }}</span>
                                 {% endif %}
