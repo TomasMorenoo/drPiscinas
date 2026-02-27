@@ -1,59 +1,74 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required # <--- 1. IMPORTAR ESTO
+from flask_login import login_required
+from app.decorators import admin_required
 from app import db
-from app.models import Barrio, Country
+from app.models.barrio import Barrio
+from app.models.country import Country
 
-barrio_bp = Blueprint(
-    "barrio",
-    __name__,
-    url_prefix="/barrios"
-)
+barrio_bp = Blueprint("barrio", __name__, url_prefix="/barrios")
 
-# Listado
 @barrio_bp.route("/")
-@login_required # <--- 2. CANDADO PUESTO
+@login_required
+@admin_required
 def listar_barrios():
-    barrios = Barrio.query.order_by(Barrio.nombre).all()
+    barrios = Barrio.query.join(Country).order_by(Country.nombre, Barrio.nombre).all()
     return render_template("barrios/list.html", barrios=barrios)
 
-# Formulario GET
-@barrio_bp.route("/create", methods=["GET"])
-@login_required # <--- CANDADO PUESTO
-def form_crear_barrio():
+@barrio_bp.route("/create", methods=["GET", "POST"])
+@login_required
+@admin_required
+def crear_barrio():
+    if request.method == "POST":
+        nombre = request.form.get("nombre")
+        country_id = request.form.get("country_id")
+        
+        if not nombre or not country_id:
+            flash("Todos los campos son obligatorios", "error")
+            return redirect(url_for("barrio.crear_barrio"))
+            
+        nuevo = Barrio(nombre=nombre, country_id=country_id)
+        db.session.add(nuevo)
+        db.session.commit()
+        flash("Barrio creado exitosamente", "success")
+        return redirect(url_for("barrio.listar_barrios"))
+        
     countries = Country.query.filter_by(activo=True).order_by(Country.nombre).all()
     return render_template("barrios/create.html", countries=countries)
 
-# Crear POST
-@barrio_bp.route("/create", methods=["POST"])
-@login_required # <--- CANDADO PUESTO
-def crear_barrio():
-    nombre = request.form.get("nombre", "").strip()
-    country_id = request.form.get("country_id")
-
-    if not nombre:
-        flash("El nombre no puede estar vacío", "error")
+@barrio_bp.route("/edit/<int:id>", methods=["GET", "POST"])
+@login_required
+@admin_required
+def editar_barrio(id):
+    barrio = Barrio.query.get_or_404(id)
+    if request.method == "POST":
+        barrio.nombre = request.form.get("nombre")
+        barrio.country_id = request.form.get("country_id")
+        db.session.commit()
+        flash("Barrio actualizado", "success")
         return redirect(url_for("barrio.listar_barrios"))
+        
+    countries = Country.query.filter_by(activo=True).order_by(Country.nombre).all()
+    return render_template("barrios/create.html", barrio=barrio, countries=countries)
 
-    if not country_id:
-        flash("Debe seleccionar un country", "error")
-        return redirect(url_for("barrio.listar_barrios"))
-
-    existe = Barrio.query.filter_by(nombre=nombre, country_id=country_id).first()
-    if existe:
-        flash("Ese barrio ya existe para el country seleccionado", "error")
-        return redirect(url_for("barrio.listar_barrios"))
-
-    barrio = Barrio(nombre=nombre, country_id=country_id)
-    db.session.add(barrio)
-    db.session.commit()
-    flash("Barrio creado correctamente", "success")
-    return redirect(url_for("barrio.listar_barrios"))
-
-# Activar / desactivar
 @barrio_bp.route("/toggle/<int:id>")
-@login_required # <--- CANDADO PUESTO
+@login_required
+@admin_required
 def toggle_barrio(id):
     barrio = Barrio.query.get_or_404(id)
     barrio.activo = not barrio.activo
     db.session.commit()
+    return redirect(url_for("barrio.listar_barrios"))
+
+@barrio_bp.route("/delete/<int:id>", methods=["POST"])
+@login_required
+@admin_required
+def eliminar_barrio(id):
+    barrio = Barrio.query.get_or_404(id)
+    try:
+        db.session.delete(barrio)
+        db.session.commit()
+        flash("Barrio eliminado definitivamente.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash("No se puede eliminar porque hay propiedades asociadas a este barrio.", "error")
     return redirect(url_for("barrio.listar_barrios"))

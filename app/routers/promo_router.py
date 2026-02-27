@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required # <--- 1. IMPORTAR SEGURIDAD
+from app.decorators import admin_required # <--- 2. IMPORTAR EL PATOVICA
 from app import db
 from app.models.promo import Promo
 from app.models.products import Product
@@ -16,6 +17,7 @@ promo_bp = Blueprint(
 # =========================
 @promo_bp.route("/")
 @login_required # <--- CANDADO PUESTO
+@admin_required # <--- SOLO ADMIN
 def listar_promos():
     promos = Promo.query.order_by(Promo.nombre).all()
     return render_template("promos/list.html", promos=promos)
@@ -26,6 +28,7 @@ def listar_promos():
 # =========================
 @promo_bp.route("/create", methods=["GET", "POST"])
 @login_required # <--- CANDADO PUESTO
+@admin_required # <--- SOLO ADMIN
 def crear_promo():
     productos = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
 
@@ -90,6 +93,7 @@ def crear_promo():
 # =========================
 @promo_bp.route("/<int:id>/edit", methods=["GET", "POST"])
 @login_required # <--- CANDADO PUESTO
+@admin_required # <--- SOLO ADMIN
 def editar_promo(id):
     promo = Promo.query.get_or_404(id)
     productos = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
@@ -143,6 +147,7 @@ def editar_promo(id):
 # =========================
 @promo_bp.route("/toggle/<int:id>")
 @login_required # <--- CANDADO PUESTO
+@admin_required # <--- SOLO ADMIN
 def toggle_promo(id):
     promo = Promo.query.get_or_404(id)
     promo.activo = not promo.activo

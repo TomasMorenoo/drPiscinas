@@ -1,12 +1,13 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required
+from app.decorators import admin_required
 from app import db
 from app.models import Casa, Country, Barrio
 from app.models.visit import Visit
+from app.models.visit_product import VisitProduct
 from app.models.abono_historico import AbonoHistorico
 from sqlalchemy.exc import IntegrityError
 import re
-
 
 casa_bp = Blueprint("casas", __name__, url_prefix="/casas")
 
@@ -25,6 +26,7 @@ def natural_sort_key(casa):
 # ==========================================
 @casa_bp.route("/", methods=["GET"])
 @login_required
+@admin_required
 def listar_casas():
     # 1. Atrapamos los parámetros
     buscar = request.args.get("buscar", "").strip()
@@ -80,7 +82,8 @@ def listar_casas():
 # HERRAMIENTA DE AUMENTOS
 # ==========================================
 @casa_bp.route("/aumento", methods=["GET", "POST"])
-@login_required 
+@login_required
+@admin_required 
 def herramienta_aumento():
     if request.method == "POST":
         tipo = request.form.get("tipo")
@@ -133,6 +136,7 @@ def herramienta_aumento():
 # ==========================================
 @casa_bp.route("/deshacer_aumento")
 @login_required
+@admin_required
 def deshacer_aumento():
     casas_modificadas = Casa.query.filter(Casa.precio_anterior.isnot(None)).all()
     
@@ -154,7 +158,8 @@ def deshacer_aumento():
 # EDITAR CLIENTE
 # ==========================================
 @casa_bp.route("/edit/<int:id>", methods=["GET", "POST"])
-@login_required 
+@login_required
+@admin_required 
 def editar_casa(id):
     casa = Casa.query.get_or_404(id)
 
@@ -211,7 +216,8 @@ def editar_casa(id):
 # CREAR (CON CARGA MÚLTIPLE)
 # ==========================================
 @casa_bp.route("/create", methods=["GET", "POST"])
-@login_required 
+@login_required
+@admin_required 
 def crear_casa():
     if request.method == "POST":
         numeros_input = request.form.get("numero", "").strip()
@@ -269,6 +275,7 @@ def crear_casa():
 
 @casa_bp.route("/create_form", methods=["GET"]) 
 @login_required
+@admin_required
 def form_crear_casa():
     return crear_casa()
 
@@ -283,6 +290,7 @@ def barrios_por_country(country_id):
 
 @casa_bp.route("/toggle/<int:id>")
 @login_required
+@admin_required
 def toggle_casa(id):
     casa = Casa.query.get_or_404(id)
     casa.activo = not casa.activo
@@ -335,6 +343,7 @@ def perfil(id):
 # ==========================================
 @casa_bp.route("/delete/<int:id>", methods=["POST"])
 @login_required
+@admin_required
 def eliminar_casa(id):
     casa = Casa.query.get_or_404(id)
     try:
