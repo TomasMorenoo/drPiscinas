@@ -331,21 +331,31 @@ def perfil(id):
     return render_template("casas/perfil.html", casa=casa, visitas=visitas, detalles_pagos=detalles_pagos)
 
 # ==========================================
-# BORRADO FÍSICO (SOLO PARA LIMPIEZA INICIAL)
+# BORRADO FÍSICO A TODA COSTA (TERMINATOR)
 # ==========================================
 @casa_bp.route("/delete/<int:id>", methods=["POST"])
 @login_required
 def eliminar_casa(id):
     casa = Casa.query.get_or_404(id)
     try:
+        # 1. Borrar todos los registros financieros de meses cerrados de este cliente
+        AbonoHistorico.query.filter_by(casa_id=id).delete()
+        
+        # 2. Borrar los productos extras que usó en sus visitas
+        visitas = Visit.query.filter_by(casa_id=id).all()
+        for visita in visitas:
+            VisitProduct.query.filter_by(visit_id=visita.id).delete()
+            
+        # 3. Borrar las visitas en sí
+        Visit.query.filter_by(casa_id=id).delete()
+        
+        # 4. Finalmente, borrar al cliente de la base de datos
         db.session.delete(casa)
         db.session.commit()
-        flash("Cliente eliminado definitivamente de la base de datos.", "success")
-    except IntegrityError:
-        db.session.rollback()
-        flash("❌ ALERTA: No se puede borrar este cliente porque ya tiene visitas o historial de abonos vinculados. Utilizá el botón de Pausar.", "error")
+        
+        flash("Cliente y TODO su historial fueron eliminados definitivamente.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Error inesperado: {str(e)}", "error")
+        flash(f"Error al intentar borrar: {str(e)}", "error")
         
     return redirect(url_for("casas.listar_casas"))
