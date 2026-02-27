@@ -33,7 +33,18 @@ def index():
     registro_congelado = AbonoHistorico.query.filter_by(mes=mes, anio=anio).first()
     mes_congelado = True if registro_congelado else False
 
-    casas = Casa.query.filter_by(activo=True).all()
+    # =========================================================
+    # LÓGICA CORREGIDA: LA "FOTO" DEL PASADO
+    # =========================================================
+    if mes_congelado:
+        # Si el mes está cerrado, la verdad absoluta la tiene el historial.
+        # Traemos a todos los que se les facturó ese mes (activos e inactivos de hoy).
+        historiales = AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()
+        casas = [h.casa for h in historiales]
+    else:
+        # Si el mes está abierto, solo miramos a los clientes activos hoy.
+        casas = Casa.query.filter_by(activo=True).all()
+
     casas.sort(key=natural_sort_key)
 
     reporte = []

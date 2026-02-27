@@ -154,9 +154,12 @@
                     {% for item in reporte %}
                     <tr>
                         <td class="ps-3 fw-bold text-truncate">
-                            <a href="{{ url_for('casas.perfil', id=item.casa.id) }}" class="text-decoration-none text-dark d-block text-truncate" title="{{ item.casa.nombre_formateado() }}">
+                            <a href="{{ url_for('casas.perfil', id=item.casa.id) }}" class="text-decoration-none text-dark d-inline-block text-truncate align-middle" title="{{ item.casa.nombre_formateado() }}" style="max-width: 80%;">
                                 {{ item.casa.nombre_formateado() }}
                             </a>
+                            {% if not item.casa.activo %}
+                                <span class="badge bg-secondary ms-1 align-middle" style="font-size: 0.6rem;" title="Cliente dado de baja actualmente">BAJA</span>
+                            {% endif %}
                         </td>
                         <td class="text-end font-monospace text-muted">${{ "{:,.2f}".format(item.abono) }}</td>
                         <td class="text-end font-monospace text-muted">${{ "{:,.2f}".format(item.extras) }}</td>

@@ -4,7 +4,9 @@ from app import db
 from app.models import Casa, Country, Barrio
 from app.models.visit import Visit
 from app.models.abono_historico import AbonoHistorico
+from sqlalchemy.exc import IntegrityError
 import re
+
 
 casa_bp = Blueprint("casas", __name__, url_prefix="/casas")
 
@@ -327,3 +329,23 @@ def perfil(id):
     detalles_pagos.reverse()
     
     return render_template("casas/perfil.html", casa=casa, visitas=visitas, detalles_pagos=detalles_pagos)
+
+# ==========================================
+# BORRADO FÍSICO (SOLO PARA LIMPIEZA INICIAL)
+# ==========================================
+@casa_bp.route("/delete/<int:id>", methods=["POST"])
+@login_required
+def eliminar_casa(id):
+    casa = Casa.query.get_or_404(id)
+    try:
+        db.session.delete(casa)
+        db.session.commit()
+        flash("Cliente eliminado definitivamente de la base de datos.", "success")
+    except IntegrityError:
+        db.session.rollback()
+        flash("❌ ALERTA: No se puede borrar este cliente porque ya tiene visitas o historial de abonos vinculados. Utilizá el botón de Pausar.", "error")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error inesperado: {str(e)}", "error")
+        
+    return redirect(url_for("casas.listar_casas"))

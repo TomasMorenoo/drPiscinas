@@ -86,6 +86,14 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(user_bp)
 
+    # ========================================================
+    # NUEVO: Inyectar variable global para el botón de borrado
+    # ========================================================
+    @app.context_processor
+    def inyectar_variables():
+        # Si existe este archivo, borrado_activado será True
+        return dict(borrado_activado=os.path.exists("borrado_activado.flag"))
+
     return app
 
 # Carga de usuario
