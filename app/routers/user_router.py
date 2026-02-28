@@ -87,3 +87,19 @@ def eliminar_usuario(id):
     db.session.commit()
     flash("Usuario eliminado correctamente.", "success")
     return redirect(url_for("users.listar_usuarios"))
+
+@user_bp.route("/reset_password/<int:id>", methods=["POST"])
+@login_required
+@admin_required
+def reset_password(id):
+    usuario = User.query.get_or_404(id)
+    nueva_password = request.form.get("nueva_password", "").strip()
+    
+    if not nueva_password:
+        flash("La contraseña no puede estar vacía.", "error")
+    else:
+        usuario.set_password(nueva_password)
+        db.session.commit()
+        flash(f"Contraseña actualizada con éxito para {usuario.username}.", "success")
+        
+    return redirect(url_for("users.listar_usuarios"))

@@ -197,12 +197,25 @@ def toggle_pago(id):
 @login_required
 @admin_required
 def sync_abonos():
+    from app.models.visit import Visit
+    from sqlalchemy import extract
+    
     mes = request.form.get("mes", type=int)
     anio = request.form.get("anio", type=int)
     if not mes or not anio: return redirect(url_for('dashboard.index'))
+    
+    # 1. Congelamos los abonos base
     for casa in Casa.query.filter_by(activo=True).all():
         if not AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first():
             db.session.add(AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=float(casa.precio_base or 0)))
+            
+    # 2. Congelamos el precio de los bidones y pastillas (NUEVA LÓGICA)
+    visitas_mes = Visit.query.filter(extract('month', Visit.fecha) == mes, extract('year', Visit.fecha) == anio).all()
+    for visita in visitas_mes:
+        for vp in visita.productos:
+            # Sobreescribimos con el precio actual en el instante de cerrar el mes
+            vp.precio_unitario = vp.product.precio 
+            
     db.session.commit()
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
 

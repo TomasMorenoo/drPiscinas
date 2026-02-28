@@ -43,13 +43,18 @@ class Visit(db.Model):
         return f"<Visit casa={self.casa_id} fecha={self.fecha}>"
     
     def calcular_total(self):
+        from app.models.abono_historico import AbonoHistorico
+        
         total = 0.0
+        mes_cerrado = AbonoHistorico.query.filter_by(mes=self.fecha.month, anio=self.fecha.year).first() is not None
 
         if self.promo and self.promo.precio:
             total += float(self.promo.precio)
 
         for vp in self.productos:
-            if vp.precio_unitario:
+            if mes_cerrado and vp.precio_unitario:
                 total += float(vp.cantidad) * float(vp.precio_unitario)
+            else:
+                total += float(vp.cantidad) * float(vp.product.precio)
 
         return round(total, 2)

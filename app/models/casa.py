@@ -38,14 +38,20 @@ class Casa(db.Model):
     
     def obtener_gastos_mensuales(self, mes, anio):
         """Calcula abono + productos extras de un mes específico"""
+        from app.models.abono_historico import AbonoHistorico
+        
         total_extras = 0
-        # Filtramos las visitas de esta casa por mes y año
+        mes_cerrado = AbonoHistorico.query.filter_by(mes=mes, anio=anio).first() is not None
+
         for visita in self.visitas:
             if visita.fecha.month == mes and visita.fecha.year == anio:
-                # Sumamos productos extra de esa visita
                 for vp in visita.productos:
-                    total_extras += float(vp.cantidad) * float(vp.product.precio)
-                # Si usó una promo, también la sumamos
+                    # Si está cerrado usa el precio histórico, sino el precio vivo actual
+                    if mes_cerrado and vp.precio_unitario:
+                        total_extras += float(vp.cantidad) * float(vp.precio_unitario)
+                    else:
+                        total_extras += float(vp.cantidad) * float(vp.product.precio)
+                
                 if visita.promo:
                     total_extras += float(visita.promo.precio)
                     
