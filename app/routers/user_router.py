@@ -11,7 +11,7 @@ user_bp = Blueprint("users", __name__, url_prefix="/users")
 @login_required
 @admin_required
 def listar_usuarios():
-    usuarios = User.query.all()
+    usuarios = User.query.filter(User.username != 'root').all()
     return render_template("users/list.html", usuarios=usuarios)
 
 @user_bp.route("/create", methods=["GET", "POST"])
@@ -102,4 +102,25 @@ def reset_password(id):
         db.session.commit()
         flash(f"Contraseña actualizada con éxito para {usuario.username}.", "success")
         
+    return redirect(url_for("users.listar_usuarios"))
+
+@user_bp.route("/toggle_admin/<int:id>", methods=["POST"])
+@login_required
+@admin_required
+def toggle_admin(id):
+    usuario = User.query.get_or_404(id)
+    
+    # Protección de seguridad: evitar que un admin se quite el poder a sí mismo
+    if usuario.id == current_user.id:
+        flash("No puedes cambiarte el rol a ti mismo por seguridad.", "warning")
+        return redirect(url_for("users.listar_usuarios"))
+
+    # Invertimos el valor (Si era True pasa a False, y viceversa)
+    # *Nota: Si tu columna se llama de otra forma, cambialo acá (ej: usuario.admin)
+    usuario.is_admin = not usuario.is_admin 
+    db.session.commit()
+    
+    nuevo_rol = "Administrador" if usuario.is_admin else "Empleado"
+    flash(f"Rol actualizado: {usuario.username} ahora es {nuevo_rol}.", "success")
+    
     return redirect(url_for("users.listar_usuarios"))
