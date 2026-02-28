@@ -1,30 +1,28 @@
-services:
-  # 1. Tu Aplicación Web
-  mi-web-python:
-    build: .
-    container_name: mi_web_python
-    ports:
-      - "5000:5000"
-    restart: unless-stopped
-    depends_on:
-      - db  # Esperar a que la base de datos arranque
-    environment:
-      # OJO ACÁ: Cambiamos 'localhost' por 'db' (el nombre del servicio de abajo)
-      - DATABASE_URL=postgresql://drPiscinas:administrador@db:5432/drPiscinas_db
-      - SECRET_KEY=${SECRET_KEY}
+version: '3.8'
 
-  # 2. La Base de Datos (PostgreSQL)
+services:
   db:
-    image: postgres:15
-    container_name: mi_base_datos
+    image: postgres:15-alpine
+    container_name: dr_piscinas_db
     restart: always
     environment:
-      POSTGRES_USER: drPiscinas
-      POSTGRES_PASSWORD: administrador
-      POSTGRES_DB: drPiscinas_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - db_data:/var/lib/postgresql/data
+      # Mantenemos la ruta que definiste para la nueva VPS
+      - /vps/clientes/drPiscinas/db_data:/var/lib/postgresql/data
 
-# 3. Volumen para que no se borren los datos si reiniciás
-volumes:
-  db_data:
+  web:
+    build: .
+    container_name: dr_piscinas_app
+    restart: always
+    depends_on:
+      - db
+    # Cargamos el archivo .env automáticamente
+    env_file:
+      - .env
+    ports:
+      - "5000:5000"
+    volumes:
+      - /vps/clientes/drPiscinas:/sistema
