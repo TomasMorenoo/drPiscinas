@@ -10,7 +10,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      # Mantenemos la ruta que definiste para la nueva VPS
       - /vps/clientes/drPiscinas/db_data:/var/lib/postgresql/data
 
   web:
@@ -19,9 +18,10 @@ services:
     restart: always
     depends_on:
       - db
-    # Cargamos el archivo .env automáticamente
-    env_file:
-      - .env
+    # Usamos environment en lugar de env_file
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
     ports:
       - "5000:5000"
     volumes:
