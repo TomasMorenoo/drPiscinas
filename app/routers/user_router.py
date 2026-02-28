@@ -110,17 +110,20 @@ def reset_password(id):
 def toggle_admin(id):
     usuario = User.query.get_or_404(id)
     
-    # Protección de seguridad: evitar que un admin se quite el poder a sí mismo
+    # Protección de seguridad
     if usuario.id == current_user.id:
         flash("No puedes cambiarte el rol a ti mismo por seguridad.", "warning")
         return redirect(url_for("users.listar_usuarios"))
 
-    # Invertimos el valor (Si era True pasa a False, y viceversa)
-    # *Nota: Si tu columna se llama de otra forma, cambialo acá (ej: usuario.admin)
-    usuario.is_admin = not usuario.is_admin 
+    # Como es un string, validamos la palabra y la cambiamos
+    if usuario.rol == 'admin':
+        usuario.rol = 'empleado'
+    else:
+        usuario.rol = 'admin'
+        
     db.session.commit()
     
-    nuevo_rol = "Administrador" if usuario.is_admin else "Empleado"
+    nuevo_rol = "Administrador" if usuario.rol == 'admin' else "Empleado"
     flash(f"Rol actualizado: {usuario.username} ahora es {nuevo_rol}.", "success")
     
     return redirect(url_for("users.listar_usuarios"))

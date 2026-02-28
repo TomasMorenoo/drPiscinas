@@ -37,22 +37,33 @@
                             {% endif %}
                         </td>
                         <td class="text-end pe-4">
-                            <div class="btn-group">
+                            <div class="d-flex justify-content-end gap-2 acciones-usuarios">
                                 
                                 <button type="button" class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#resetModal{{ u.id }}" title="Cambiar Contraseña">
                                     <i class="bi bi-key-fill"></i>
                                 </button>
                                 
-                                <form action="{{ url_for('users.toggle_admin', id=u.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro de cambiar el rol de este usuario?');">
+                                <form action="{{ url_for('users.toggle_admin', id=u.id) }}" method="POST" class="m-0" onsubmit="return confirm('¿Seguro de cambiar el rol de {{ u.username }}?');">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                    <button type="submit" class="btn btn-sm {% if u.is_admin() %}btn-warning{% else %}btn-success{% endif %} border-0" 
-                                            title="{% if u.is_admin() %}Quitar privilegios de Administrador{% else %}Ascender a Administrador{% endif %}"
-                                            {% if u.id == current_user.id %}disabled{% endif %}>
-                                        <i class="bi {% if u.is_admin() %}bi-person-down{% else %}bi-person-up-fill{% endif %}"></i>
-                                    </button>
+                                    
+                                    {% if u.id == current_user.id %}
+                                        <button type="button" class="btn btn-sm btn-light border" disabled title="No puedes cambiar tu propio rol">
+                                            <i class="bi bi-person-lock me-1"></i> Tu Perfil
+                                        </button>
+                                    {% else %}
+                                        {% if u.is_admin() %}
+                                            <button type="submit" class="btn btn-sm btn-secondary fw-bold" title="Quitar privilegios de Administrador">
+                                                <i class="bi bi-person-down me-1"></i> Quitar Admin
+                                            </button>
+                                        {% else %}
+                                            <button type="submit" class="btn btn-sm btn-success fw-bold" title="Ascender a Administrador">
+                                                <i class="bi bi-person-up-fill me-1"></i> Ascender a Admin
+                                            </button>
+                                        {% endif %}
+                                    {% endif %}
                                 </form>
 
-                                <form action="{{ url_for('users.eliminar_usuario', id=u.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Seguro que querés borrar este acceso? No podrá volver a entrar.');">
+                                <form action="{{ url_for('users.eliminar_usuario', id=u.id) }}" method="POST" class="m-0" onsubmit="return confirm('¿Seguro de borrar este acceso?');">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <button type="submit" class="btn btn-sm btn-outline-danger" {% if u.id == current_user.id %}disabled{% endif %} title="Borrar Usuario">
                                         <i class="bi bi-trash"></i>
