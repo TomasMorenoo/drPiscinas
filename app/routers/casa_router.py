@@ -39,7 +39,15 @@ def listar_casas():
 
     # Filtro de texto libre (Lote/Número)
     if buscar:
-        query = query.filter(Casa.numero.ilike(f"%{buscar}%"))
+        # Esto permite buscar "Acacias" y que traiga los lotes de ese barrio
+        query = query.join(Country).outerjoin(Barrio).filter(
+            db.or_(
+                Casa.numero.ilike(f"%{buscar}%"),
+                Barrio.nombre.ilike(f"%{buscar}%"),
+                Country.nombre.ilike(f"%{buscar}%"),
+                Casa.nombre_cliente.ilike(f"%{buscar}%")
+            )
+        )
 
     # Filtro por Estado
     if estado == "activos":

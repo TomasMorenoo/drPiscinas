@@ -136,6 +136,14 @@
         </div>
     </div>
 
+    {# --- NUEVA BARRA DE BÚSQUEDA EN TIEMPO REAL --- #}
+    <div class="mb-3">
+        <div class="input-group shadow-sm">
+            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+            <input type="text" id="busquedaRealTime" class="form-control border-start-0" placeholder="Filtrar por Lote, Barrio o Country en este mes...">
+        </div>
+    </div>
+
     {# --- 3. TABLA DE DETALLE --- #}
     <div class="card border-0 shadow-sm">
         <div class="table-responsive">
@@ -270,6 +278,20 @@
 </div>
 
 <script>
+// --- BUSCADOR EN TIEMPO REAL DASHBOARD ---
+const buscador = document.getElementById('busquedaRealTime');
+if (buscador) {
+    buscador.addEventListener('keyup', function() {
+        let filtro = this.value.toLowerCase();
+        let filas = document.querySelectorAll('table tbody tr');
+
+        filas.forEach(fila => {
+            let textoColumna = fila.cells[0].textContent.toLowerCase();
+            fila.style.display = textoColumna.includes(filtro) ? '' : 'none';
+        });
+    });
+}
+
 // --- LÓGICA DE FORMATEO AUTOMÁTICO DE MILES ---
 const montoInput = document.getElementById('monto_entregado');
 montoInput.addEventListener('input', function(e) {

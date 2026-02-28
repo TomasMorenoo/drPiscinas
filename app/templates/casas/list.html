@@ -37,7 +37,7 @@
                 <label class="form-label fw-bold text-secondary small text-uppercase">Buscar Lote</label>
                 <div class="input-group shadow-sm">
                     <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-search"></i></span>
-                    <input type="text" name="buscar" class="form-control border-0" placeholder="Ej: 43" value="{{ buscar_actual }}">
+                    <input type="text" name="buscar" class="form-control border-0" placeholder="Ej: Acacias 43" value="{{ buscar_actual }}">
                 </div>
             </div>
 
@@ -163,34 +163,55 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    
+    // --- LÓGICA DEL BUSCADOR EN TIEMPO REAL ---
+    const inputBuscar = document.querySelector('input[name="buscar"]');
+    if (inputBuscar) {
+        inputBuscar.addEventListener('keyup', function() {
+            let filtro = this.value.toLowerCase();
+            let filas = document.querySelectorAll('table tbody tr');
+
+            filas.forEach(fila => {
+                // Evitamos ocultar la fila de "No hay clientes" si existiera
+                if (fila.cells.length > 1) {
+                    let texto = fila.cells[0].textContent.toLowerCase();
+                    fila.style.display = texto.includes(filtro) ? '' : 'none';
+                }
+            });
+        });
+    }
+
+    // --- LÓGICA DE DEPENDENCIAS COUNTRY/BARRIO ---
     const countrySelect = document.getElementById('filtroCountry');
     const barrioSelect = document.getElementById('filtroBarrio');
 
-    countrySelect.addEventListener('change', function() {
-        const countryId = this.value;
+    if(countrySelect && barrioSelect) {
+        countrySelect.addEventListener('change', function() {
+            const countryId = this.value;
 
-        // Limpiar y bloquear barrio por defecto
-        barrioSelect.innerHTML = '<option value="">Todos los Barrios</option>';
-        barrioSelect.disabled = true;
+            // Limpiar y bloquear barrio por defecto
+            barrioSelect.innerHTML = '<option value="">Todos los Barrios</option>';
+            barrioSelect.disabled = true;
 
-        if (countryId) {
-            // Buscamos los barrios de este country
-            fetch(`/casas/barrios/${countryId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.length > 0) {
-                        barrioSelect.disabled = false;
-                        data.forEach(b => {
-                            const option = document.createElement('option');
-                            option.value = b.id;
-                            option.textContent = b.nombre;
-                            barrioSelect.appendChild(option);
-                        });
-                    }
-                })
-                .catch(err => console.error('Error al cargar barrios:', err));
-        }
-    });
+            if (countryId) {
+                // Buscamos los barrios de este country
+                fetch(`/casas/barrios/${countryId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.length > 0) {
+                            barrioSelect.disabled = false;
+                            data.forEach(b => {
+                                const option = document.createElement('option');
+                                option.value = b.id;
+                                option.textContent = b.nombre;
+                                barrioSelect.appendChild(option);
+                            });
+                        }
+                    })
+                    .catch(err => console.error('Error al cargar barrios:', err));
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

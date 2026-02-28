@@ -16,20 +16,20 @@
 
             <div class="card shadow-sm border-0 mb-3">
                 <div class="card-body p-4">
-                    <div class="mb-3">
+                    
+                    <div class="mb-3 position-relative">
                         <label class="form-label fw-bold">¿Qué casa visitaste?</label>
                         <div class="input-group input-group-lg">
                             <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
                             <input type="text" id="casa_search" class="form-control {% if visit %}is-valid{% endif %}" 
-                                   placeholder="Escribí Country, Barrio o Número..." autocomplete="off"
+                                   placeholder="🔍 Escribí Barrio o Lote (Ej: Acacias 43)..." autocomplete="off"
                                    value="{% if visit %}{{ visit.casa.nombre_formateado() }}{% endif %}">
                         </div>
                         <input type="hidden" name="casa_id" id="casa_id_hidden" value="{% if visit %}{{ visit.casa_id }}{% endif %}" required>
-                        <datalist id="casas_list">
-                            {% for casa in casas %}
-                                <option data-id="{{ casa.id }}" value="{{ casa.nombre_formateado() }}">
-                            {% endfor %}
-                        </datalist>
+                        
+                        <div id="custom-autocomplete-list" class="dropdown-menu w-100 shadow-lg mt-1 border-0" 
+                             style="max-height: 250px; overflow-y: auto; display: none; position: absolute; z-index: 1050;">
+                        </div>
                     </div>
 
                     <div class="row">
@@ -151,21 +151,66 @@
         fechaInput.valueAsDate = new Date();
     }
 
-    // 2. Lógica del Buscador
+    // 2. LÓGICA DEL BUSCADOR (Custom Autocomplete)
     const searchInput = document.getElementById('casa_search');
     const hiddenInput = document.getElementById('casa_id_hidden');
-    const casasList = document.getElementById('casas_list');
+    const autocompleteList = document.getElementById('custom-autocomplete-list');
 
-    searchInput.setAttribute('list', 'casas_list');
+    // Pasamos los datos de Jinja a un array de JavaScript
+    const casasData = [
+        {% for casa in casas %}
+        { id: "{{ casa.id }}", nombre: "{{ casa.nombre_formateado() | escape }}" }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
 
     searchInput.addEventListener('input', function() {
-        const option = Array.from(casasList.options).find(opt => opt.value === searchInput.value);
-        if (option) {
-            hiddenInput.value = option.dataset.id;
-            searchInput.classList.add('is-valid');
+        const val = this.value.toLowerCase();
+        autocompleteList.innerHTML = ''; // Limpiar resultados anteriores
+        hiddenInput.value = ''; // Borrar el ID oculto si el usuario cambia el texto
+        searchInput.classList.remove('is-valid');
+
+        if (!val) {
+            autocompleteList.style.display = 'none';
+            return;
+        }
+
+        // Filtrar las casas que coincidan
+        let matches = casasData.filter(casa => casa.nombre.toLowerCase().includes(val));
+
+        if (matches.length > 0) {
+            autocompleteList.style.display = 'block';
+            
+            matches.forEach(match => {
+                const item = document.createElement('a');
+                item.className = 'dropdown-item py-2 border-bottom text-wrap';
+                item.href = 'javascript:void(0)';
+                
+                // Resaltar la parte del texto que coincide
+                const regex = new RegExp(`(${val})`, "gi");
+                const highlightedName = match.nombre.replace(regex, "<strong class='text-primary'>$1</strong>");
+
+                item.innerHTML = `<i class="bi bi-geo-alt-fill text-secondary me-2"></i>${highlightedName}`;
+
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    searchInput.value = match.nombre;
+                    hiddenInput.value = match.id;
+                    searchInput.classList.add('is-valid');
+                    autocompleteList.style.display = 'none';
+                });
+                
+                autocompleteList.appendChild(item);
+            });
         } else {
-            hiddenInput.value = "";
-            searchInput.classList.remove('is-valid');
+            autocompleteList.style.display = 'block';
+            autocompleteList.innerHTML = '<div class="px-3 py-2 text-muted small"><i class="bi bi-emoji-frown me-1"></i> No se encontraron propiedades...</div>';
+        }
+    });
+
+    // Cerrar el menú si se hace clic afuera
+    document.addEventListener('click', function(e) {
+        if (e.target !== searchInput && e.target !== autocompleteList) {
+            autocompleteList.style.display = 'none';
         }
     });
 
