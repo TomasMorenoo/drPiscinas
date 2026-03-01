@@ -51,6 +51,37 @@ def create_app():
     login_manager.login_view = "auth.login"
     login_manager.login_message = "Sesión expirada o acceso denegado."
     login_manager.login_message_category = "warning"
+    # --- Crear Tablas ---
+    
+    with app.app_context():
+        from sqlalchemy import text
+        print("🔍 Verificando estructura de base de datos...")
+        
+        # 1. Crea las tablas nuevas (como 'grupos_clientes') si no existen
+        db.create_all()
+        
+        # 2. Inyecta columnas nuevas en tablas viejas (Migración automática simple)
+        try:
+            # Agregamos grupo_id a la tabla casas si no existe
+            # Usamos el nombre de la tabla 'casas' que es el que definiste en el modelo
+            db.session.execute(text("ALTER TABLE casas ADD COLUMN IF NOT EXISTS grupo_id INTEGER;"))
+            
+            # Intentamos crear la relación (FK)
+            try:
+                db.session.execute(text("""
+                    ALTER TABLE casas 
+                    ADD CONSTRAINT fk_casa_grupo 
+                    FOREIGN KEY (grupo_id) 
+                    REFERENCES grupos_clientes(id);
+                """))
+            except Exception:
+                pass # Si ya existe el constraint, no pasa nada
+                
+            db.session.commit()
+            print("✅ Estructura de base de datos actualizada.")
+        except Exception as e:
+            db.session.rollback()
+            print(f"⚠️ Nota: No se pudo alterar la tabla (probablemente ya está actualizada).")
 
     # --- MANEJADORES DE ERROR ---
     @app.errorhandler(404)
