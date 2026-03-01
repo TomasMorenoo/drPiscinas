@@ -101,7 +101,9 @@ def index():
             # WhatsApp Individual
             if casa.telefono:
                 texto_wa = f"Hola! Te paso el resumen: Abono ${format_money(abono_mes)} + Productos ${format_money(extras)}. Total a pagar: ${format_money(total_mes + saldo_anterior)}."
-                item_casa["url_wa"] = f"https://wa.me/549{re.sub(r'\D', '', casa.telefono)}?text={urllib.parse.quote(texto_wa)}"
+                # CORRECCIÓN AQUÍ: Sacamos el re.sub de adentro del f-string
+                tel_limpio = re.sub(r'\D', '', casa.telefono)
+                item_casa["url_wa"] = f"https://wa.me/549{tel_limpio}?text={urllib.parse.quote(texto_wa)}"
             reporte_sueltas.append(item_casa)
 
         total_clientes += 1
