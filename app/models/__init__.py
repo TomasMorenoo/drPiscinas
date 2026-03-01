@@ -5,3 +5,4 @@ from app.models.visit_product import VisitProduct
 from .products import Product
 from .promo import Promo
 from app.models.promo_product import PromoProduct
+from app.models.grupo import GrupoCliente

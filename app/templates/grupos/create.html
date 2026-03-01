@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Crear Grupo de Clientes{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0 mt-4">
+            <div class="card-header bg-dark text-white py-3">
+                <h4 class="mb-0"><i class="bi bi-collection-fill me-2"></i>Agrupar Propiedades</h4>
+            </div>
+            
+            <div class="card-body p-4 bg-light">
+                <div class="mb-4 p-3 bg-white border rounded shadow-sm">
+                    <label class="form-label fw-bold text-success"><i class="bi bi-whatsapp me-1"></i> Buscar por Teléfono</label>
+                    <div class="input-group">
+                        <input type="text" id="telefono_buscar" class="form-control" placeholder="Ej: 1122334455">
+                        <button class="btn btn-success" type="button" onclick="buscarCasas()"><i class="bi bi-search"></i> Buscar</button>
+                    </div>
+                    <div class="form-text">Buscá propiedades que compartan el mismo número para agruparlas.</div>
+                </div>
+
+                <form method="POST" action="{{ url_for('grupos.crear_grupo') }}" id="formGrupo">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Nombre del Grupo</label>
+                        <input type="text" name="nombre" class="form-control form-control-lg" placeholder="Ej: Familia Pérez (3 Casas)" required>
+                    </div>
+
+                    <h6 class="fw-bold mb-3 text-muted border-bottom pb-2">Casas Seleccionadas para el Grupo</h6>
+                    
+                    <div class="table-responsive bg-white border rounded mb-4">
+                        <table class="table table-hover mb-0" id="tabla-borrador">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 50px;">Incluir</th>
+                                    <th>Propiedad</th>
+                                    <th>Titular</th>
+                                    <th class="text-end">Abono</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lista-casas">
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-4 fst-italic">Buscá un teléfono para agregar casas al borrador...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-secondary px-4">Cancelar</a>
+                        <button type="submit" class="btn btn-dark px-5 fw-bold" id="btn-guardar" disabled>Guardar Grupo Definitivo</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function buscarCasas() {
+    const telefono = document.getElementById('telefono_buscar').value;
+    const tbody = document.getElementById('lista-casas');
+    const btnGuardar = document.getElementById('btn-guardar');
+    
+    if(!telefono) return;
+    
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success"></div> Buscando...</td></tr>';
+    
+    fetch(`/grupos/api/buscar_por_telefono?telefono=${telefono}`)
+        .then(response => response.json())
+        .then(data => {
+            tbody.innerHTML = '';
+            if(data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-4">No se encontraron casas sueltas con ese teléfono.</td></tr>';
+                btnGuardar.disabled = true;
+                return;
+            }
+            
+            data.forEach(casa => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="text-center">
+                            <input class="form-check-input" type="checkbox" name="casas_ids[]" value="${casa.id}" checked>
+                        </td>
+                        <td class="fw-bold">${casa.nombre}</td>
+                        <td class="text-muted"><i class="bi bi-person me-1"></i>${casa.cliente}</td>
+                        <td class="text-end font-monospace">$${casa.abono.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+            btnGuardar.disabled = false;
+        });
+}
+</script>
+{% endblock %}

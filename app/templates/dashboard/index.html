@@ -47,30 +47,36 @@
                 {% endif %}
             </form>
 
-            {% if mes_congelado %}
-            <form method="POST" action="{{ url_for('dashboard.unsync_abonos') }}" class="m-0" onsubmit="return confirm('¿Seguro que querés reabrir este mes? Se permitirán editar visitas y los abonos volverán a ser los actuales.');">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="mes" value="{{ mes }}">
-                <input type="hidden" name="anio" value="{{ anio }}">
-                <button type="submit" class="btn btn-sm btn-outline-danger fw-bold shadow-sm">
-                    <i class="bi bi-unlock-fill me-1"></i> REABRIR MES
-                </button>
-            </form>
-            {% else %}
-            <form method="POST" action="{{ url_for('dashboard.sync_abonos') }}" class="m-0" onsubmit="return confirm('¿Estás seguro de cerrar el mes? Se sellarán los abonos actuales y se bloqueará la edición de visitas para este período.');">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="mes" value="{{ mes }}">
-                <input type="hidden" name="anio" value="{{ anio }}">
-                <button type="submit" class="btn btn-sm btn-warning fw-bold shadow-sm">
-                    <i class="bi bi-lock-fill me-1"></i> CERRAR MES
-                </button>
-            </form>
-            {% endif %}
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('grupos.crear_grupo') }}" class="btn btn-sm btn-outline-dark fw-bold shadow-sm">
+                    <i class="bi bi-collection-fill me-1"></i> AGRUPAR CASAS
+                </a>
+
+                {% if mes_congelado %}
+                <form method="POST" action="{{ url_for('dashboard.unsync_abonos') }}" class="m-0" onsubmit="return confirm('¿Seguro que querés reabrir este mes? Se permitirán editar visitas y los abonos volverán a ser los actuales.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="mes" value="{{ mes }}">
+                    <input type="hidden" name="anio" value="{{ anio }}">
+                    <button type="submit" class="btn btn-sm btn-outline-danger fw-bold shadow-sm">
+                        <i class="bi bi-unlock-fill me-1"></i> REABRIR MES
+                    </button>
+                </form>
+                {% else %}
+                <form method="POST" action="{{ url_for('dashboard.sync_abonos') }}" class="m-0" onsubmit="return confirm('¿Estás seguro de cerrar el mes? Se sellarán los abonos actuales y se bloqueará la edición de visitas para este período.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="mes" value="{{ mes }}">
+                    <input type="hidden" name="anio" value="{{ anio }}">
+                    <button type="submit" class="btn btn-sm btn-warning fw-bold shadow-sm">
+                        <i class="bi bi-lock-fill me-1"></i> CERRAR MES
+                    </button>
+                </form>
+                {% endif %}
+            </div>
 
         </div>
     </div>
 
-    {% if not reporte or kpi_clientes == 0 %}
+    {% if (not reporte_sueltas and not reporte_grupos) or kpi_clientes == 0 %}
     <div class="row justify-content-center mt-5">
         <div class="col-md-6 text-center">
             <div class="card shadow-sm border-0 py-5">
@@ -144,10 +150,14 @@
         </div>
     </div>
 
-    {# --- 3. TABLA DE DETALLE --- #}
-    <div class="card border-0 shadow-sm">
+    {# --- 3. SECCIÓN: PROPIEDADES INDIVIDUALES --- #}
+    <h5 class="fw-bold mt-5 mb-3 text-secondary border-bottom pb-2">
+        <i class="bi bi-house-door me-2"></i>Propiedades Individuales
+    </h5>
+    
+    <div class="card border-0 shadow-sm mb-5">
         <div class="table-responsive">
-            <table class="table table-striped table-hover align-middle mb-0" style="table-layout: fixed;">
+            <table class="table table-striped table-hover align-middle mb-0 buscar-tabla" style="table-layout: fixed;">
                 <thead class="table-dark">
                     <tr>
                         <th class="ps-3 text-uppercase small py-3" style="width: 16.66%;">Cliente</th>
@@ -159,7 +169,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in reporte %}
+                    {% for item in reporte_sueltas %}
                     <tr>
                         <td class="ps-3 fw-bold text-truncate">
                             <a href="{{ url_for('casas.perfil', id=item.casa.id) }}" class="text-decoration-none text-dark d-inline-block text-truncate align-middle" title="{{ item.casa.nombre_formateado() }}" style="max-width: 80%;">
@@ -169,11 +179,11 @@
                                 <span class="badge bg-secondary ms-1 align-middle" style="font-size: 0.6rem;" title="Cliente dado de baja actualmente">BAJA</span>
                             {% endif %}
                         </td>
-                        <td class="text-end font-monospace text-muted">${{ "{:,.2f}".format(item.abono) }}</td>
-                        <td class="text-end font-monospace text-muted">${{ "{:,.2f}".format(item.extras) }}</td>
+                        <td class="text-end font-monospace text-muted">${{ "{:,.0f}".format(item.abono) }}</td>
+                        <td class="text-end font-monospace text-muted">${{ "{:,.0f}".format(item.extras) }}</td>
                         
                         <td class="text-end font-monospace fw-bold text-dark fs-6">
-                            ${{ "{:,.2f}".format(item.total_mes) }}
+                            ${{ "{:,.0f}".format(item.total_mes) }}
                         </td>
 
                         <td class="text-end pe-3 text-nowrap align-middle">
@@ -212,7 +222,7 @@
                                     
                                     <button onclick="togglePago({{ item.id_historial }}, this)" 
                                             class="btn btn-sm border shadow-sm py-2 {% if item.pagado %}btn-success{% elif item.mensaje_enviado %}btn-primary{% else %}btn-light{% endif %}"
-                                            title="Cambiar estado / Abrir WA">
+                                            title="Cambiar estado">
                                         {% if item.pagado %}<i class="bi bi-check-circle-fill fs-5"></i>
                                         {% elif item.mensaje_enviado %}<i class="bi bi-send-check-fill fs-5"></i>
                                         {% else %}<i class="bi bi-clock-fill fs-5 text-danger"></i>{% endif %}
@@ -227,7 +237,7 @@
                                         <button class="btn btn-sm btn-outline-secondary opacity-25 flex-grow-1 py-1" disabled><i class="bi bi-whatsapp"></i></button>
                                         {% endif %}
 
-                                        <button onclick="abrirModalPago({{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-secondary flex-grow-1 py-1">
+                                        <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-secondary flex-grow-1 py-1">
                                             <i class="bi bi-cash-stack"></i>
                                         </button>
                                     </div>
@@ -238,11 +248,152 @@
                             {% endif %}
                         </td>
                     </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="text-center py-4 text-muted fst-italic">No hay propiedades sueltas.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
+
+    {# --- 4. SECCIÓN: GRUPOS CONSOLIDADOS --- #}
+    {% if reporte_grupos %}
+    <h5 class="fw-bold mt-5 mb-3 text-primary border-bottom pb-2">
+        <i class="bi bi-collection-fill me-2"></i>Grupos Consolidados
+    </h5>
+
+    <div class="row">
+        {% for g in reporte_grupos %}
+        <div class="col-12 mb-4">
+            <div class="card border-0 shadow-sm border-start border-4 border-primary">
+                
+                <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center">
+                    <div class="d-flex align-items-center mb-2 mb-md-0">
+                        <h5 class="mb-0 fw-bold text-dark">{{ g.nombre }}</h5>
+                        <span class="badge bg-light text-primary border border-primary ms-3">{{ g.casas|length }} Propiedades</span>
+                    </div>
+                    
+                    <div class="d-flex align-items-center gap-3">
+                        
+                        {# --- 1. SALDO ACTUAL DEL GRUPO (A favor, Deuda o Pendiente) --- #}
+                        <div class="text-end me-3 border-end pe-3">
+                            <span class="d-block small text-muted text-uppercase">Saldo del Grupo</span>
+                            
+                            {% if g.saldo_restante < -0.1 %}
+                                <span class="fs-5 text-success fw-bold font-monospace" title="Saldo a favor del cliente">
+                                    <i class="bi bi-plus-circle me-1"></i>${{ "{:,.0f}".format(g.saldo_restante | abs) }}
+                                </span>
+                            {% elif g.saldo_restante > 0.1 %}
+                                {% if g.saldo_restante != (g.total_mes + g.saldo_anterior) or g.monto_pagado > 0 %}
+                                    <span class="fs-5 text-danger fw-bold font-monospace" title="Deuda pendiente">
+                                        <i class="bi bi-dash-circle me-1"></i>${{ "{:,.0f}".format(g.saldo_restante) }}
+                                    </span>
+                                {% else %}
+                                    <span class="fs-5 fw-bold text-secondary" style="font-family: system-ui;">Pendiente</span>
+                                {% endif %}
+                            {% else %}
+                                {% if g.pagado %}
+                                    <span class="fs-5 fw-bold text-success" style="font-family: system-ui;">Pagó</span>
+                                {% else %}
+                                    <span class="fs-5 fw-bold text-secondary" style="font-family: system-ui;">Pendiente</span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+
+                        {# --- 2. TOTAL CONSOLIDADO Y SALDO DEL MES ANTERIOR --- #}
+                        <div class="text-end me-3 border-end pe-3">
+                            <span class="d-block small text-muted text-uppercase">Total a Pagar</span>
+                            
+                            {% if g.saldo_anterior < -0.1 %}
+                                <span class="d-block small text-success fw-bold">Viene a favor: ${{ "{:,.0f}".format(g.saldo_anterior | abs) }}</span>
+                            {% elif g.saldo_anterior > 0.1 %}
+                                <span class="d-block small text-danger fw-bold">Deuda ant: ${{ "{:,.0f}".format(g.saldo_anterior) }}</span>
+                            {% endif %}
+
+                            <span class="fs-5 fw-bold text-dark">${{ "{:,.0f}".format(g.total_mes + g.saldo_anterior) }}</span>
+                        </div>
+
+                        {# --- BOTONES DE ACCIÓN DEL GRUPO --- #}
+                        <div class="d-flex gap-1 align-items-center" style="width: 140px;">
+                            {% if mes_congelado %}
+                                
+                                {% if g.pagado %}
+                                    {# Si está pagado: Botón único verde que absorbe todo el 100% del ancho #}
+                                    <button onclick="togglePagoGrupo({{ g.grupo_id }}, {{ mes }}, {{ anio }}, this)" 
+                                            class="btn btn-sm btn-success w-100 shadow-sm py-2 d-flex align-items-center justify-content-center"
+                                            title="Deshacer pago del grupo">
+                                        <i class="bi bi-check-circle-fill fs-5 me-2"></i>
+                                        <span class="fw-bold" style="font-size: 0.85rem;">PAGADO</span>
+                                    </button>
+                                {% else %}
+                                    {# Si está pendiente: Los 3 botones se reparten el espacio equitativamente (flex-grow-1) #}
+                                    <button onclick="togglePagoGrupo({{ g.grupo_id }}, {{ mes }}, {{ anio }}, this)" 
+                                            class="btn btn-sm border shadow-sm py-2 flex-grow-1 {% if g.mensaje_enviado %}btn-primary{% else %}btn-light{% endif %}"
+                                            title="Cambiar estado del grupo">
+                                        {% if g.mensaje_enviado %}<i class="bi bi-send-check-fill fs-5"></i>
+                                        {% else %}<i class="bi bi-clock-fill fs-5 text-danger"></i>{% endif %}
+                                    </button>
+
+                                    {% if g.url_wa %}
+                                    <a href="{{ g.url_wa }}" target="_blank" onclick="marcarEnviadoGrupo({{ g.grupo_id }}, {{ mes }}, {{ anio }})" class="btn btn-sm btn-outline-success py-2 flex-grow-1">
+                                        <i class="bi bi-whatsapp fs-5"></i>
+                                    </a>
+                                    {% endif %}
+
+                                    <button onclick="abrirModalPago('grupo', {{ g.grupo_id }}, 'GRUPO: {{ g.nombre }}', {{ g.total_mes + g.saldo_anterior - g.monto_pagado }})" class="btn btn-sm btn-outline-secondary py-2 flex-grow-1">
+                                        <i class="bi bi-cash-stack fs-5"></i>
+                                    </button>
+                                {% endif %}
+
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body p-0 table-responsive">
+                    <table class="table table-hover align-middle mb-0 buscar-tabla">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4 py-2" style="width: 20%;">Propiedad</th>
+                                <th class="text-end py-2" style="width: 20%;">Abono Base</th>
+                                <th class="text-end py-2" style="width: 20%;">Extras</th>
+                                <th class="text-end py-2" style="width: 20%;">Total Mes</th>
+                                <th class="text-center pe-3 py-2" style="width: 20%;">Estado Individual</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in g.casas %}
+                            <tr>
+                                <td class="ps-4 fw-bold text-truncate">
+                                    <i class="bi bi-arrow-return-right text-muted me-1"></i>
+                                    <a href="{{ url_for('casas.perfil', id=item.casa.id) }}" class="text-decoration-none text-dark d-inline-block text-truncate align-middle" style="max-width: 80%;">
+                                        {{ item.casa.nombre_formateado() }}
+                                    </a>
+                                </td>
+                                <td class="text-end font-monospace text-muted">${{ "{:,.0f}".format(item.abono) }}</td>
+                                <td class="text-end font-monospace text-muted">${{ "{:,.0f}".format(item.extras) }}</td>
+                                <td class="text-end font-monospace fw-bold text-dark fs-6">${{ "{:,.0f}".format(item.total_mes) }}</td>
+                                
+                                <td class="p-1 align-middle text-center">
+                                    {% if item.pagado %}
+                                        <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Pagado</span>
+                                    {% elif item.mensaje_enviado %}
+                                        <span class="badge bg-primary"><i class="bi bi-send-check-fill me-1"></i>Notificado</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark border"><i class="bi bi-clock-fill text-danger me-1"></i>Pendiente</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     {% endif %}
 </div>
 
@@ -265,7 +416,8 @@
                 </div>
                 <div class="form-text mt-2"><i class="bi bi-info-circle"></i> El saldo restante se calculará automáticamente.</div>
                 
-                <input type="hidden" id="historial_id_oculto">
+                <input type="hidden" id="modal_tipo_pago">
+                <input type="hidden" id="modal_id_referencia">
             </div>
             <div class="modal-footer bg-light border-0 d-flex justify-content-center pb-4 pt-0">
                 <button type="button" class="btn btn-outline-secondary px-4 fw-bold" data-bs-dismiss="modal">Cancelar</button>
@@ -278,12 +430,12 @@
 </div>
 
 <script>
-// --- BUSCADOR EN TIEMPO REAL DASHBOARD ---
+// --- BUSCADOR EN TIEMPO REAL ADAPTADO PARA MÚLTIPLES TABLAS ---
 const buscador = document.getElementById('busquedaRealTime');
 if (buscador) {
     buscador.addEventListener('keyup', function() {
         let filtro = this.value.toLowerCase();
-        let filas = document.querySelectorAll('table tbody tr');
+        let filas = document.querySelectorAll('.buscar-tabla tbody tr');
 
         filas.forEach(fila => {
             let textoColumna = fila.cells[0].textContent.toLowerCase();
@@ -303,7 +455,11 @@ montoInput.addEventListener('input', function(e) {
     this.value = new Intl.NumberFormat('es-AR').format(parseInt(value, 10));
 });
 
-// --- LÓGICAS ORIGINALES ---
+
+// ==========================================
+// LÓGICAS PARA CASAS INDIVIDUALES
+// ==========================================
+
 function desbloquearFila(id) {
     document.getElementById(`bloqueo-${id}`).classList.add('d-none');
     let acciones = document.getElementById(`acciones-${id}`);
@@ -342,8 +498,53 @@ function togglePago(id, btn) {
     });
 }
 
-function abrirModalPago(id, nombre, deuda) {
-    document.getElementById('historial_id_oculto').value = id;
+
+// ==========================================
+// LÓGICAS NUEVAS PARA GRUPOS
+// ==========================================
+
+function marcarEnviadoGrupo(grupo_id, mes, anio) {
+    fetch(`/dashboard/marcar-mensaje-grupo/${grupo_id}`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mes: mes, anio: anio })
+    }).then(() => setTimeout(() => location.reload(), 1500));
+}
+
+function togglePagoGrupo(grupo_id, mes, anio, btn) {
+    const contenidoOriginal = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm text-secondary my-1"></span>';
+    btn.disabled = true;
+
+    fetch(`/dashboard/toggle-pago-grupo/${grupo_id}`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mes: mes, anio: anio })
+    })
+    .then(res => res.json())
+    .then(data => { 
+        if (data.success) {
+            if (data.url_wa) {
+                window.open(data.url_wa, '_blank');
+            }
+            location.reload(); 
+        }
+    })
+    .catch(() => { 
+        btn.innerHTML = contenidoOriginal; 
+        btn.disabled = false; 
+    });
+}
+
+
+// ==========================================
+// MODAL DE PAGO UNIFICADO
+// ==========================================
+
+function abrirModalPago(tipo, id_referencia, nombre, deuda) {
+    document.getElementById('modal_tipo_pago').value = tipo; 
+    document.getElementById('modal_id_referencia').value = id_referencia;
+    
     document.getElementById('modal-nombre-cliente').innerText = nombre;
     
     let deudaFormat = new Intl.NumberFormat("es-AR", {style: "currency", currency: "ARS"}).format(deuda);
@@ -358,9 +559,9 @@ function abrirModalPago(id, nombre, deuda) {
 }
 
 function enviarPagoParcial() {
-    let id = document.getElementById('historial_id_oculto').value;
+    let tipo = document.getElementById('modal_tipo_pago').value;
+    let id_referencia = document.getElementById('modal_id_referencia').value;
     
-    // Le quitamos los puntitos antes de mandar al servidor
     let montoRaw = document.getElementById('monto_entregado').value.replace(/\./g, '');
     let monto = parseFloat(montoRaw);
     
@@ -373,10 +574,18 @@ function enviarPagoParcial() {
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Guardando...';
     btn.disabled = true;
 
-    fetch(`/dashboard/registrar-pago-especial/${id}`, {
+    let url = tipo === 'grupo' ? `/dashboard/registrar-pago-grupo/${id_referencia}` : `/dashboard/registrar-pago-especial/${id_referencia}`;
+    let bodyData = { monto: monto };
+
+    if (tipo === 'grupo') {
+        bodyData.mes = {{ mes }};
+        bodyData.anio = {{ anio }};
+    }
+
+    fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
-        body: JSON.stringify({ monto: monto })
+        body: JSON.stringify(bodyData)
     })
     .then(res => res.json())
     .then(data => { if(data.success) location.reload(); });

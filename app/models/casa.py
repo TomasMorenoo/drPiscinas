@@ -32,6 +32,9 @@ class Casa(db.Model):
         db.ForeignKey("barrios.id"),
         nullable=True
     )
+    
+    grupo_id = db.Column(db.Integer, db.ForeignKey("grupos_clientes.id"), nullable=True)
+    grupo = db.relationship("GrupoCliente", backref=db.backref("casas", lazy=True))
 
     def __repr__(self):
         return f"<Casa {self.numero}>"

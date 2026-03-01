@@ -74,6 +74,7 @@ def create_app():
     from app.routers.auth_router import auth_bp
     from app.models.abono_historico import AbonoHistorico
     from app.routers.user_router import user_bp
+    from app.routers.grupo_router import grupo_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(country_bp)
@@ -85,6 +86,7 @@ def create_app():
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(user_bp)
+    app.register_blueprint(grupo_bp)
 
     # ========================================================
     # NUEVO: Inyectar variable global para el botón de borrado
