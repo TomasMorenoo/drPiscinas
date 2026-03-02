@@ -79,33 +79,52 @@
 
                         <div class="tab-pane fade" id="pagos" role="tabpanel">
                             <div class="table-responsive">
-                                <table class="table table-hover mb-0 align-middle bg-white">
-                                    <thead class="table-light">
+                                <table class="table table-hover mb-0 align-middle bg-white" style="font-size: 0.95rem;">
+                                    {# CABECERA OSCURA CON TEXTO BLANCO #}
+                                    <thead class="table-dark">
                                         <tr>
-                                            <th class="ps-4 py-3">Período</th>
-                                            <th class="text-end py-3">Costo del Mes</th>
-                                            <th class="text-end py-3">Dinero Entregado</th>
-                                            <th class="text-end pe-4 py-3" style="width: 180px;">Saldo Resultante</th>
+                                            <th class="ps-4 py-3 text-white text-uppercase small fw-bold">Período</th>
+                                            <th class="text-end py-3 text-white text-uppercase small fw-bold">Saldo Anterior</th>
+                                            <th class="text-end py-3 text-white text-uppercase small fw-bold">Costo del Mes</th>
+                                            <th class="text-end py-3 text-white text-uppercase small fw-bold">Dinero Entregado</th>
+                                            <th class="text-end pe-4 py-3 text-white text-uppercase small fw-bold" style="width: 160px;">Saldo Resultante</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for d in detalles_pagos %}
                                         <tr>
-                                            <td class="ps-4 fw-bold text-uppercase">{{ d.periodo }}</td>
-                                            <td class="text-end font-monospace text-muted">${{ "{:,.2f}".format(d.costo_mes) }}</td>
-                                            <td class="text-end font-monospace text-success fw-bold">${{ "{:,.2f}".format(d.pagado) }}</td>
-                                            <td class="text-end pe-4">
-                                                {% if d.saldo > 0 %}
-                                                    <span class="badge bg-danger fs-6 w-100 py-2">Debe: ${{ "{:,.0f}".format(d.saldo) }}</span>
-                                                {% elif d.saldo < 0 %}
-                                                    <span class="badge bg-success fs-6 w-100 py-2">A favor: ${{ "{:,.0f}".format(d.saldo | abs) }}</span>
+                                            <td class="ps-4 fw-bold text-dark text-uppercase">{{ d.periodo }}</td>
+                                            
+                                            {# SALDO ANTERIOR #}
+                                            <td class="text-end font-monospace">
+                                                {% if d.saldo_anterior < -0.1 %}
+                                                    <span class="text-success fw-bold">A favor: ${{ "{:,.0f}".format(d.saldo_anterior | abs) }}</span>
+                                                {% elif d.saldo_anterior > 0.1 %}
+                                                    <span class="text-danger fw-bold">Deuda: ${{ "{:,.0f}".format(d.saldo_anterior) }}</span>
                                                 {% else %}
-                                                    <span class="badge bg-secondary fs-6 w-100 py-2 text-uppercase">$0 (Al día)</span>
+                                                    <span class="text-muted">$0</span>
+                                                {% endif %}
+                                            </td>
+
+                                            {# COSTO DEL MES #}
+                                            <td class="text-end font-monospace fw-bold text-dark">${{ "{:,.0f}".format(d.costo_mes) }}</td>
+                                            
+                                            {# DINERO ENTREGADO #}
+                                            <td class="text-end font-monospace text-success fw-bold">${{ "{:,.0f}".format(d.pagado) }}</td>
+                                            
+                                            {# SALDO RESULTANTE #}
+                                            <td class="text-end pe-4">
+                                                {% if d.saldo > 0.1 %}
+                                                    <span class="badge bg-danger fs-6 w-100 py-2 shadow-sm">Debe: ${{ "{:,.0f}".format(d.saldo) }}</span>
+                                                {% elif d.saldo < -0.1 %}
+                                                    <span class="badge bg-success fs-6 w-100 py-2 shadow-sm">A favor: ${{ "{:,.0f}".format(d.saldo | abs) }}</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary fs-6 w-100 py-2 text-uppercase shadow-sm">$0 (Al día)</span>
                                                 {% endif %}
                                             </td>
                                         </tr>
                                         {% else %}
-                                        <tr><td colspan="4" class="text-center py-5 text-muted fst-italic">Aún no hay cierres de mes registrados.</td></tr>
+                                        <tr><td colspan="5" class="text-center py-5 text-muted fst-italic">Aún no hay cierres de mes registrados.</td></tr>
                                         {% endfor %}
                                     </tbody>
                                 </table>

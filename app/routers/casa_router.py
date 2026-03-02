@@ -313,10 +313,7 @@ def toggle_casa(id):
 def perfil(id):
     casa = Casa.query.get_or_404(id)
     
-    # Obtenemos las visitas ordenadas por fecha (las más nuevas primero)
     visitas = sorted(casa.visitas, key=lambda v: v.fecha, reverse=True)
-    
-    # Buscamos todo el historial ordenado de viejo a nuevo para calcular la cuenta corriente
     historial_asc = AbonoHistorico.query.filter_by(casa_id=casa.id).order_by(AbonoHistorico.anio.asc(), AbonoHistorico.mes.asc()).all()
     
     detalles_pagos = []
@@ -326,22 +323,34 @@ def perfil(id):
     for h in historial_asc:
         gastos = casa.obtener_gastos_mensuales(h.mes, h.anio)
         total_mes = gastos['total']
-        pagado = float(getattr(h, 'monto_pagado', 0) or 0)
+        pagado_real = float(getattr(h, 'monto_pagado', 0) or 0)
         
-        # Corrección: si se tocó el tilde verde (pago total) pero el monto está en 0
-        if getattr(h, 'pagado', False) and pagado == 0:
-            pagado = total_mes
+        # Guardamos la foto del saldo antes de aplicarle los gastos de este mes
+        saldo_anterior_iter = saldo_acumulado
+        
+        # 1. Sumamos la deuda de este mes y le restamos lo que pagó
+        saldo_acumulado += total_mes
+        saldo_acumulado -= pagado_real
+        
+        # 2. Regla de compatibilidad / Tilde Verde Manual
+        # Si tiene el tilde verde (pagado), no hay registro de plata real, y LA CUENTA DA DEUDA:
+        # Significa que lo perdonamos o lo marcó manual tu tío. Simula que pagó el total.
+        # Pero si la cuenta da SALDO A FAVOR, no se mete, así la plata sigue bajando de mes a mes.
+        if getattr(h, 'pagado', False) and pagado_real == 0 and saldo_acumulado > 0.01:
+            pagado_simulado = saldo_acumulado 
+            saldo_acumulado = 0.0
+            dinero_mostrado = pagado_simulado
+        else:
+            dinero_mostrado = pagado_real
             
-        saldo_acumulado += (total_mes - pagado)
-        
         detalles_pagos.append({
             "periodo": f"{nombres_meses[h.mes - 1]} {h.anio}",
+            "saldo_anterior": saldo_anterior_iter,
             "costo_mes": total_mes,
-            "pagado": pagado,
+            "pagado": dinero_mostrado,
             "saldo": saldo_acumulado
         })
         
-    # Invertimos para que el mes más nuevo quede arriba en la tabla
     detalles_pagos.reverse()
     
     return render_template("casas/perfil.html", casa=casa, visitas=visitas, detalles_pagos=detalles_pagos)
@@ -355,21 +364,13 @@ def perfil(id):
 def eliminar_casa(id):
     casa = Casa.query.get_or_404(id)
     try:
-        # 1. Borrar todos los registros financieros de meses cerrados de este cliente
         AbonoHistorico.query.filter_by(casa_id=id).delete()
-        
-        # 2. Borrar los productos extras que usó en sus visitas
         visitas = Visit.query.filter_by(casa_id=id).all()
         for visita in visitas:
             VisitProduct.query.filter_by(visit_id=visita.id).delete()
-            
-        # 3. Borrar las visitas en sí
         Visit.query.filter_by(casa_id=id).delete()
-        
-        # 4. Finalmente, borrar al cliente de la base de datos
         db.session.delete(casa)
         db.session.commit()
-        
         flash("Cliente y TODO su historial fueron eliminados definitivamente.", "success")
     except Exception as e:
         db.session.rollback()

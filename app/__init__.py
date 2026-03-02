@@ -57,7 +57,7 @@ def create_app():
         from sqlalchemy import text
         print("🔍 Verificando estructura de base de datos...")
         
-        # 1. Crea las tablas nuevas (como 'grupos_clientes') si no existen
+        # 1. Crea las tablas nuevas (como 'grupos_clientes' y 'cierres_mes') si no existen
         db.create_all()
         
         # 2. Inyecta columnas nuevas en tablas viejas (Migración automática simple)
@@ -82,6 +82,22 @@ def create_app():
         except Exception as e:
             db.session.rollback()
             print(f"⚠️ Nota: No se pudo alterar la tabla (probablemente ya está actualizada).")
+
+        # ========================================================
+        # NUEVO: MIGRACIÓN DEL CANDADO DE MESES CERRADOS
+        # Convierte los registros viejos al nuevo sistema seguro
+        # ========================================================
+        try:
+            from app.models.abono_historico import AbonoHistorico
+            from app.models.cierre_mes import CierreMes
+            meses_hist = db.session.query(AbonoHistorico.mes, AbonoHistorico.anio).distinct().all()
+            for m, a in meses_hist:
+                if not CierreMes.query.filter_by(mes=m, anio=a).first():
+                    db.session.add(CierreMes(mes=m, anio=a))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"⚠️ Nota: Error al migrar CierreMes: {e}")
 
     # --- MANEJADORES DE ERROR ---
     @app.errorhandler(404)
@@ -120,7 +136,7 @@ def create_app():
     app.register_blueprint(grupo_bp)
 
     # ========================================================
-    # NUEVO: Inyectar variable global para el botón de borrado
+    # Inyectar variable global para el botón de borrado
     # ========================================================
     @app.context_processor
     def inyectar_variables():

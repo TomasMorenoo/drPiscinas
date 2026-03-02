@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from flask_login import login_required, current_user  # <-- IMPORTAMOS current_user
+from flask_login import login_required, current_user
 from app import db
 from app.models.visit import Visit
 from app.models.visit_product import VisitProduct
@@ -7,6 +7,7 @@ from app.models.casa import Casa
 from app.models.products import Product
 from app.models.promo import Promo
 from app.models.abono_historico import AbonoHistorico 
+from app.models.cierre_mes import CierreMes  # <-- IMPORTAMOS EL CANDADO
 from sqlalchemy import extract, func
 from datetime import datetime
 
@@ -18,7 +19,8 @@ visit_bp = Blueprint(
 
 # --- FUNCIÓN DE AYUDA PARA SABER SI EL MES ESTÁ CERRADO ---
 def is_mes_cerrado(mes, anio):
-    return AbonoHistorico.query.filter_by(mes=mes, anio=anio).first() is not None
+    # AHORA MIRA EL CANDADO NUEVO
+    return CierreMes.query.filter_by(mes=mes, anio=anio).first() is not None
 
 @visit_bp.route("/")
 @login_required
@@ -83,7 +85,7 @@ def crear_visit():
             fecha=fecha_obj,
             observaciones=request.form.get("observaciones", "").strip(),
             promo_id=promo_id if promo_id else None,
-            usuario_id=current_user.id  # <-- GUARDAMOS EL AUDITOR ACÁ
+            usuario_id=current_user.id 
         )
         db.session.add(visit)
         db.session.commit()
@@ -145,9 +147,6 @@ def editar_visit(id):
         visit.observaciones = request.form.get("observaciones", "").strip()
         visit.promo_id = request.form.get("promo_id") or None
         
-        # Opcional: Podrías actualizar el usuario_id acá si querés que quede registro de quién la editó por última vez
-        # visit.usuario_id = current_user.id 
-        
         VisitProduct.query.filter_by(visit_id=id).delete()
         product_ids = request.form.getlist("product_id[]")
         cantidades = request.form.getlist("cantidad[]")
@@ -168,7 +167,6 @@ def editar_visit(id):
     promos = Promo.query.filter_by(activo=True).all()
     return render_template("visits/create.html", visit=visit, casas=casas, products=products, promos=promos)
 
-# --- NUEVA RUTA PARA VER EL DETALLE ---
 @visit_bp.route("/detalle/<int:id>")
 @login_required
 def detalle_visit(id):

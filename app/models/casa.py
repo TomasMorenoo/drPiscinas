@@ -18,7 +18,7 @@ class Casa(db.Model):
     precio_base = db.Column(db.Numeric(10, 2), nullable=False)
     precio_anterior = db.Column(db.Float, nullable=True)
     activo = db.Column(db.Boolean, default=True)
-    nombre_cliente = db.Column(db.String(100), nullable=True) # Opcional
+    nombre_cliente = db.Column(db.String(100), nullable=True)
     telefono = db.Column(db.String(50), nullable=True)
     
     country_id = db.Column(
@@ -40,16 +40,13 @@ class Casa(db.Model):
         return f"<Casa {self.numero}>"
     
     def obtener_gastos_mensuales(self, mes, anio):
-        """Calcula abono + productos extras de un mes específico"""
         from app.models.abono_historico import AbonoHistorico
-        
         total_extras = 0
         mes_cerrado = AbonoHistorico.query.filter_by(mes=mes, anio=anio).first() is not None
 
         for visita in self.visitas:
             if visita.fecha.month == mes and visita.fecha.year == anio:
                 for vp in visita.productos:
-                    # Si está cerrado usa el precio histórico, sino el precio vivo actual
                     if mes_cerrado and vp.precio_unitario:
                         total_extras += float(vp.cantidad) * float(vp.precio_unitario)
                     else:
@@ -65,29 +62,32 @@ class Casa(db.Model):
         }
 
     def nombre_formateado(self):
-        """Retorna 'Barrio Número' o 'Country Número' según corresponda"""
         if self.barrio:
-            # Si tiene barrio, ignoramos el nombre del country para abreviar
             return f"{self.barrio.nombre} {self.numero}"
-        
-        # Si no tiene barrio, usamos el nombre del country
         return f"{self.country.nombre} {self.numero}"
     
     def obtener_saldo_anterior(self, mes, anio):
         """Calcula la deuda o saldo a favor acumulado revisando el historial mes a mes"""
         saldo = 0.0
-        for hist in self.historial_abonos:
-            # Solo evaluamos los meses ANTERIORES al que estamos consultando en pantalla
+        
+        # Ordenamos cronológicamente para que la plata fluya en el tiempo
+        historiales_ordenados = sorted(self.historial_abonos, key=lambda x: (x.anio, x.mes))
+        
+        for hist in historiales_ordenados:
             if hist.anio < anio or (hist.anio == anio and hist.mes < mes):
                 gastos = self.obtener_gastos_mensuales(hist.mes, hist.anio)
                 total_hist = gastos['total']
                 pagado_hist = float(getattr(hist, 'monto_pagado', 0) or 0)
                 
-                # Si tiene el Tilde Verde pero el monto dice 0, asumimos que pagó el 100%
-                if getattr(hist, 'pagado', False) and pagado_hist == 0:
-                    pagado_hist = total_hist
-                    
-                # Si el mes salía $10.000 y pagó $15.000, la resta da -$5.000 (a favor).
-                saldo += (total_hist - pagado_hist)
+                # REGLA 1: Sumamos la deuda de ese mes y le restamos la plata que ingresó
+                saldo += total_hist
+                saldo -= pagado_hist
                 
+                # REGLA 2: Compatibilidad con botones viejos.
+                # Si el mes figura como "Pagado" (con el tilde verde), pero nunca se le cargó un monto_pagado numérico,
+                # y actualmente la cuenta dice que nos debe plata (saldo > 0), asumimos que lo pagó exacto y reseteamos la deuda a 0.
+                # OJO: Si el saldo es negativo (saldo <= 0), no lo tocamos, dejamos que pase al mes siguiente.
+                if getattr(hist, 'pagado', False) and pagado_hist == 0 and saldo > 0.01:
+                    saldo = 0.0
+                    
         return round(saldo, 2)

@@ -4,6 +4,7 @@ from app.decorators import admin_required
 from app import db
 from app.models import Casa, Country, Barrio
 from app.models.abono_historico import AbonoHistorico
+from app.models.cierre_mes import CierreMes
 from datetime import datetime
 import re
 import urllib.parse
@@ -19,6 +20,12 @@ def natural_sort_key(casa):
 def format_money(value):
     return f"{value:,.0f}".replace(",", ".")
 
+def limpiar_telefono(tel):
+    if not tel: return ""
+    num = re.sub(r'\D', '', tel)
+    if len(num) == 10: num = "549" + num
+    return num
+
 @dashboard_bp.route("/")
 @login_required
 @admin_required
@@ -30,7 +37,7 @@ def index():
         mes = datetime.now().month
         anio = datetime.now().year
     
-    registro_congelado = AbonoHistorico.query.filter_by(mes=mes, anio=anio).first()
+    registro_congelado = CierreMes.query.filter_by(mes=mes, anio=anio).first()
     mes_congelado = True if registro_congelado else False
 
     if mes_congelado:
@@ -48,6 +55,8 @@ def index():
     total_abono = 0.0
     total_extras = 0.0
     total_recaudado = 0.0 
+    
+    hubo_cambios = False
 
     for casa in casas:
         datos = casa.obtener_gastos_mensuales(mes, anio)
@@ -59,13 +68,26 @@ def index():
         total_mes = abono_mes + extras
         saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
         monto_pagado = float(getattr(historial, 'monto_pagado', 0) or 0)
+        
         saldo_restante = (total_mes + saldo_anterior) - monto_pagado
 
         esta_pagado = getattr(historial, 'pagado', False) if historial else False
         mensaje_enviado = getattr(historial, 'mensaje_enviado', False) if historial else False
 
+        # SOLO AUTO-PAGAMOS SI EL MES ESTÁ CERRADO Y HAY UN HISTORIAL
+        if mes_congelado and historial:
+            if not casa.grupo_id:
+                if saldo_restante <= 0.01:
+                    esta_pagado = True
+                    mensaje_enviado = True
+                    if not historial.pagado:
+                        historial.pagado = True
+                        historial.mensaje_enviado = True
+                        hubo_cambios = True
+
         item_casa = {
             "id_historial": historial.id if historial else None,
+            "historial_obj": historial, 
             "casa": casa,
             "abono": abono_mes,
             "extras": extras,
@@ -78,7 +100,6 @@ def index():
             "url_wa": "" 
         }
 
-        # LÓGICA DE AGRUPAMIENTO
         if casa.grupo_id:
             if casa.grupo_id not in reporte_grupos:
                 reporte_grupos[casa.grupo_id] = {
@@ -98,12 +119,10 @@ def index():
             g["saldo_restante"] += saldo_restante
             g["monto_pagado"] += monto_pagado
         else:
-            # WhatsApp Individual
             if casa.telefono:
+                num_tel = limpiar_telefono(casa.telefono)
                 texto_wa = f"Hola! Te paso el resumen: Abono ${format_money(abono_mes)} + Productos ${format_money(extras)}. Total a pagar: ${format_money(total_mes + saldo_anterior)}."
-                # CORRECCIÓN AQUÍ: Sacamos el re.sub de adentro del f-string
-                tel_limpio = re.sub(r'\D', '', casa.telefono)
-                item_casa["url_wa"] = f"https://wa.me/549{tel_limpio}?text={urllib.parse.quote(texto_wa)}"
+                item_casa["url_wa"] = f"https://wa.me/{num_tel}?text={urllib.parse.quote(texto_wa)}"
             reporte_sueltas.append(item_casa)
 
         total_clientes += 1
@@ -116,35 +135,41 @@ def index():
 
     total_general = total_abono + total_extras
 
-    # Preparar WhatsApp y Estados para Grupos
     for g_id, g in reporte_grupos.items():
-        g["pagado"] = all(c["pagado"] for c in g["casas"])
-        g["mensaje_enviado"] = all(c["mensaje_enviado"] for c in g["casas"])
+        # SOLO AUTO-PAGAMOS GRUPOS SI EL MES ESTÁ CERRADO
+        if mes_congelado and g["saldo_restante"] <= 0.01:
+            g["pagado"] = True
+            g["mensaje_enviado"] = True
+            for c in g["casas"]:
+                c["pagado"] = True
+                c["mensaje_enviado"] = True
+                hist_obj = c["historial_obj"]
+                if hist_obj and not hist_obj.pagado:
+                    hist_obj.pagado = True
+                    hist_obj.mensaje_enviado = True
+                    hubo_cambios = True
+        else:
+            g["pagado"] = all(c["pagado"] for c in g["casas"])
+            g["mensaje_enviado"] = all(c["mensaje_enviado"] for c in g["casas"])
 
         if g["telefono"]:
+            num_tel = limpiar_telefono(g["telefono"])
             cant = len(g["casas"])
             texto_wa = f"Hola! *{g['nombre']}* Te paso el resumen de las {cant} propiedades.\n\n"
             
-            # 1. Detalle del mes por casa (SIN saldo anterior)
             for c in g["casas"]:
-                nombre_c = c['casa'].nombre_formateado()
-                abono_str = format_money(c['abono'])
-                extras_str = format_money(c['extras'])
-                total_c_str = format_money(c['total_mes']) 
-                texto_wa += f"• {nombre_c}: Abono ${abono_str} + Productos ${extras_str} = ${total_c_str}\n"
+                texto_wa += f"• {c['casa'].nombre_formateado()}: Abono ${format_money(c['abono'])} + Productos ${format_money(c['extras'])} = ${format_money(c['total_mes'])}\n"
             
-            # 2. Resumen financiero del grupo (Saldo a favor / en contra)
             if g['saldo_anterior'] < -0.1:
                 texto_wa += f"\nSaldo a favor (Mes anterior): *${format_money(abs(g['saldo_anterior']))}*"
             elif g['saldo_anterior'] > 0.1:
                 texto_wa += f"\nDeuda pendiente (Mes anterior): *${format_money(g['saldo_anterior'])}*"
 
-            # 3. Total Final
             texto_wa += f"\n*TOTAL A PAGAR: ${format_money(g['total_mes'] + g['saldo_anterior'])}*"
-            
-            tel = re.sub(r'\D', '', g['telefono'])
-            if len(tel) == 10: tel = "549" + tel
-            g["url_wa"] = f"https://wa.me/{tel}?text={urllib.parse.quote(texto_wa)}"
+            g["url_wa"] = f"https://wa.me/{num_tel}?text={urllib.parse.quote(texto_wa)}"
+
+    if hubo_cambios:
+        db.session.commit()
 
     lista_grupos = list(reporte_grupos.values())
 
@@ -227,9 +252,17 @@ def sync_abonos():
     anio = request.form.get("anio", type=int)
     if not mes or not anio: return redirect(url_for('dashboard.index'))
     
+    cierre = CierreMes.query.filter_by(mes=mes, anio=anio).first()
+    if not cierre:
+        db.session.add(CierreMes(mes=mes, anio=anio))
+    
     for casa in Casa.query.filter_by(activo=True).all():
-        if not AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first():
+        hist = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
+        if not hist:
             db.session.add(AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=float(casa.precio_base or 0)))
+        else:
+            if hist.monto_pagado == 0 and not hist.pagado:
+                hist.monto = float(casa.precio_base or 0)
             
     visitas_mes = Visit.query.filter(extract('month', Visit.fecha) == mes, extract('year', Visit.fecha) == anio).all()
     for visita in visitas_mes:
@@ -246,7 +279,7 @@ def unsync_abonos():
     mes = request.form.get("mes", type=int)
     anio = request.form.get("anio", type=int)
     if mes and anio:
-        AbonoHistorico.query.filter_by(mes=mes, anio=anio).delete()
+        CierreMes.query.filter_by(mes=mes, anio=anio).delete()
         db.session.commit()
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
 
