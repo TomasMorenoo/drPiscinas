@@ -142,7 +142,7 @@
         </div>
     </div>
 
-    {# --- NUEVA BARRA DE BÚSQUEDA EN TIEMPO REAL --- #}
+    {# --- BÚSQUEDA --- #}
     <div class="mb-3">
         <div class="input-group shadow-sm">
             <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
@@ -274,7 +274,6 @@
             </table>
         </div>
     </div>
-
     {# --- 4. SECCIÓN: GRUPOS CONSOLIDADOS --- #}
     {% if reporte_grupos %}
     <h5 class="fw-bold mt-5 mb-3 text-primary border-bottom pb-2">
@@ -305,7 +304,7 @@
                         </div>
 
                         <div class="text-start text-md-end border-end pe-3">
-                            <span class="d-block small text-muted text-uppercase">Total a Pagar</span>
+                            <span class="d-block small text-muted text-uppercase">Total</span>
                             <span class="fs-5 fw-bold text-dark">${{ "{:,.0f}".format(g.total_mes + g.saldo_anterior) }}</span>
                         </div>
 
@@ -318,4 +317,409 @@
                                 {% if mes_congelado %}
                                     {% if g.pagado %}
                                         <li>
-                                            <button class="dropdown-i
+                                            <button class="dropdown-item text-success fw-bold py-2" onclick="togglePagoGrupo({{ g.grupo_id }}, {{ mes }}, {{ anio }}, this)">
+                                                <i class="bi bi-check-circle-fill me-2 fs-5 align-middle"></i> Deshacer Pago Completo
+                                            </button>
+                                        </li>
+                                    {% else %}
+                                        <li>
+                                            <button class="dropdown-item py-2 fw-bold {% if g.mensaje_enviado %}text-primary{% else %}text-danger{% endif %}" onclick="togglePagoGrupo({{ g.grupo_id }}, {{ mes }}, {{ anio }}, this)">
+                                                {% if g.mensaje_enviado %}
+                                                    <i class="bi bi-send-check-fill me-2 fs-5 align-middle"></i> Marcar como Pagado
+                                                {% else %}
+                                                    <i class="bi bi-clock-fill me-2 fs-5 align-middle"></i> Notificar y Avanzar
+                                                {% endif %}
+                                            </button>
+                                        </li>
+                                        {% if g.url_wa %}
+                                        <li>
+                                            <a class="dropdown-item text-success py-2 fw-bold" href="{{ g.url_wa }}" target="_blank" onclick="marcarEnviadoGrupo({{ g.grupo_id }}, {{ mes }}, {{ anio }})">
+                                                <i class="bi bi-whatsapp me-2 fs-5 align-middle"></i> Enviar WhatsApp
+                                            </a>
+                                        </li>
+                                        {% endif %}
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <button class="dropdown-item text-secondary py-2 fw-bold" onclick="abrirModalPago('grupo', {{ g.grupo_id }}, 'GRUPO: {{ g.nombre }}', {{ g.total_mes + g.saldo_anterior - g.monto_pagado }})">
+                                                <i class="bi bi-cash-stack me-2 fs-5 align-middle"></i> Registrar Pago Parcial
+                                            </button>
+                                        </li>
+                                    {% endif %}
+                                {% else %}
+                                    <li><span class="dropdown-item text-muted disabled"><i class="bi bi-lock-fill me-2"></i>Mes Abierto (Cerrar primero)</span></li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body p-0 table-responsive">
+                    <table class="table table-hover align-middle mb-0 buscar-tabla">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4 py-2 text-uppercase small">Propiedad</th>
+                                <th class="text-end py-2 text-uppercase small d-none d-md-table-cell">Abono Base</th>
+                                <th class="text-end py-2 text-uppercase small d-none d-md-table-cell">Extras</th>
+                                
+                                <th class="text-end py-2 text-uppercase small">Total Mes</th>
+                                
+                                <th class="text-center pe-3 py-2 text-uppercase small d-none d-md-table-cell">Estado Indiv.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in g.casas %}
+                            <tr>
+                                <td class="ps-4 fw-bold text-truncate" style="max-width: 150px;">
+                                    <i class="bi bi-arrow-return-right text-muted me-1 d-none d-md-inline"></i>
+                                    <a href="{{ url_for('casas.perfil', id=item.casa.id) }}" class="text-decoration-none text-dark d-inline-block text-truncate align-middle" style="max-width: 100%;">
+                                        {{ item.casa.nombre_formateado() }}
+                                    </a>
+                                </td>
+                                
+                                <td class="text-end font-monospace text-muted d-none d-md-table-cell">${{ "{:,.0f}".format(item.abono) }}</td>
+                                <td class="text-end font-monospace text-muted d-none d-md-table-cell">${{ "{:,.0f}".format(item.extras) }}</td>
+                                
+                                {# TOTAL MES + BOTON "i" EN CELULAR (Semáforo) #}
+                                <td class="text-end font-monospace fw-bold text-dark fs-6 text-nowrap pe-md-4">
+                                    ${{ "{:,.0f}".format(item.total_mes) }}
+                                    <button class="btn btn-sm rounded-circle ms-2 px-2 py-1 shadow-sm d-inline-block d-md-none {% if item.pagado %}btn-success{% elif item.mensaje_enviado %}btn-primary{% else %}btn-light border{% endif %}" 
+                                            onclick="abrirDetalle({{ item.casa.id }})">
+                                        <i class="bi bi-info-lg fw-bold {% if not item.pagado and not item.mensaje_enviado %}text-dark{% else %}text-white{% endif %}"></i>
+                                    </button>
+                                </td>
+                                
+                                <td class="p-1 align-middle text-center pe-3 d-none d-md-table-cell">
+                                    {% if item.pagado %}
+                                        <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Pagado</span>
+                                    {% elif item.mensaje_enviado %}
+                                        <span class="badge bg-primary"><i class="bi bi-send-check-fill me-1"></i>Notificado</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark border"><i class="bi bi-clock-fill text-danger me-1"></i>Pendte.</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            <script type="application/json" id="data-casa-{{ item.casa.id }}">
+                                {
+                                    "id_historial": {{ item.id_historial | tojson }},
+                                    "nombre": {{ item.casa.nombre_formateado() | tojson }},
+                                    "abono": {{ item.abono }},
+                                    "extras": {{ item.extras }},
+                                    "saldo_anterior": {{ item.saldo_anterior }},
+                                    "total_mes": {{ item.total_mes }},
+                                    "monto_pagado": {{ item.monto_pagado }},
+                                    "saldo_restante": {{ item.saldo_restante }},
+                                    "pagado": {{ item.pagado | tojson }},
+                                    "mensaje_enviado": {{ item.mensaje_enviado | tojson }},
+                                    "url_wa": {{ item.url_wa | tojson }},
+                                    "mes_congelado": {{ mes_congelado | tojson }},
+                                    "es_grupo": true
+                                }
+                            </script>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% endif %}
+</div>
+<div class="modal fade" id="modalPago" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-dark text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="bi bi-wallet-fill me-2 text-success"></i>Registrar Entrega de Dinero</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center bg-light">
+                
+                <h5 class="text-primary fw-bold mb-1" id="modal-nombre-cliente">Cliente</h5>
+                <p class="text-muted small mb-4">Deuda Actual: <strong class="text-danger" id="modal-deuda-cliente">$0</strong></p>
+
+                <label class="form-label fw-bold text-uppercase small text-secondary">¿Cuánto dinero entregó ahora?</label>
+                <div class="input-group input-group-lg mx-auto w-75 shadow-sm mb-2">
+                    <span class="input-group-text bg-white border-success fw-bold text-success">$</span>
+                    <input type="text" id="monto_entregado" class="form-control border-success text-center fw-bold text-dark fs-4" placeholder="Ej: 15.000" inputmode="numeric">
+                </div>
+                <div class="form-text mt-2"><i class="bi bi-info-circle"></i> El saldo restante se calculará automáticamente.</div>
+                
+                <input type="hidden" id="modal_tipo_pago">
+                <input type="hidden" id="modal_id_referencia">
+            </div>
+            <div class="modal-footer bg-light border-0 d-flex justify-content-center pb-4 pt-0">
+                <button type="button" class="btn btn-outline-secondary px-4 fw-bold" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success px-5 fw-bold shadow-sm" onclick="enviarPagoParcial()" id="btn-guardar-pago">
+                    <i class="bi bi-check-circle-fill me-1"></i> Confirmar Pago
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalDetalleMovil" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white py-2 border-0">
+                <h6 class="modal-title mb-0 fw-bold"><i class="bi bi-receipt me-2 text-warning"></i>Detalle de Cuenta</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <h4 class="fw-bold text-dark mb-3 text-center" id="detMovilNombre">Cliente</h4>
+                
+                <div class="bg-white rounded shadow-sm border p-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted small fw-bold text-uppercase">Abono Base</span>
+                        <span class="fw-bold font-monospace text-dark" id="detMovilAbono">$0</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted small fw-bold text-uppercase">Extras</span>
+                        <span class="fw-bold font-monospace text-dark" id="detMovilExtras">$0</span>
+                    </div>
+                    <hr class="my-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted small fw-bold text-uppercase">Saldo Anterior</span>
+                        <span class="fw-bold font-monospace" id="detMovilSaldoAnt">$0</span>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center p-3 bg-dark text-white rounded shadow-sm mb-4">
+                    <span class="fw-bold text-uppercase">A Pagar</span>
+                    <span class="fw-bold font-monospace fs-4 text-warning" id="detMovilTotal">$0</span>
+                </div>
+
+                <div id="detMovilAcciones"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- BUSCADOR EN TIEMPO REAL ADAPTADO PARA MÚLTIPLES TABLAS ---
+const buscador = document.getElementById('busquedaRealTime');
+if (buscador) {
+    buscador.addEventListener('keyup', function() {
+        let filtro = this.value.toLowerCase();
+        let filas = document.querySelectorAll('.buscar-tabla tbody tr');
+
+        filas.forEach(fila => {
+            let textoColumna = fila.cells[0].textContent.toLowerCase();
+            fila.style.display = textoColumna.includes(filtro) ? '' : 'none';
+        });
+    });
+}
+
+// --- LÓGICA DE FORMATEO AUTOMÁTICO DE MILES ---
+const montoInput = document.getElementById('monto_entregado');
+if (montoInput) {
+    montoInput.addEventListener('input', function(e) {
+        let value = this.value.replace(/\D/g, '');
+        if (value === '') {
+            this.value = '';
+            return;
+        }
+        this.value = new Intl.NumberFormat('es-AR').format(parseInt(value, 10));
+    });
+}
+
+// ==========================================
+// ABRIR DETALLE MÓVIL (LA MAGIA DE LA 'i')
+// ==========================================
+function abrirDetalle(id) {
+    // 1. Buscamos el objeto JSON escondido en el HTML
+    const dataNode = document.getElementById('data-casa-' + id);
+    if(!dataNode) return;
+    const data = JSON.parse(dataNode.textContent);
+    
+    // 2. Llenamos los textos
+    document.getElementById('detMovilNombre').innerText = data.nombre;
+    document.getElementById('detMovilAbono').innerText = '$' + data.abono.toLocaleString('es-AR', {maximumFractionDigits:0});
+    document.getElementById('detMovilExtras').innerText = '$' + data.extras.toLocaleString('es-AR', {maximumFractionDigits:0});
+    
+    let elSaldo = document.getElementById('detMovilSaldoAnt');
+    if(data.saldo_anterior < -0.1) {
+        elSaldo.innerHTML = '<span class="text-success">A favor: $' + Math.abs(data.saldo_anterior).toLocaleString('es-AR', {maximumFractionDigits:0}) + '</span>';
+    } else if(data.saldo_anterior > 0.1) {
+        elSaldo.innerHTML = '<span class="text-danger">Deuda: $' + data.saldo_anterior.toLocaleString('es-AR', {maximumFractionDigits:0}) + '</span>';
+    } else {
+        elSaldo.innerHTML = '<span class="text-muted">$0</span>';
+    }
+    
+    document.getElementById('detMovilTotal').innerText = '$' + (data.total_mes + data.saldo_anterior).toLocaleString('es-AR', {maximumFractionDigits:0});
+    
+    // 3. Renderizamos los botones si NO es grupo y el mes está cerrado
+    const accionesDiv = document.getElementById('detMovilAcciones');
+    accionesDiv.innerHTML = ''; 
+
+    if (data.es_grupo) {
+        accionesDiv.innerHTML = '<div class="text-center text-muted small fst-italic">Las opciones de cobro para esta propiedad se manejan desde su Grupo Consolidado (Botón "Acciones" arriba).</div>';
+    } else {
+        if (!data.mes_congelado) {
+            accionesDiv.innerHTML = '<div class="alert alert-warning py-2 border-0 text-center small fw-bold mb-0"><i class="bi bi-lock-fill me-1"></i> Cerrá el mes para cobrar</div>';
+        } else if (!data.id_historial) {
+            accionesDiv.innerHTML = '<div class="alert alert-secondary py-2 border-0 text-center small mb-0">Sin historial</div>';
+        } else {
+            if (data.pagado) {
+                accionesDiv.innerHTML = `
+                    <button onclick="togglePago(${data.id_historial}, this)" class="btn btn-success w-100 shadow-sm py-3 d-flex flex-column justify-content-center align-items-center">
+                        <i class="bi bi-check-circle-fill fs-3 mb-1"></i>
+                        <span class="fw-bold">PAGADO (Tocar para deshacer)</span>
+                    </button>
+                `;
+            } else {
+                let btnColor = data.mensaje_enviado ? 'btn-primary' : 'btn-danger';
+                let btnIcon = data.mensaje_enviado ? 'bi-send-check-fill' : 'bi-clock-fill';
+                let btnText = data.mensaje_enviado ? 'NOTIFICADO (Avanzar a Pagado)' : 'PENDIENTE (Marcar Notificado)';
+                
+                let html = `
+                    <button onclick="togglePago(${data.id_historial}, this)" class="btn ${btnColor} w-100 shadow-sm py-3 mb-2 fw-bold text-white fs-6">
+                        <i class="bi ${btnIcon} me-2 fs-5 align-middle"></i> ${btnText}
+                    </button>
+                    <div class="d-flex gap-2 mt-2">
+                `;
+                
+                if (data.url_wa) {
+                    html += `<a href="${data.url_wa}" target="_blank" onclick="marcarEnviado(${data.id_historial})" class="btn btn-outline-success flex-grow-1 fw-bold py-2"><i class="bi bi-whatsapp me-1"></i> WSP</a>`;
+                }
+                
+                html += `<button onclick="bootstrap.Modal.getInstance(document.getElementById('modalDetalleMovil')).hide(); abrirModalPago('individual', ${data.id_historial}, '${data.nombre}', ${data.total_mes + data.saldo_anterior - data.monto_pagado});" class="btn btn-outline-dark flex-grow-1 fw-bold py-2"><i class="bi bi-cash-stack me-1"></i> Parcial</button></div>`;
+                
+                accionesDiv.innerHTML = html;
+            }
+        }
+    }
+    
+    // 4. Mostramos el modal
+    var myModal = new bootstrap.Modal(document.getElementById('modalDetalleMovil'));
+    myModal.show();
+}
+
+// ==========================================
+// RESTO DE FUNCIONES EXISTENTES
+// ==========================================
+
+function desbloquearFila(id) {
+    document.getElementById(`bloqueo-${id}`).classList.add('d-none');
+    let acciones = document.getElementById(`acciones-${id}`);
+    acciones.classList.remove('d-none');
+    acciones.classList.add('d-flex', 'flex-column'); 
+}
+
+function marcarEnviado(id) {
+    fetch(`/dashboard/marcar-mensaje/${id}`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }
+    }).then(() => setTimeout(() => location.reload(), 1500));
+}
+
+function togglePago(id, btn) {
+    const contenidoOriginal = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm text-light my-1"></span>';
+    btn.disabled = true;
+
+    fetch(`/dashboard/toggle-pago/${id}`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(data => { 
+        if (data.success) {
+            if (data.url_wa) {
+                window.open(data.url_wa, '_blank');
+            }
+            location.reload(); 
+        }
+    })
+    .catch(() => { 
+        btn.innerHTML = contenidoOriginal; 
+        btn.disabled = false; 
+    });
+}
+
+function marcarEnviadoGrupo(grupo_id, mes, anio) {
+    fetch(`/dashboard/marcar-mensaje-grupo/${grupo_id}`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mes: mes, anio: anio })
+    }).then(() => setTimeout(() => location.reload(), 1500));
+}
+
+function togglePagoGrupo(grupo_id, mes, anio, btn) {
+    const contenidoOriginal = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm text-secondary my-1"></span>';
+    btn.disabled = true;
+
+    fetch(`/dashboard/toggle-pago-grupo/${grupo_id}`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mes: mes, anio: anio })
+    })
+    .then(res => res.json())
+    .then(data => { 
+        if (data.success) {
+            if (data.url_wa) {
+                window.open(data.url_wa, '_blank');
+            }
+            location.reload(); 
+        }
+    })
+    .catch(() => { 
+        btn.innerHTML = contenidoOriginal; 
+        btn.disabled = false; 
+    });
+}
+
+function abrirModalPago(tipo, id_referencia, nombre, deuda) {
+    document.getElementById('modal_tipo_pago').value = tipo; 
+    document.getElementById('modal_id_referencia').value = id_referencia;
+    
+    document.getElementById('modal-nombre-cliente').innerText = nombre;
+    
+    let deudaFormat = new Intl.NumberFormat("es-AR", {style: "currency", currency: "ARS"}).format(deuda);
+    document.getElementById('modal-deuda-cliente').innerText = deudaFormat;
+    
+    document.getElementById('monto_entregado').value = '';
+    
+    var myModal = new bootstrap.Modal(document.getElementById('modalPago'));
+    myModal.show();
+    
+    setTimeout(() => document.getElementById('monto_entregado').focus(), 500);
+}
+
+function enviarPagoParcial() {
+    let tipo = document.getElementById('modal_tipo_pago').value;
+    let id_referencia = document.getElementById('modal_id_referencia').value;
+    
+    let montoRaw = document.getElementById('monto_entregado').value.replace(/\./g, '');
+    let monto = parseFloat(montoRaw);
+    
+    if (isNaN(monto) || monto <= 0) {
+        alert("Por favor ingresá un monto mayor a 0.");
+        return;
+    }
+
+    let btn = document.getElementById('btn-guardar-pago');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Guardando...';
+    btn.disabled = true;
+
+    let url = tipo === 'grupo' ? `/dashboard/registrar-pago-grupo/${id_referencia}` : `/dashboard/registrar-pago-especial/${id_referencia}`;
+    let bodyData = { monto: monto };
+
+    if (tipo === 'grupo') {
+        bodyData.mes = {{ mes }};
+        bodyData.anio = {{ anio }};
+    }
+
+    fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+        body: JSON.stringify(bodyData)
+    })
+    .then(res => res.json())
+    .then(data => { if(data.success) location.reload(); });
+}
+</script>
+{% endblock %}
