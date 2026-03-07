@@ -142,7 +142,7 @@
         </div>
     </div>
 
-    {# --- BÚSQUEDA --- #}
+    {# --- NUEVA BARRA DE BÚSQUEDA EN TIEMPO REAL --- #}
     <div class="mb-3">
         <div class="input-group shadow-sm">
             <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
@@ -178,7 +178,7 @@
                                 {{ item.casa.nombre_formateado() }}
                             </a>
                             {% if not item.casa.activo %}
-                                <span class="badge bg-secondary ms-1 align-middle" style="font-size: 0.6rem;">BAJA</span>
+                                <span class="badge bg-secondary ms-1 align-middle" style="font-size: 0.6rem;" title="Cliente dado de baja actualmente">BAJA</span>
                             {% endif %}
                         </td>
                         
@@ -189,7 +189,10 @@
                         <td class="text-end font-monospace fw-bold text-dark fs-6 text-nowrap pe-md-4">
                             ${{ "{:,.0f}".format(item.total_mes) }}
                             
-                            <button class="btn btn-sm rounded-circle ms-2 px-2 py-1 shadow-sm d-inline-block d-md-none {% if item.pagado %}btn-success{% elif item.mensaje_enviado %}btn-primary{% else %}btn-danger{% endif %}" 
+                            {# Lógica del color del botón "i" #}
+                            {% set color_info = 'btn-success' if item.pagado else ('btn-primary' if item.mensaje_enviado else 'btn-danger') %}
+                            
+                            <button class="btn btn-sm rounded-circle ms-2 px-2 py-1 shadow-sm d-inline-block d-md-none {{ color_info }}" 
                                     onclick="abrirDetalle({{ item.casa.id }})" 
                                     title="Ver Detalles y Acciones">
                                 <i class="bi bi-info-lg fw-bold text-white"></i>
@@ -218,7 +221,7 @@
                             {% if mes_congelado and item.id_historial %}
                                 {% if item.pagado %}
                                 <div id="bloqueo-{{ item.id_historial }}">
-                                    <button onclick="desbloquearFila({{ item.id_historial }})" class="btn btn-sm btn-outline-success w-100 d-flex flex-column justify-content-center align-items-center shadow-sm" style="border-style: dashed; height: 74px;" title="Tocar para desbloquear">
+                                    <button onclick="desbloquearFila({{ item.id_historial }})" class="btn btn-sm btn-outline-success w-100 d-flex flex-column justify-content-center align-items-center shadow-sm" style="border-style: dashed; height: 74px;" title="Pago registrado. Tocar para desbloquear.">
                                         <i class="bi bi-lock-fill fs-5 mb-1"></i>
                                         <small class="fw-bold" style="font-size: 0.7rem;">PAGADO</small>
                                     </button>
@@ -302,7 +305,7 @@
                         </div>
 
                         <div class="text-start text-md-end border-end pe-3">
-                            <span class="d-block small text-muted text-uppercase">Total</span>
+                            <span class="d-block small text-muted text-uppercase">Total a Pagar</span>
                             <span class="fs-5 fw-bold text-dark">${{ "{:,.0f}".format(g.total_mes + g.saldo_anterior) }}</span>
                         </div>
 
@@ -315,6 +318,4 @@
                                 {% if mes_congelado %}
                                     {% if g.pagado %}
                                         <li>
-                                            <button class="dropdown-item text-success fw-bold py-2" onclick="togglePagoGrupo({{ g.grupo_id }}, {{ mes }}, {{ anio }}, this)">
-                                                <i class="bi bi-check-circle-fill me-2 fs-5 align-middle"></i> Deshacer Pago Completo
-       
+                                            <button class="dropdown-i
