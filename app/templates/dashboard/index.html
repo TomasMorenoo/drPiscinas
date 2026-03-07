@@ -157,33 +157,38 @@
     
     <div class="card border-0 shadow-sm mb-5">
         <div class="table-responsive">
-            <table class="table table-striped table-hover align-middle mb-0 buscar-tabla" style="table-layout: fixed;">
+            <table class="table table-striped table-hover align-middle mb-0 buscar-tabla">
                 <thead class="table-dark">
                     <tr>
-                        <th class="ps-3 text-uppercase small py-3" style="width: 16.66%;">Cliente</th>
-                        <th class="text-end text-uppercase small py-3" style="width: 16.66%;">Abono Base</th>
-                        <th class="text-end text-uppercase small py-3" style="width: 16.66%;">Extras</th>
-                        <th class="text-end text-uppercase small py-3" style="width: 16.66%;">Total Mes</th>
-                        <th class="text-end text-uppercase small py-3" style="width: 16.66%;">Saldo</th>
-                        <th class="text-center text-uppercase small pe-3 py-3" style="width: 16.66%;">Acción / Estado</th>
+                        <th class="ps-3 text-uppercase small py-3">Cliente</th>
+                        <th class="text-end text-uppercase small py-3 d-none d-md-table-cell">Abono Base</th>
+                        <th class="text-end text-uppercase small py-3 d-none d-md-table-cell">Extras</th>
+                        <th class="text-end text-uppercase small py-3">Total Mes</th>
+                        <th class="text-end text-uppercase small py-3">Saldo</th>
+                        <th class="text-center text-uppercase small pe-3 py-3">Acción / Estado</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in reporte_sueltas %}
                     <tr>
-                        <td class="ps-3 fw-bold text-truncate">
-                            <a href="{{ url_for('casas.perfil', id=item.casa.id) }}" class="text-decoration-none text-dark d-inline-block text-truncate align-middle" title="{{ item.casa.nombre_formateado() }}" style="max-width: 80%;">
+                        <td class="ps-3 fw-bold text-truncate" style="max-width: 150px;">
+                            <a href="{{ url_for('casas.perfil', id=item.casa.id) }}" class="text-decoration-none text-dark d-inline-block text-truncate align-middle" title="{{ item.casa.nombre_formateado() }}" style="max-width: 100%;">
                                 {{ item.casa.nombre_formateado() }}
                             </a>
                             {% if not item.casa.activo %}
                                 <span class="badge bg-secondary ms-1 align-middle" style="font-size: 0.6rem;" title="Cliente dado de baja actualmente">BAJA</span>
                             {% endif %}
                         </td>
-                        <td class="text-end font-monospace text-muted">${{ "{:,.0f}".format(item.abono) }}</td>
-                        <td class="text-end font-monospace text-muted">${{ "{:,.0f}".format(item.extras) }}</td>
                         
-                        <td class="text-end font-monospace fw-bold text-dark fs-6">
+                        <td class="text-end font-monospace text-muted d-none d-md-table-cell">${{ "{:,.0f}".format(item.abono) }}</td>
+                        <td class="text-end font-monospace text-muted d-none d-md-table-cell">${{ "{:,.0f}".format(item.extras) }}</td>
+                        
+                        {# Columna Total Mes con el botón de info para celular #}
+                        <td class="text-end font-monospace fw-bold text-dark fs-6 text-nowrap">
                             ${{ "{:,.0f}".format(item.total_mes) }}
+                            <i class="bi bi-info-circle-fill text-primary ms-1 d-md-none opacity-75" style="cursor: pointer; font-size: 1.2rem; vertical-align: middle;"
+                               onclick="mostrarDetalleMovil('{{ item.casa.nombre_formateado() }}', {{ item.abono }}, {{ item.extras }}, {{ item.saldo_anterior }}, {{ item.total_mes + item.saldo_anterior }})">
+                            </i>
                         </td>
 
                         <td class="text-end pe-3 text-nowrap align-middle">
@@ -206,7 +211,7 @@
                             {% endif %}
                         </td>
 
-                        <td class="p-1 align-middle">
+                        <td class="p-1 align-middle" style="width: 130px;">
                             {% if mes_congelado and item.id_historial %}
                                 
                                 {% if item.pagado %}
@@ -230,14 +235,14 @@
 
                                     <div class="d-flex gap-1">
                                         {% if item.url_wa %}
-                                        <a href="{{ item.url_wa }}" target="_blank" onclick="marcarEnviado({{ item.id_historial }})" class="btn btn-sm btn-outline-success flex-grow-1 py-1">
+                                        <a href="{{ item.url_wa }}" target="_blank" onclick="marcarEnviado({{ item.id_historial }})" class="btn btn-sm btn-outline-success flex-grow-1 py-1 px-0">
                                             <i class="bi bi-whatsapp"></i>
                                         </a>
                                         {% else %}
-                                        <button class="btn btn-sm btn-outline-secondary opacity-25 flex-grow-1 py-1" disabled><i class="bi bi-whatsapp"></i></button>
+                                        <button class="btn btn-sm btn-outline-secondary opacity-25 flex-grow-1 py-1 px-0" disabled><i class="bi bi-whatsapp"></i></button>
                                         {% endif %}
 
-                                        <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-secondary flex-grow-1 py-1">
+                                        <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-secondary flex-grow-1 py-1 px-0">
                                             <i class="bi bi-cash-stack"></i>
                                         </button>
                                     </div>
@@ -273,7 +278,7 @@
                         <span class="badge bg-light text-primary border border-primary ms-3">{{ g.casas|length }} Propiedades</span>
                     </div>
                     
-                    <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center gap-3 mt-2 mt-md-0">
                         
                         {# --- 1. SALDO ACTUAL DEL GRUPO (A favor, Deuda o Pendiente) --- #}
                         <div class="text-end me-3 border-end pe-3">
@@ -354,33 +359,41 @@
                     <table class="table table-hover align-middle mb-0 buscar-tabla">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-4 py-2" style="width: 20%;">Propiedad</th>
-                                <th class="text-end py-2" style="width: 20%;">Abono Base</th>
-                                <th class="text-end py-2" style="width: 20%;">Extras</th>
-                                <th class="text-end py-2" style="width: 20%;">Total Mes</th>
-                                <th class="text-center pe-3 py-2" style="width: 20%;">Estado Individual</th>
+                                <th class="ps-4 py-2">Propiedad</th>
+                                <th class="text-end py-2 d-none d-md-table-cell">Abono Base</th>
+                                <th class="text-end py-2 d-none d-md-table-cell">Extras</th>
+                                <th class="text-end py-2">Total Mes</th>
+                                <th class="text-center pe-3 py-2">Estado Individual</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for item in g.casas %}
                             <tr>
-                                <td class="ps-4 fw-bold text-truncate">
-                                    <i class="bi bi-arrow-return-right text-muted me-1"></i>
-                                    <a href="{{ url_for('casas.perfil', id=item.casa.id) }}" class="text-decoration-none text-dark d-inline-block text-truncate align-middle" style="max-width: 80%;">
+                                <td class="ps-4 fw-bold text-truncate" style="max-width: 150px;">
+                                    <i class="bi bi-arrow-return-right text-muted me-1 d-none d-sm-inline"></i>
+                                    <a href="{{ url_for('casas.perfil', id=item.casa.id) }}" class="text-decoration-none text-dark d-inline-block text-truncate align-middle" style="max-width: 100%;">
                                         {{ item.casa.nombre_formateado() }}
                                     </a>
                                 </td>
-                                <td class="text-end font-monospace text-muted">${{ "{:,.0f}".format(item.abono) }}</td>
-                                <td class="text-end font-monospace text-muted">${{ "{:,.0f}".format(item.extras) }}</td>
-                                <td class="text-end font-monospace fw-bold text-dark fs-6">${{ "{:,.0f}".format(item.total_mes) }}</td>
                                 
-                                <td class="p-1 align-middle text-center">
+                                <td class="text-end font-monospace text-muted d-none d-md-table-cell">${{ "{:,.0f}".format(item.abono) }}</td>
+                                <td class="text-end font-monospace text-muted d-none d-md-table-cell">${{ "{:,.0f}".format(item.extras) }}</td>
+                                
+                                {# Columna Total Mes con el botón de info para celular #}
+                                <td class="text-end font-monospace fw-bold text-dark fs-6 text-nowrap">
+                                    ${{ "{:,.0f}".format(item.total_mes) }}
+                                    <i class="bi bi-info-circle-fill text-primary ms-1 d-md-none opacity-75" style="cursor: pointer; font-size: 1.2rem; vertical-align: middle;"
+                                       onclick="mostrarDetalleMovil('{{ item.casa.nombre_formateado() }}', {{ item.abono }}, {{ item.extras }}, {{ item.saldo_anterior }}, {{ item.total_mes + item.saldo_anterior }})">
+                                    </i>
+                                </td>
+                                
+                                <td class="p-1 align-middle text-center pe-3">
                                     {% if item.pagado %}
-                                        <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Pagado</span>
+                                        <span class="badge bg-success"><i class="bi bi-check-circle-fill d-none d-sm-inline me-1"></i>Pagado</span>
                                     {% elif item.mensaje_enviado %}
-                                        <span class="badge bg-primary"><i class="bi bi-send-check-fill me-1"></i>Notificado</span>
+                                        <span class="badge bg-primary"><i class="bi bi-send-check-fill d-none d-sm-inline me-1"></i>Notificado</span>
                                     {% else %}
-                                        <span class="badge bg-light text-dark border"><i class="bi bi-clock-fill text-danger me-1"></i>Pendiente</span>
+                                        <span class="badge bg-light text-dark border"><i class="bi bi-clock-fill text-danger d-none d-sm-inline me-1"></i>Pendte.</span>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -424,6 +437,38 @@
                 <button type="button" class="btn btn-success px-5 fw-bold shadow-sm" onclick="enviarPagoParcial()" id="btn-guardar-pago">
                     <i class="bi bi-check-circle-fill me-1"></i> Confirmar Pago
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalDetalleMovil" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white py-2">
+                <h6 class="modal-title mb-0"><i class="bi bi-receipt me-2"></i>Detalle de Cuenta</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <h5 class="fw-bold text-primary mb-3 text-center border-bottom pb-2" id="detMovilNombre">Cliente</h5>
+                <ul class="list-group list-group-flush mb-0" style="font-size: 0.95rem;">
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                        <span class="text-muted">Abono Base:</span>
+                        <span class="fw-bold font-monospace text-dark" id="detMovilAbono">$0</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                        <span class="text-muted">Productos Extras:</span>
+                        <span class="fw-bold font-monospace text-dark" id="detMovilExtras">$0</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                        <span class="text-muted">Saldo Anterior:</span>
+                        <span class="fw-bold font-monospace" id="detMovilSaldoAnt">$0</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3 bg-light rounded mt-3 border border-2 border-primary">
+                        <span class="fw-bold text-uppercase text-primary ms-2">Total a Pagar:</span>
+                        <span class="fw-bold font-monospace fs-5 text-primary me-2" id="detMovilTotal">$0</span>
+                    </li>
+                </ul>
             </div>
         </div>
     </div>
@@ -538,7 +583,7 @@ function togglePagoGrupo(grupo_id, mes, anio, btn) {
 
 
 // ==========================================
-// MODAL DE PAGO UNIFICADO
+// MODAL DE PAGO UNIFICADO Y DETALLE MOVIL
 // ==========================================
 
 function abrirModalPago(tipo, id_referencia, nombre, deuda) {
@@ -589,6 +634,26 @@ function enviarPagoParcial() {
     })
     .then(res => res.json())
     .then(data => { if(data.success) location.reload(); });
+}
+
+function mostrarDetalleMovil(nombre, abono, extras, saldoAnt, totalPagar) {
+    document.getElementById('detMovilNombre').innerText = nombre;
+    document.getElementById('detMovilAbono').innerText = '$' + abono.toLocaleString('es-AR', {maximumFractionDigits:0});
+    document.getElementById('detMovilExtras').innerText = '$' + extras.toLocaleString('es-AR', {maximumFractionDigits:0});
+    
+    let elSaldo = document.getElementById('detMovilSaldoAnt');
+    if(saldoAnt < -0.1) {
+        elSaldo.innerHTML = '<span class="text-success">A favor: $' + Math.abs(saldoAnt).toLocaleString('es-AR', {maximumFractionDigits:0}) + '</span>';
+    } else if(saldoAnt > 0.1) {
+        elSaldo.innerHTML = '<span class="text-danger">Deuda: $' + saldoAnt.toLocaleString('es-AR', {maximumFractionDigits:0}) + '</span>';
+    } else {
+        elSaldo.innerHTML = '<span class="text-muted">$0</span>';
+    }
+    
+    document.getElementById('detMovilTotal').innerText = '$' + totalPagar.toLocaleString('es-AR', {maximumFractionDigits:0});
+    
+    var myModal = new bootstrap.Modal(document.getElementById('modalDetalleMovil'));
+    myModal.show();
 }
 </script>
 {% endblock %}
