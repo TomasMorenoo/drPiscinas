@@ -142,7 +142,7 @@
         </div>
     </div>
 
-    {# --- NUEVA BARRA DE BÚSQUEDA EN TIEMPO REAL --- #}
+    {# --- BÚSQUEDA --- #}
     <div class="mb-3">
         <div class="input-group shadow-sm">
             <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
@@ -163,9 +163,11 @@
                         <th class="ps-3 text-uppercase small py-3">Cliente</th>
                         <th class="text-end text-uppercase small py-3 d-none d-md-table-cell">Abono Base</th>
                         <th class="text-end text-uppercase small py-3 d-none d-md-table-cell">Extras</th>
+                        
                         <th class="text-end text-uppercase small py-3">Total Mes</th>
-                        <th class="text-end text-uppercase small py-3">Saldo</th>
-                        <th class="text-center text-uppercase small pe-3 py-3">Acción / Estado</th>
+                        
+                        <th class="text-end text-uppercase small py-3 d-none d-md-table-cell">Saldo</th>
+                        <th class="text-center text-uppercase small pe-3 py-3 d-none d-md-table-cell">Acción / Estado</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -176,32 +178,33 @@
                                 {{ item.casa.nombre_formateado() }}
                             </a>
                             {% if not item.casa.activo %}
-                                <span class="badge bg-secondary ms-1 align-middle" style="font-size: 0.6rem;" title="Cliente dado de baja actualmente">BAJA</span>
+                                <span class="badge bg-secondary ms-1 align-middle" style="font-size: 0.6rem;">BAJA</span>
                             {% endif %}
                         </td>
                         
                         <td class="text-end font-monospace text-muted d-none d-md-table-cell">${{ "{:,.0f}".format(item.abono) }}</td>
                         <td class="text-end font-monospace text-muted d-none d-md-table-cell">${{ "{:,.0f}".format(item.extras) }}</td>
                         
-                        {# Columna Total Mes con el botón de info para celular #}
-                        <td class="text-end font-monospace fw-bold text-dark fs-6 text-nowrap">
+                        {# TOTAL MES + BOTON "i" EN CELULAR (Con Semáforo de colores) #}
+                        <td class="text-end font-monospace fw-bold text-dark fs-6 text-nowrap pe-md-4">
                             ${{ "{:,.0f}".format(item.total_mes) }}
-                            <i class="bi bi-info-circle-fill text-primary ms-1 d-md-none opacity-75" style="cursor: pointer; font-size: 1.2rem; vertical-align: middle;"
-                               onclick="mostrarDetalleMovil('{{ item.casa.nombre_formateado() }}', {{ item.abono }}, {{ item.extras }}, {{ item.saldo_anterior }}, {{ item.total_mes + item.saldo_anterior }})">
-                            </i>
+                            
+                            <button class="btn btn-sm rounded-circle ms-2 px-2 py-1 shadow-sm d-inline-block d-md-none {% if item.pagado %}btn-success{% elif item.mensaje_enviado %}btn-primary{% else %}btn-danger{% endif %}" 
+                                    onclick="abrirDetalle({{ item.casa.id }})" 
+                                    title="Ver Detalles y Acciones">
+                                <i class="bi bi-info-lg fw-bold text-white"></i>
+                            </button>
                         </td>
 
-                        <td class="text-end pe-3 text-nowrap align-middle">
+                        <td class="text-end pe-3 text-nowrap align-middle d-none d-md-table-cell">
                             {% if item.saldo_restante < -0.1 %}
                                 <span class="text-success fw-bold font-monospace"><i class="bi bi-plus-circle me-1"></i>${{ "{:,.0f}".format(item.saldo_restante | abs) }}</span>
-                            
                             {% elif item.saldo_restante > 0.1 %}
                                 {% if item.saldo_restante != item.total_mes or item.monto_pagado > 0 %}
                                     <span class="text-danger fw-bold font-monospace"><i class="bi bi-dash-circle me-1"></i>${{ "{:,.0f}".format(item.saldo_restante) }}</span>
                                 {% else %}
                                     <span class="fw-bold text-secondary" style="font-family: system-ui;">Pendiente</span>
                                 {% endif %}
-                                
                             {% else %}
                                 {% if item.pagado %}
                                     <span class="fw-bold text-success" style="font-family: system-ui;">Pagó</span>
@@ -211,48 +214,56 @@
                             {% endif %}
                         </td>
 
-                        <td class="p-1 align-middle" style="width: 130px;">
+                        <td class="p-1 align-middle d-none d-md-table-cell" style="width: 130px;">
                             {% if mes_congelado and item.id_historial %}
-                                
                                 {% if item.pagado %}
                                 <div id="bloqueo-{{ item.id_historial }}">
-                                    <button onclick="desbloquearFila({{ item.id_historial }})" class="btn btn-sm btn-outline-success w-100 d-flex flex-column justify-content-center align-items-center shadow-sm" style="border-style: dashed; height: 74px;" title="Pago registrado. Tocar para desbloquear.">
+                                    <button onclick="desbloquearFila({{ item.id_historial }})" class="btn btn-sm btn-outline-success w-100 d-flex flex-column justify-content-center align-items-center shadow-sm" style="border-style: dashed; height: 74px;" title="Tocar para desbloquear">
                                         <i class="bi bi-lock-fill fs-5 mb-1"></i>
                                         <small class="fw-bold" style="font-size: 0.7rem;">PAGADO</small>
                                     </button>
                                 </div>
                                 {% endif %}
-
                                 <div id="acciones-{{ item.id_historial }}" class="{% if item.pagado %}d-none{% else %}d-flex flex-column{% endif %} gap-1">
-                                    
-                                    <button onclick="togglePago({{ item.id_historial }}, this)" 
-                                            class="btn btn-sm border shadow-sm py-2 {% if item.pagado %}btn-success{% elif item.mensaje_enviado %}btn-primary{% else %}btn-light{% endif %}"
-                                            title="Cambiar estado">
+                                    <button onclick="togglePago({{ item.id_historial }}, this)" class="btn btn-sm border shadow-sm py-2 {% if item.pagado %}btn-success{% elif item.mensaje_enviado %}btn-primary{% else %}btn-light{% endif %}" title="Cambiar estado">
                                         {% if item.pagado %}<i class="bi bi-check-circle-fill fs-5"></i>
                                         {% elif item.mensaje_enviado %}<i class="bi bi-send-check-fill fs-5"></i>
                                         {% else %}<i class="bi bi-clock-fill fs-5 text-danger"></i>{% endif %}
                                     </button>
-
                                     <div class="d-flex gap-1">
                                         {% if item.url_wa %}
-                                        <a href="{{ item.url_wa }}" target="_blank" onclick="marcarEnviado({{ item.id_historial }})" class="btn btn-sm btn-outline-success flex-grow-1 py-1 px-0">
-                                            <i class="bi bi-whatsapp"></i>
-                                        </a>
+                                        <a href="{{ item.url_wa }}" target="_blank" onclick="marcarEnviado({{ item.id_historial }})" class="btn btn-sm btn-outline-success flex-grow-1 py-1 px-0"><i class="bi bi-whatsapp"></i></a>
                                         {% else %}
                                         <button class="btn btn-sm btn-outline-secondary opacity-25 flex-grow-1 py-1 px-0" disabled><i class="bi bi-whatsapp"></i></button>
                                         {% endif %}
-
-                                        <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-secondary flex-grow-1 py-1 px-0">
-                                            <i class="bi bi-cash-stack"></i>
-                                        </button>
+                                        <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-secondary flex-grow-1 py-1 px-0"><i class="bi bi-cash-stack"></i></button>
                                     </div>
                                 </div>
-
                             {% else %}
                                 <button class="btn btn-light btn-sm w-100 border opacity-50 fs-5 d-flex align-items-center justify-content-center" style="height: 74px;" disabled><i class="bi bi-lock-fill text-secondary"></i></button>
                             {% endif %}
                         </td>
                     </tr>
+                    
+                    {# Inyectamos la Data en un Script oculto para que la ventanita móvil lo lea sin romperse #}
+                    <script type="application/json" id="data-casa-{{ item.casa.id }}">
+                        {
+                            "id_historial": {{ item.id_historial | tojson }},
+                            "nombre": {{ item.casa.nombre_formateado() | tojson }},
+                            "abono": {{ item.abono }},
+                            "extras": {{ item.extras }},
+                            "saldo_anterior": {{ item.saldo_anterior }},
+                            "total_mes": {{ item.total_mes }},
+                            "monto_pagado": {{ item.monto_pagado }},
+                            "saldo_restante": {{ item.saldo_restante }},
+                            "pagado": {{ item.pagado | tojson }},
+                            "mensaje_enviado": {{ item.mensaje_enviado | tojson }},
+                            "url_wa": {{ item.url_wa | tojson }},
+                            "mes_congelado": {{ mes_congelado | tojson }},
+                            "es_grupo": false
+                        }
+                    </script>
+                    
                     {% else %}
                     <tr><td colspan="6" class="text-center py-4 text-muted fst-italic">No hay propiedades sueltas.</td></tr>
                     {% endfor %}
@@ -272,388 +283,38 @@
         <div class="col-12 mb-4">
             <div class="card border-0 shadow-sm border-start border-4 border-primary">
                 
-                <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center">
-                    <div class="d-flex align-items-center mb-2 mb-md-0">
+                <div class="card-header bg-white py-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+                    <div class="d-flex align-items-center mb-3 mb-md-0">
                         <h5 class="mb-0 fw-bold text-dark">{{ g.nombre }}</h5>
-                        <span class="badge bg-light text-primary border border-primary ms-3">{{ g.casas|length }} Propiedades</span>
+                        <span class="badge bg-light text-primary border border-primary ms-3">{{ g.casas|length }} Lotes</span>
                     </div>
                     
-                    <div class="d-flex align-items-center gap-3 mt-2 mt-md-0">
-                        
-                        {# --- 1. SALDO ACTUAL DEL GRUPO (A favor, Deuda o Pendiente) --- #}
-                        <div class="text-end me-3 border-end pe-3">
-                            <span class="d-block small text-muted text-uppercase">Saldo del Grupo</span>
-                            
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <div class="text-start text-md-end border-end pe-3">
+                            <span class="d-block small text-muted text-uppercase">Saldo</span>
                             {% if g.saldo_restante < -0.1 %}
-                                <span class="fs-5 text-success fw-bold font-monospace" title="Saldo a favor del cliente">
-                                    <i class="bi bi-plus-circle me-1"></i>${{ "{:,.0f}".format(g.saldo_restante | abs) }}
-                                </span>
+                                <span class="fs-6 text-success fw-bold font-monospace"><i class="bi bi-plus-circle me-1"></i>${{ "{:,.0f}".format(g.saldo_restante | abs) }}</span>
                             {% elif g.saldo_restante > 0.1 %}
-                                {% if g.saldo_restante != (g.total_mes + g.saldo_anterior) or g.monto_pagado > 0 %}
-                                    <span class="fs-5 text-danger fw-bold font-monospace" title="Deuda pendiente">
-                                        <i class="bi bi-dash-circle me-1"></i>${{ "{:,.0f}".format(g.saldo_restante) }}
-                                    </span>
-                                {% else %}
-                                    <span class="fs-5 fw-bold text-secondary" style="font-family: system-ui;">Pendiente</span>
-                                {% endif %}
+                                <span class="fs-6 text-danger fw-bold font-monospace"><i class="bi bi-dash-circle me-1"></i>${{ "{:,.0f}".format(g.saldo_restante) }}</span>
                             {% else %}
-                                {% if g.pagado %}
-                                    <span class="fs-5 fw-bold text-success" style="font-family: system-ui;">Pagó</span>
-                                {% else %}
-                                    <span class="fs-5 fw-bold text-secondary" style="font-family: system-ui;">Pendiente</span>
-                                {% endif %}
+                                <span class="fs-6 fw-bold text-secondary">Al día</span>
                             {% endif %}
                         </div>
 
-                        {# --- 2. TOTAL CONSOLIDADO Y SALDO DEL MES ANTERIOR --- #}
-                        <div class="text-end me-3 border-end pe-3">
-                            <span class="d-block small text-muted text-uppercase">Total a Pagar</span>
-                            
-                            {% if g.saldo_anterior < -0.1 %}
-                                <span class="d-block small text-success fw-bold">Viene a favor: ${{ "{:,.0f}".format(g.saldo_anterior | abs) }}</span>
-                            {% elif g.saldo_anterior > 0.1 %}
-                                <span class="d-block small text-danger fw-bold">Deuda ant: ${{ "{:,.0f}".format(g.saldo_anterior) }}</span>
-                            {% endif %}
-
+                        <div class="text-start text-md-end border-end pe-3">
+                            <span class="d-block small text-muted text-uppercase">Total</span>
                             <span class="fs-5 fw-bold text-dark">${{ "{:,.0f}".format(g.total_mes + g.saldo_anterior) }}</span>
                         </div>
 
-                        {# --- BOTONES DE ACCIÓN DEL GRUPO --- #}
-                        <div class="d-flex gap-1 align-items-center" style="width: 140px;">
-                            {% if mes_congelado %}
-                                
-                                {% if g.pagado %}
-                                    {# Si está pagado: Botón único verde que absorbe todo el 100% del ancho #}
-                                    <button onclick="togglePagoGrupo({{ g.grupo_id }}, {{ mes }}, {{ anio }}, this)" 
-                                            class="btn btn-sm btn-success w-100 shadow-sm py-2 d-flex align-items-center justify-content-center"
-                                            title="Deshacer pago del grupo">
-                                        <i class="bi bi-check-circle-fill fs-5 me-2"></i>
-                                        <span class="fw-bold" style="font-size: 0.85rem;">PAGADO</span>
-                                    </button>
-                                {% else %}
-                                    {# Si está pendiente: Los 3 botones se reparten el espacio equitativamente (flex-grow-1) #}
-                                    <button onclick="togglePagoGrupo({{ g.grupo_id }}, {{ mes }}, {{ anio }}, this)" 
-                                            class="btn btn-sm border shadow-sm py-2 flex-grow-1 {% if g.mensaje_enviado %}btn-primary{% else %}btn-light{% endif %}"
-                                            title="Cambiar estado del grupo">
-                                        {% if g.mensaje_enviado %}<i class="bi bi-send-check-fill fs-5"></i>
-                                        {% else %}<i class="bi bi-clock-fill fs-5 text-danger"></i>{% endif %}
-                                    </button>
-
-                                    {% if g.url_wa %}
-                                    <a href="{{ g.url_wa }}" target="_blank" onclick="marcarEnviadoGrupo({{ g.grupo_id }}, {{ mes }}, {{ anio }})" class="btn btn-sm btn-outline-success py-2 flex-grow-1">
-                                        <i class="bi bi-whatsapp fs-5"></i>
-                                    </a>
-                                    {% endif %}
-
-                                    <button onclick="abrirModalPago('grupo', {{ g.grupo_id }}, 'GRUPO: {{ g.nombre }}', {{ g.total_mes + g.saldo_anterior - g.monto_pagado }})" class="btn btn-sm btn-outline-secondary py-2 flex-grow-1">
-                                        <i class="bi bi-cash-stack fs-5"></i>
-                                    </button>
-                                {% endif %}
-
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card-body p-0 table-responsive">
-                    <table class="table table-hover align-middle mb-0 buscar-tabla">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="ps-4 py-2">Propiedad</th>
-                                <th class="text-end py-2 d-none d-md-table-cell">Abono Base</th>
-                                <th class="text-end py-2 d-none d-md-table-cell">Extras</th>
-                                <th class="text-end py-2">Total Mes</th>
-                                <th class="text-center pe-3 py-2">Estado Individual</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in g.casas %}
-                            <tr>
-                                <td class="ps-4 fw-bold text-truncate" style="max-width: 150px;">
-                                    <i class="bi bi-arrow-return-right text-muted me-1 d-none d-sm-inline"></i>
-                                    <a href="{{ url_for('casas.perfil', id=item.casa.id) }}" class="text-decoration-none text-dark d-inline-block text-truncate align-middle" style="max-width: 100%;">
-                                        {{ item.casa.nombre_formateado() }}
-                                    </a>
-                                </td>
-                                
-                                <td class="text-end font-monospace text-muted d-none d-md-table-cell">${{ "{:,.0f}".format(item.abono) }}</td>
-                                <td class="text-end font-monospace text-muted d-none d-md-table-cell">${{ "{:,.0f}".format(item.extras) }}</td>
-                                
-                                {# Columna Total Mes con el botón de info para celular #}
-                                <td class="text-end font-monospace fw-bold text-dark fs-6 text-nowrap">
-                                    ${{ "{:,.0f}".format(item.total_mes) }}
-                                    <i class="bi bi-info-circle-fill text-primary ms-1 d-md-none opacity-75" style="cursor: pointer; font-size: 1.2rem; vertical-align: middle;"
-                                       onclick="mostrarDetalleMovil('{{ item.casa.nombre_formateado() }}', {{ item.abono }}, {{ item.extras }}, {{ item.saldo_anterior }}, {{ item.total_mes + item.saldo_anterior }})">
-                                    </i>
-                                </td>
-                                
-                                <td class="p-1 align-middle text-center pe-3">
-                                    {% if item.pagado %}
-                                        <span class="badge bg-success"><i class="bi bi-check-circle-fill d-none d-sm-inline me-1"></i>Pagado</span>
-                                    {% elif item.mensaje_enviado %}
-                                        <span class="badge bg-primary"><i class="bi bi-send-check-fill d-none d-sm-inline me-1"></i>Notificado</span>
-                                    {% else %}
-                                        <span class="badge bg-light text-dark border"><i class="bi bi-clock-fill text-danger d-none d-sm-inline me-1"></i>Pendte.</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-
-    {% endif %}
-</div>
-
-<div class="modal fade" id="modalPago" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-dark text-white border-0">
-                <h5 class="modal-title fw-bold"><i class="bi bi-wallet-fill me-2 text-success"></i>Registrar Entrega de Dinero</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4 text-center bg-light">
-                
-                <h5 class="text-primary fw-bold mb-1" id="modal-nombre-cliente">Cliente</h5>
-                <p class="text-muted small mb-4">Deuda Actual: <strong class="text-danger" id="modal-deuda-cliente">$0</strong></p>
-
-                <label class="form-label fw-bold text-uppercase small text-secondary">¿Cuánto dinero entregó ahora?</label>
-                <div class="input-group input-group-lg mx-auto w-75 shadow-sm mb-2">
-                    <span class="input-group-text bg-white border-success fw-bold text-success">$</span>
-                    <input type="text" id="monto_entregado" class="form-control border-success text-center fw-bold text-dark fs-4" placeholder="Ej: 15.000" inputmode="numeric">
-                </div>
-                <div class="form-text mt-2"><i class="bi bi-info-circle"></i> El saldo restante se calculará automáticamente.</div>
-                
-                <input type="hidden" id="modal_tipo_pago">
-                <input type="hidden" id="modal_id_referencia">
-            </div>
-            <div class="modal-footer bg-light border-0 d-flex justify-content-center pb-4 pt-0">
-                <button type="button" class="btn btn-outline-secondary px-4 fw-bold" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-success px-5 fw-bold shadow-sm" onclick="enviarPagoParcial()" id="btn-guardar-pago">
-                    <i class="bi bi-check-circle-fill me-1"></i> Confirmar Pago
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="modalDetalleMovil" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-dark text-white py-2">
-                <h6 class="modal-title mb-0"><i class="bi bi-receipt me-2"></i>Detalle de Cuenta</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4">
-                <h5 class="fw-bold text-primary mb-3 text-center border-bottom pb-2" id="detMovilNombre">Cliente</h5>
-                <ul class="list-group list-group-flush mb-0" style="font-size: 0.95rem;">
-                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
-                        <span class="text-muted">Abono Base:</span>
-                        <span class="fw-bold font-monospace text-dark" id="detMovilAbono">$0</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
-                        <span class="text-muted">Productos Extras:</span>
-                        <span class="fw-bold font-monospace text-dark" id="detMovilExtras">$0</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
-                        <span class="text-muted">Saldo Anterior:</span>
-                        <span class="fw-bold font-monospace" id="detMovilSaldoAnt">$0</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3 bg-light rounded mt-3 border border-2 border-primary">
-                        <span class="fw-bold text-uppercase text-primary ms-2">Total a Pagar:</span>
-                        <span class="fw-bold font-monospace fs-5 text-primary me-2" id="detMovilTotal">$0</span>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-// --- BUSCADOR EN TIEMPO REAL ADAPTADO PARA MÚLTIPLES TABLAS ---
-const buscador = document.getElementById('busquedaRealTime');
-if (buscador) {
-    buscador.addEventListener('keyup', function() {
-        let filtro = this.value.toLowerCase();
-        let filas = document.querySelectorAll('.buscar-tabla tbody tr');
-
-        filas.forEach(fila => {
-            let textoColumna = fila.cells[0].textContent.toLowerCase();
-            fila.style.display = textoColumna.includes(filtro) ? '' : 'none';
-        });
-    });
-}
-
-// --- LÓGICA DE FORMATEO AUTOMÁTICO DE MILES ---
-const montoInput = document.getElementById('monto_entregado');
-montoInput.addEventListener('input', function(e) {
-    let value = this.value.replace(/\D/g, '');
-    if (value === '') {
-        this.value = '';
-        return;
-    }
-    this.value = new Intl.NumberFormat('es-AR').format(parseInt(value, 10));
-});
-
-
-// ==========================================
-// LÓGICAS PARA CASAS INDIVIDUALES
-// ==========================================
-
-function desbloquearFila(id) {
-    document.getElementById(`bloqueo-${id}`).classList.add('d-none');
-    let acciones = document.getElementById(`acciones-${id}`);
-    acciones.classList.remove('d-none');
-    acciones.classList.add('d-flex', 'flex-column'); 
-}
-
-function marcarEnviado(id) {
-    fetch(`/dashboard/marcar-mensaje/${id}`, {
-        method: 'POST',
-        headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }
-    }).then(() => setTimeout(() => location.reload(), 1500));
-}
-
-function togglePago(id, btn) {
-    const contenidoOriginal = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm text-secondary my-1"></span>';
-    btn.disabled = true;
-
-    fetch(`/dashboard/toggle-pago/${id}`, {
-        method: 'POST',
-        headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }
-    })
-    .then(res => res.json())
-    .then(data => { 
-        if (data.success) {
-            if (data.url_wa) {
-                window.open(data.url_wa, '_blank');
-            }
-            location.reload(); 
-        }
-    })
-    .catch(() => { 
-        btn.innerHTML = contenidoOriginal; 
-        btn.disabled = false; 
-    });
-}
-
-
-// ==========================================
-// LÓGICAS NUEVAS PARA GRUPOS
-// ==========================================
-
-function marcarEnviadoGrupo(grupo_id, mes, anio) {
-    fetch(`/dashboard/marcar-mensaje-grupo/${grupo_id}`, {
-        method: 'POST',
-        headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mes: mes, anio: anio })
-    }).then(() => setTimeout(() => location.reload(), 1500));
-}
-
-function togglePagoGrupo(grupo_id, mes, anio, btn) {
-    const contenidoOriginal = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm text-secondary my-1"></span>';
-    btn.disabled = true;
-
-    fetch(`/dashboard/toggle-pago-grupo/${grupo_id}`, {
-        method: 'POST',
-        headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mes: mes, anio: anio })
-    })
-    .then(res => res.json())
-    .then(data => { 
-        if (data.success) {
-            if (data.url_wa) {
-                window.open(data.url_wa, '_blank');
-            }
-            location.reload(); 
-        }
-    })
-    .catch(() => { 
-        btn.innerHTML = contenidoOriginal; 
-        btn.disabled = false; 
-    });
-}
-
-
-// ==========================================
-// MODAL DE PAGO UNIFICADO Y DETALLE MOVIL
-// ==========================================
-
-function abrirModalPago(tipo, id_referencia, nombre, deuda) {
-    document.getElementById('modal_tipo_pago').value = tipo; 
-    document.getElementById('modal_id_referencia').value = id_referencia;
-    
-    document.getElementById('modal-nombre-cliente').innerText = nombre;
-    
-    let deudaFormat = new Intl.NumberFormat("es-AR", {style: "currency", currency: "ARS"}).format(deuda);
-    document.getElementById('modal-deuda-cliente').innerText = deudaFormat;
-    
-    document.getElementById('monto_entregado').value = '';
-    
-    var myModal = new bootstrap.Modal(document.getElementById('modalPago'));
-    myModal.show();
-    
-    setTimeout(() => document.getElementById('monto_entregado').focus(), 500);
-}
-
-function enviarPagoParcial() {
-    let tipo = document.getElementById('modal_tipo_pago').value;
-    let id_referencia = document.getElementById('modal_id_referencia').value;
-    
-    let montoRaw = document.getElementById('monto_entregado').value.replace(/\./g, '');
-    let monto = parseFloat(montoRaw);
-    
-    if (isNaN(monto) || monto <= 0) {
-        alert("Por favor ingresá un monto mayor a 0.");
-        return;
-    }
-
-    let btn = document.getElementById('btn-guardar-pago');
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Guardando...';
-    btn.disabled = true;
-
-    let url = tipo === 'grupo' ? `/dashboard/registrar-pago-grupo/${id_referencia}` : `/dashboard/registrar-pago-especial/${id_referencia}`;
-    let bodyData = { monto: monto };
-
-    if (tipo === 'grupo') {
-        bodyData.mes = {{ mes }};
-        bodyData.anio = {{ anio }};
-    }
-
-    fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
-        body: JSON.stringify(bodyData)
-    })
-    .then(res => res.json())
-    .then(data => { if(data.success) location.reload(); });
-}
-
-function mostrarDetalleMovil(nombre, abono, extras, saldoAnt, totalPagar) {
-    document.getElementById('detMovilNombre').innerText = nombre;
-    document.getElementById('detMovilAbono').innerText = '$' + abono.toLocaleString('es-AR', {maximumFractionDigits:0});
-    document.getElementById('detMovilExtras').innerText = '$' + extras.toLocaleString('es-AR', {maximumFractionDigits:0});
-    
-    let elSaldo = document.getElementById('detMovilSaldoAnt');
-    if(saldoAnt < -0.1) {
-        elSaldo.innerHTML = '<span class="text-success">A favor: $' + Math.abs(saldoAnt).toLocaleString('es-AR', {maximumFractionDigits:0}) + '</span>';
-    } else if(saldoAnt > 0.1) {
-        elSaldo.innerHTML = '<span class="text-danger">Deuda: $' + saldoAnt.toLocaleString('es-AR', {maximumFractionDigits:0}) + '</span>';
-    } else {
-        elSaldo.innerHTML = '<span class="text-muted">$0</span>';
-    }
-    
-    document.getElementById('detMovilTotal').innerText = '$' + totalPagar.toLocaleString('es-AR', {maximumFractionDigits:0});
-    
-    var myModal = new bootstrap.Modal(document.getElementById('modalDetalleMovil'));
-    myModal.show();
-}
-</script>
-{% endblock %}
+                        {# --- NUEVO BOTÓN DESPLEGABLE PARA ACCIONES DE GRUPO --- #}
+                        <div class="dropdown mt-2 mt-md-0">
+                            <button class="btn btn-outline-dark dropdown-toggle shadow-sm fw-bold" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-gear-fill me-1"></i>Acciones
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-1">
+                                {% if mes_congelado %}
+                                    {% if g.pagado %}
+                                        <li>
+                                            <button class="dropdown-item text-success fw-bold py-2" onclick="togglePagoGrupo({{ g.grupo_id }}, {{ mes }}, {{ anio }}, this)">
+                                                <i class="bi bi-check-circle-fill me-2 fs-5 align-middle"></i> Deshacer Pago Completo
+       
