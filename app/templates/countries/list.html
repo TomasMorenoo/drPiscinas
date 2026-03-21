@@ -17,6 +17,7 @@
                     <tr>
                         <th class="ps-4" style="width: 150px;">ID</th>
                         <th>Nombre del Complejo</th>
+                        <th class="text-center">Estado</th>
                         <th class="text-end pe-4">Acciones</th>
                     </tr>
                 </thead>
@@ -29,15 +30,39 @@
                         <td>
                             <span class="fw-bold text-dark">{{ country.nombre }}</span>
                         </td>
+                        <td class="text-center">
+                            {% if country.activo %}
+                                <span class="badge rounded-pill bg-success-subtle text-success border border-success">Activo</span>
+                            {% else %}
+                                <span class="badge rounded-pill bg-danger-subtle text-danger border border-danger">Pausado</span>
+                            {% endif %}
+                        </td>
                         <td class="text-end pe-4">
-                            <a href="#" class="btn btn-sm btn-outline-secondary disabled" title="Próximamente">
-                                <i class="bi bi-pencil"></i>
-                            </a>
+                            <div class="d-flex justify-content-end gap-2">
+                                {# BOTÓN PAUSAR / ACTIVAR #}
+                                <a href="{{ url_for('country.toggle_country', id=country.id) }}" 
+                                   class="btn btn-sm {{ 'btn-outline-warning' if country.activo else 'btn-outline-success' }}"
+                                   title="Cambiar Estado">
+                                    <i class="bi {{ 'bi-pause-circle' if country.activo else 'bi-play-circle' }}"></i>
+                                    <span class="d-none d-md-inline ms-1">{{ 'Pausar' if country.activo else 'Activar' }}</span>
+                                </a>
+
+                                {# BOTÓN BORRAR (SOLO APARECE SI ESTÁ PAUSADO) #}
+                                {% if not country.activo %}
+                                <form action="{{ url_for('country.eliminar_country', id=country.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar este Country definitivamente? Solo se podrá si no tiene barrios ni propiedades asociadas.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar">
+                                        <i class="bi bi-trash"></i>
+                                        <span class="d-none d-md-inline ms-1">Borrar</span>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="3" class="text-center py-5 text-muted">
+                        <td colspan="4" class="text-center py-5 text-muted">
                             <i class="bi bi-tree display-4 d-block mb-3 text-opacity-25"></i>
                             Todavía no registraste ningún Country.
                         </td>

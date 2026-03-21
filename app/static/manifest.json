@@ -1,0 +1,21 @@
+{
+  "name": "Dr. Piscinas",
+  "short_name": "Dr. Piscinas",
+  "description": "Gestión de mantenimiento de piscinas",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#e9ecef",
+  "theme_color": "#212529",
+  "icons": [
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

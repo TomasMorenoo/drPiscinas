@@ -2,6 +2,26 @@
 {% block title %}Reporte Mensual - Dr. Piscinas{% endblock %}
 
 {% block content %}
+<style>
+/* MAGIA PARA IMPRESIÓN Y PDF: Esto le da formato de hoja A4 al Dashboard */
+@media print {
+    @page { margin: 1cm; size: A4 portrait; }
+    body { background-color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    
+    /* Ocultamos menú, barra de búsqueda y botones operativos */
+    .navbar, .d-print-none { display: none !important; }
+    
+    /* Forzamos a que las columnas de plata se vean enteras aunque esté en el celu */
+    .d-print-table-cell { display: table-cell !important; }
+    
+    /* Limpiamos bordes y sombras para ahorrar tinta */
+    .card { box-shadow: none !important; border: 1px solid #ccc !important; page-break-inside: avoid; margin-bottom: 1rem !important; }
+    .table-dark th { background-color: #e9ecef !important; color: #000 !important; border-bottom: 2px solid #000 !important; }
+    .table-light th { background-color: #f8f9fa !important; color: #000 !important; border-bottom: 2px solid #000 !important; }
+    a { color: #000 !important; text-decoration: none !important; }
+}
+</style>
+
 {# --- DEFINICIÓN DE MESES --- #}
 {% set nombres_meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] %}
 
@@ -9,15 +29,15 @@
     
     <div class="d-flex align-items-center mb-4">
         <h1 class="h3 mb-0 text-gray-800 fw-bold">
-            <i class="bi bi-speedometer2 me-2"></i>Reporte Financiero
+            <i class="bi bi-speedometer2 me-2 d-print-none"></i>Reporte Financiero
         </h1>
         <span class="badge bg-primary ms-3 fs-6 fw-normal shadow-sm">
-            <i class="bi bi-calendar-check me-1"></i> Viendo: {{ nombres_meses[mes - 1] }} {{ anio }}
+            <i class="bi bi-calendar-check me-1 d-print-none"></i> Viendo: {{ nombres_meses[mes - 1] }} {{ anio }}
         </span>
     </div>
 
-    {# --- 1. FILTROS Y CONTROLES --- #}
-    <div class="card mb-4 border-0 shadow-sm {% if mes_congelado %}border-start border-4 border-warning{% endif %}">
+    {# --- 1. FILTROS Y CONTROLES (Se ocultan al imprimir) --- #}
+    <div class="card mb-4 border-0 shadow-sm d-print-none {% if mes_congelado %}border-start border-4 border-warning{% endif %}">
         <div class="card-body bg-light rounded d-flex justify-content-between align-items-center flex-wrap gap-3">
             
             <form method="GET" class="row g-2 align-items-center m-0">
@@ -48,21 +68,26 @@
             </form>
 
             <div class="d-flex gap-2">
-                <a href="{{ url_for('grupos.crear_grupo') }}" class="btn btn-sm btn-outline-dark fw-bold shadow-sm">
-                    <i class="bi bi-collection-fill me-1"></i> AGRUPAR CASAS
+                {# BOTÓN DE IMPRESIÓN MÁGICO #}
+                <button onclick="window.print()" class="btn btn-sm btn-outline-secondary fw-bold shadow-sm d-print-none" title="Imprimir o Guardar como PDF">
+                    <i class="bi bi-printer-fill me-1"></i> IMPRIMIR
+                </button>
+
+                <a href="{{ url_for('grupos.crear_grupo') }}" class="btn btn-sm btn-outline-dark fw-bold shadow-sm d-print-none">
+                    <i class="bi bi-collection-fill me-1"></i> AGRUPAR
                 </a>
 
                 {% if mes_congelado %}
-                <form method="POST" action="{{ url_for('dashboard.unsync_abonos') }}" class="m-0" onsubmit="return confirm('¿Seguro que querés reabrir este mes? Se permitirán editar visitas y los abonos volverán a ser los actuales.');">
+                <form method="POST" action="{{ url_for('dashboard.unsync_abonos') }}" class="m-0 d-print-none" onsubmit="return confirm('¿Seguro que querés reabrir este mes? Se permitirán editar visitas y los abonos volverán a ser los actuales.');">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="hidden" name="mes" value="{{ mes }}">
                     <input type="hidden" name="anio" value="{{ anio }}">
                     <button type="submit" class="btn btn-sm btn-outline-danger fw-bold shadow-sm">
-                        <i class="bi bi-unlock-fill me-1"></i> REABRIR MES
+                        <i class="bi bi-unlock-fill me-1"></i> REABRIR
                     </button>
                 </form>
                 {% else %}
-                <form method="POST" action="{{ url_for('dashboard.sync_abonos') }}" class="m-0" onsubmit="return confirm('¿Estás seguro de cerrar el mes? Se sellarán los abonos actuales y se bloqueará la edición de visitas para este período.');">
+                <form method="POST" action="{{ url_for('dashboard.sync_abonos') }}" class="m-0 d-print-none" onsubmit="return confirm('¿Estás seguro de cerrar el mes? Se sellarán los abonos actuales y se bloqueará la edición de visitas para este período.');">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="hidden" name="mes" value="{{ mes }}">
                     <input type="hidden" name="anio" value="{{ anio }}">
@@ -77,7 +102,7 @@
     </div>
 
     {% if (not reporte_sueltas and not reporte_grupos) or kpi_clientes == 0 %}
-    <div class="row justify-content-center mt-5">
+    <div class="row justify-content-center mt-5 d-print-none">
         <div class="col-md-6 text-center">
             <div class="card shadow-sm border-0 py-5">
                 <div class="card-body">
@@ -99,7 +124,7 @@
                     <div class="text-muted small text-uppercase fw-bold mb-1">Clientes</div>
                     <div class="d-flex align-items-center justify-content-between">
                         <h3 class="mb-0 fw-bold text-dark">{{ kpi_clientes }}</h3>
-                        <i class="bi bi-people fs-1 text-primary opacity-25"></i>
+                        <i class="bi bi-people fs-1 text-primary opacity-25 d-print-none"></i>
                     </div>
                 </div>
             </div>
@@ -111,7 +136,7 @@
                     <div class="text-muted small text-uppercase fw-bold mb-1">Total Abonos</div>
                     <div class="d-flex align-items-center justify-content-between">
                         <h4 class="mb-0 fw-bold text-secondary">${{ "{:,.0f}".format(kpi_abono) }}</h4>
-                        <i class="bi bi-patch-check fs-1 text-secondary opacity-25"></i>
+                        <i class="bi bi-patch-check fs-1 text-secondary opacity-25 d-print-none"></i>
                     </div>
                 </div>
             </div>
@@ -123,7 +148,7 @@
                     <div class="text-muted small text-uppercase fw-bold mb-1">Total Extras</div>
                     <div class="d-flex align-items-center justify-content-between">
                         <h4 class="mb-0 fw-bold text-info">${{ "{:,.0f}".format(kpi_extras) }}</h4>
-                        <i class="bi bi-box-seam fs-1 text-info opacity-25"></i>
+                        <i class="bi bi-box-seam fs-1 text-info opacity-25 d-print-none"></i>
                     </div>
                 </div>
             </div>
@@ -135,7 +160,7 @@
                     <div class="text-muted small text-uppercase fw-bold mb-1">Total a Cobrar</div>
                     <div class="d-flex align-items-center justify-content-between">
                         <h3 class="mb-0 fw-bold text-success">${{ "{:,.0f}".format(kpi_total) }}</h3>
-                        <i class="bi bi-wallet2 fs-1 text-success opacity-25"></i>
+                        <i class="bi bi-wallet2 fs-1 text-success opacity-25 d-print-none"></i>
                     </div>
                 </div>
             </div>
@@ -143,7 +168,7 @@
     </div>
 
     {# --- BÚSQUEDA --- #}
-    <div class="mb-3">
+    <div class="mb-3 d-print-none">
         <div class="input-group shadow-sm">
             <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
             <input type="text" id="busquedaRealTime" class="form-control border-start-0" placeholder="Filtrar por Lote, Barrio o Country en este mes...">
@@ -152,7 +177,7 @@
 
     {# --- 3. SECCIÓN: PROPIEDADES INDIVIDUALES --- #}
     <h5 class="fw-bold mt-5 mb-3 text-secondary border-bottom pb-2">
-        <i class="bi bi-house-door me-2"></i>Propiedades Individuales
+        <i class="bi bi-house-door me-2 d-print-none"></i>Propiedades Individuales
     </h5>
     
     <div class="card border-0 shadow-sm mb-5">
@@ -161,13 +186,12 @@
                 <thead class="table-dark">
                     <tr>
                         <th class="ps-3 text-uppercase small py-3">Cliente</th>
-                        <th class="text-end text-uppercase small py-3 d-none d-md-table-cell">Abono Base</th>
-                        <th class="text-end text-uppercase small py-3 d-none d-md-table-cell">Extras</th>
-                        
+                        <th class="text-end text-uppercase small py-3 d-none d-md-table-cell d-print-table-cell">Abono Base</th>
+                        <th class="text-end text-uppercase small py-3 d-none d-md-table-cell d-print-table-cell">Extras</th>
                         <th class="text-end text-uppercase small py-3">Total Mes</th>
+                        <th class="text-end text-uppercase small py-3 d-none d-md-table-cell d-print-table-cell">Saldo</th>
                         
-                        <th class="text-end text-uppercase small py-3 d-none d-md-table-cell">Saldo</th>
-                        <th class="text-center text-uppercase small pe-3 py-3 d-none d-md-table-cell">Acción / Estado</th>
+                        <th class="text-center text-uppercase small pe-3 py-3 d-none d-md-table-cell d-print-none">Acción / Estado</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -182,29 +206,27 @@
                             {% endif %}
                         </td>
                         
-                        <td class="text-end font-monospace text-muted d-none d-md-table-cell">${{ "{:,.0f}".format(item.abono) }}</td>
-                        <td class="text-end font-monospace text-muted d-none d-md-table-cell">${{ "{:,.0f}".format(item.extras) }}</td>
+                        <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">${{ "{:,.0f}".format(item.abono) }}</td>
+                        <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">${{ "{:,.0f}".format(item.extras) }}</td>
                         
-                        {# TOTAL MES + BOTON "i" EN CELULAR (Con Semáforo de colores) #}
                         <td class="text-end font-monospace fw-bold text-dark fs-6 text-nowrap pe-md-4">
                             ${{ "{:,.0f}".format(item.total_mes) }}
                             
-                            {# Lógica del color del botón "i" #}
                             {% set color_info = 'btn-success' if item.pagado else ('btn-primary' if item.mensaje_enviado else 'btn-danger') %}
                             
-                            <button class="btn btn-sm rounded-circle ms-2 px-2 py-1 shadow-sm d-inline-block d-md-none {{ color_info }}" 
+                            <button class="btn btn-sm rounded-circle ms-2 px-2 py-1 shadow-sm d-inline-block d-md-none d-print-none {{ color_info }}" 
                                     onclick="abrirDetalle({{ item.casa.id }})" 
                                     title="Ver Detalles y Acciones">
                                 <i class="bi bi-info-lg fw-bold text-white"></i>
                             </button>
                         </td>
 
-                        <td class="text-end pe-3 text-nowrap align-middle d-none d-md-table-cell">
+                        <td class="text-end pe-3 text-nowrap align-middle d-none d-md-table-cell d-print-table-cell">
                             {% if item.saldo_restante < -0.1 %}
-                                <span class="text-success fw-bold font-monospace"><i class="bi bi-plus-circle me-1"></i>${{ "{:,.0f}".format(item.saldo_restante | abs) }}</span>
+                                <span class="text-success fw-bold font-monospace"><i class="bi bi-plus-circle me-1 d-print-none"></i>${{ "{:,.0f}".format(item.saldo_restante | abs) }}</span>
                             {% elif item.saldo_restante > 0.1 %}
                                 {% if item.saldo_restante != item.total_mes or item.monto_pagado > 0 %}
-                                    <span class="text-danger fw-bold font-monospace"><i class="bi bi-dash-circle me-1"></i>${{ "{:,.0f}".format(item.saldo_restante) }}</span>
+                                    <span class="text-danger fw-bold font-monospace"><i class="bi bi-dash-circle me-1 d-print-none"></i>${{ "{:,.0f}".format(item.saldo_restante) }}</span>
                                 {% else %}
                                     <span class="fw-bold text-secondary" style="font-family: system-ui;">Pendiente</span>
                                 {% endif %}
@@ -217,7 +239,7 @@
                             {% endif %}
                         </td>
 
-                        <td class="p-1 align-middle d-none d-md-table-cell" style="width: 130px;">
+                        <td class="p-1 align-middle d-none d-md-table-cell d-print-none" style="width: 130px;">
                             {% if mes_congelado and item.id_historial %}
                                 {% if item.pagado %}
                                 <div id="bloqueo-{{ item.id_historial }}">
@@ -248,7 +270,6 @@
                         </td>
                     </tr>
                     
-                    {# Inyectamos la Data en un Script oculto para que la ventanita móvil lo lea sin romperse #}
                     <script type="application/json" id="data-casa-{{ item.casa.id }}">
                         {
                             "id_historial": {{ item.id_historial | tojson }},
@@ -274,10 +295,11 @@
             </table>
         </div>
     </div>
+
     {# --- 4. SECCIÓN: GRUPOS CONSOLIDADOS --- #}
     {% if reporte_grupos %}
     <h5 class="fw-bold mt-5 mb-3 text-primary border-bottom pb-2">
-        <i class="bi bi-collection-fill me-2"></i>Grupos Consolidados
+        <i class="bi bi-collection-fill me-2 d-print-none"></i>Grupos Consolidados
     </h5>
 
     <div class="row">
@@ -295,9 +317,9 @@
                         <div class="text-start text-md-end border-end pe-3">
                             <span class="d-block small text-muted text-uppercase">Saldo</span>
                             {% if g.saldo_restante < -0.1 %}
-                                <span class="fs-6 text-success fw-bold font-monospace"><i class="bi bi-plus-circle me-1"></i>${{ "{:,.0f}".format(g.saldo_restante | abs) }}</span>
+                                <span class="fs-6 text-success fw-bold font-monospace"><i class="bi bi-plus-circle me-1 d-print-none"></i>${{ "{:,.0f}".format(g.saldo_restante | abs) }}</span>
                             {% elif g.saldo_restante > 0.1 %}
-                                <span class="fs-6 text-danger fw-bold font-monospace"><i class="bi bi-dash-circle me-1"></i>${{ "{:,.0f}".format(g.saldo_restante) }}</span>
+                                <span class="fs-6 text-danger fw-bold font-monospace"><i class="bi bi-dash-circle me-1 d-print-none"></i>${{ "{:,.0f}".format(g.saldo_restante) }}</span>
                             {% else %}
                                 <span class="fs-6 fw-bold text-secondary">Al día</span>
                             {% endif %}
@@ -308,8 +330,7 @@
                             <span class="fs-5 fw-bold text-dark">${{ "{:,.0f}".format(g.total_mes + g.saldo_anterior) }}</span>
                         </div>
 
-                        {# --- NUEVO BOTÓN DESPLEGABLE PARA ACCIONES DE GRUPO --- #}
-                        <div class="dropdown mt-2 mt-md-0">
+                        <div class="dropdown mt-2 mt-md-0 d-print-none">
                             <button class="btn btn-outline-dark dropdown-toggle shadow-sm fw-bold" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-gear-fill me-1"></i>Acciones
                             </button>
@@ -358,43 +379,42 @@
                         <thead class="table-light">
                             <tr>
                                 <th class="ps-4 py-2 text-uppercase small">Propiedad</th>
-                                <th class="text-end py-2 text-uppercase small d-none d-md-table-cell">Abono Base</th>
-                                <th class="text-end py-2 text-uppercase small d-none d-md-table-cell">Extras</th>
-                                
+                                <th class="text-end py-2 text-uppercase small d-none d-md-table-cell d-print-table-cell">Abono Base</th>
+                                <th class="text-end py-2 text-uppercase small d-none d-md-table-cell d-print-table-cell">Extras</th>
                                 <th class="text-end py-2 text-uppercase small">Total Mes</th>
-                                
-                                <th class="text-center pe-3 py-2 text-uppercase small d-none d-md-table-cell">Estado Indiv.</th>
+                                <th class="text-center pe-3 py-2 text-uppercase small d-none d-md-table-cell d-print-table-cell">Estado Indiv.</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for item in g.casas %}
                             <tr>
                                 <td class="ps-4 fw-bold text-truncate" style="max-width: 150px;">
-                                    <i class="bi bi-arrow-return-right text-muted me-1 d-none d-md-inline"></i>
+                                    <i class="bi bi-arrow-return-right text-muted me-1 d-none d-md-inline d-print-inline"></i>
                                     <a href="{{ url_for('casas.perfil', id=item.casa.id) }}" class="text-decoration-none text-dark d-inline-block text-truncate align-middle" style="max-width: 100%;">
                                         {{ item.casa.nombre_formateado() }}
                                     </a>
                                 </td>
                                 
-                                <td class="text-end font-monospace text-muted d-none d-md-table-cell">${{ "{:,.0f}".format(item.abono) }}</td>
-                                <td class="text-end font-monospace text-muted d-none d-md-table-cell">${{ "{:,.0f}".format(item.extras) }}</td>
+                                <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">${{ "{:,.0f}".format(item.abono) }}</td>
+                                <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">${{ "{:,.0f}".format(item.extras) }}</td>
                                 
-                                {# TOTAL MES + BOTON "i" EN CELULAR (Semáforo) #}
                                 <td class="text-end font-monospace fw-bold text-dark fs-6 text-nowrap pe-md-4">
                                     ${{ "{:,.0f}".format(item.total_mes) }}
-                                    <button class="btn btn-sm rounded-circle ms-2 px-2 py-1 shadow-sm d-inline-block d-md-none {% if item.pagado %}btn-success{% elif item.mensaje_enviado %}btn-primary{% else %}btn-light border{% endif %}" 
+                                    
+                                    {% set color_info_g = 'btn-success' if item.pagado else ('btn-primary' if item.mensaje_enviado else 'btn-danger') %}
+                                    <button class="btn btn-sm rounded-circle ms-2 px-2 py-1 shadow-sm d-inline-block d-md-none d-print-none {{ color_info_g }}" 
                                             onclick="abrirDetalle({{ item.casa.id }})">
-                                        <i class="bi bi-info-lg fw-bold {% if not item.pagado and not item.mensaje_enviado %}text-dark{% else %}text-white{% endif %}"></i>
+                                        <i class="bi bi-info-lg fw-bold text-white"></i>
                                     </button>
                                 </td>
                                 
-                                <td class="p-1 align-middle text-center pe-3 d-none d-md-table-cell">
+                                <td class="p-1 align-middle text-center pe-3 d-none d-md-table-cell d-print-table-cell">
                                     {% if item.pagado %}
-                                        <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Pagado</span>
+                                        <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1 d-print-none"></i>Pagado</span>
                                     {% elif item.mensaje_enviado %}
-                                        <span class="badge bg-primary"><i class="bi bi-send-check-fill me-1"></i>Notificado</span>
+                                        <span class="badge bg-primary"><i class="bi bi-send-check-fill me-1 d-print-none"></i>Notificado</span>
                                     {% else %}
-                                        <span class="badge bg-light text-dark border"><i class="bi bi-clock-fill text-danger me-1"></i>Pendte.</span>
+                                        <span class="badge bg-light text-dark border"><i class="bi bi-clock-fill text-danger me-1 d-print-none"></i>Pendte.</span>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -428,77 +448,79 @@
 
     {% endif %}
 </div>
-<div class="modal fade" id="modalPago" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-dark text-white border-0">
-                <h5 class="modal-title fw-bold"><i class="bi bi-wallet-fill me-2 text-success"></i>Registrar Entrega de Dinero</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4 text-center bg-light">
-                
-                <h5 class="text-primary fw-bold mb-1" id="modal-nombre-cliente">Cliente</h5>
-                <p class="text-muted small mb-4">Deuda Actual: <strong class="text-danger" id="modal-deuda-cliente">$0</strong></p>
 
-                <label class="form-label fw-bold text-uppercase small text-secondary">¿Cuánto dinero entregó ahora?</label>
-                <div class="input-group input-group-lg mx-auto w-75 shadow-sm mb-2">
-                    <span class="input-group-text bg-white border-success fw-bold text-success">$</span>
-                    <input type="text" id="monto_entregado" class="form-control border-success text-center fw-bold text-dark fs-4" placeholder="Ej: 15.000" inputmode="numeric">
+<div class="d-print-none">
+    <div class="modal fade" id="modalPago" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-dark text-white border-0">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-wallet-fill me-2 text-success"></i>Registrar Entrega de Dinero</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="form-text mt-2"><i class="bi bi-info-circle"></i> El saldo restante se calculará automáticamente.</div>
-                
-                <input type="hidden" id="modal_tipo_pago">
-                <input type="hidden" id="modal_id_referencia">
-            </div>
-            <div class="modal-footer bg-light border-0 d-flex justify-content-center pb-4 pt-0">
-                <button type="button" class="btn btn-outline-secondary px-4 fw-bold" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-success px-5 fw-bold shadow-sm" onclick="enviarPagoParcial()" id="btn-guardar-pago">
-                    <i class="bi bi-check-circle-fill me-1"></i> Confirmar Pago
-                </button>
+                <div class="modal-body p-4 text-center bg-light">
+                    
+                    <h5 class="text-primary fw-bold mb-1" id="modal-nombre-cliente">Cliente</h5>
+                    <p class="text-muted small mb-4">Deuda Actual: <strong class="text-danger" id="modal-deuda-cliente">$0</strong></p>
+
+                    <label class="form-label fw-bold text-uppercase small text-secondary">¿Cuánto dinero entregó ahora?</label>
+                    <div class="input-group input-group-lg mx-auto w-75 shadow-sm mb-2">
+                        <span class="input-group-text bg-white border-success fw-bold text-success">$</span>
+                        <input type="text" id="monto_entregado" class="form-control border-success text-center fw-bold text-dark fs-4" placeholder="Ej: 15.000" inputmode="numeric">
+                    </div>
+                    <div class="form-text mt-2"><i class="bi bi-info-circle"></i> El saldo restante se calculará automáticamente.</div>
+                    
+                    <input type="hidden" id="modal_tipo_pago">
+                    <input type="hidden" id="modal_id_referencia">
+                </div>
+                <div class="modal-footer bg-light border-0 d-flex justify-content-center pb-4 pt-0">
+                    <button type="button" class="btn btn-outline-secondary px-4 fw-bold" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success px-5 fw-bold shadow-sm" onclick="enviarPagoParcial()" id="btn-guardar-pago">
+                        <i class="bi bi-check-circle-fill me-1"></i> Confirmar Pago
+                    </button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<div class="modal fade" id="modalDetalleMovil" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-dark text-white py-2 border-0">
-                <h6 class="modal-title mb-0 fw-bold"><i class="bi bi-receipt me-2 text-warning"></i>Detalle de Cuenta</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4 bg-light">
-                <h4 class="fw-bold text-dark mb-3 text-center" id="detMovilNombre">Cliente</h4>
-                
-                <div class="bg-white rounded shadow-sm border p-3 mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="text-muted small fw-bold text-uppercase">Abono Base</span>
-                        <span class="fw-bold font-monospace text-dark" id="detMovilAbono">$0</span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="text-muted small fw-bold text-uppercase">Extras</span>
-                        <span class="fw-bold font-monospace text-dark" id="detMovilExtras">$0</span>
-                    </div>
-                    <hr class="my-2">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted small fw-bold text-uppercase">Saldo Anterior</span>
-                        <span class="fw-bold font-monospace" id="detMovilSaldoAnt">$0</span>
-                    </div>
+    <div class="modal fade" id="modalDetalleMovil" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-dark text-white py-2 border-0">
+                    <h6 class="modal-title mb-0 fw-bold"><i class="bi bi-receipt me-2 text-warning"></i>Detalle de Cuenta</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
+                <div class="modal-body p-4 bg-light">
+                    <h4 class="fw-bold text-dark mb-3 text-center" id="detMovilNombre">Cliente</h4>
+                    
+                    <div class="bg-white rounded shadow-sm border p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted small fw-bold text-uppercase">Abono Base</span>
+                            <span class="fw-bold font-monospace text-dark" id="detMovilAbono">$0</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted small fw-bold text-uppercase">Extras</span>
+                            <span class="fw-bold font-monospace text-dark" id="detMovilExtras">$0</span>
+                        </div>
+                        <hr class="my-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted small fw-bold text-uppercase">Saldo Anterior</span>
+                            <span class="fw-bold font-monospace" id="detMovilSaldoAnt">$0</span>
+                        </div>
+                    </div>
 
-                <div class="d-flex justify-content-between align-items-center p-3 bg-dark text-white rounded shadow-sm mb-4">
-                    <span class="fw-bold text-uppercase">A Pagar</span>
-                    <span class="fw-bold font-monospace fs-4 text-warning" id="detMovilTotal">$0</span>
+                    <div class="d-flex justify-content-between align-items-center p-3 bg-dark text-white rounded shadow-sm mb-4">
+                        <span class="fw-bold text-uppercase">A Pagar</span>
+                        <span class="fw-bold font-monospace fs-4 text-warning" id="detMovilTotal">$0</span>
+                    </div>
+
+                    <div id="detMovilAcciones"></div>
                 </div>
-
-                <div id="detMovilAcciones"></div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-// --- BUSCADOR EN TIEMPO REAL ADAPTADO PARA MÚLTIPLES TABLAS ---
 const buscador = document.getElementById('busquedaRealTime');
 if (buscador) {
     buscador.addEventListener('keyup', function() {
@@ -512,7 +534,6 @@ if (buscador) {
     });
 }
 
-// --- LÓGICA DE FORMATEO AUTOMÁTICO DE MILES ---
 const montoInput = document.getElementById('monto_entregado');
 if (montoInput) {
     montoInput.addEventListener('input', function(e) {
@@ -525,16 +546,11 @@ if (montoInput) {
     });
 }
 
-// ==========================================
-// ABRIR DETALLE MÓVIL (LA MAGIA DE LA 'i')
-// ==========================================
 function abrirDetalle(id) {
-    // 1. Buscamos el objeto JSON escondido en el HTML
     const dataNode = document.getElementById('data-casa-' + id);
     if(!dataNode) return;
     const data = JSON.parse(dataNode.textContent);
     
-    // 2. Llenamos los textos
     document.getElementById('detMovilNombre').innerText = data.nombre;
     document.getElementById('detMovilAbono').innerText = '$' + data.abono.toLocaleString('es-AR', {maximumFractionDigits:0});
     document.getElementById('detMovilExtras').innerText = '$' + data.extras.toLocaleString('es-AR', {maximumFractionDigits:0});
@@ -550,7 +566,6 @@ function abrirDetalle(id) {
     
     document.getElementById('detMovilTotal').innerText = '$' + (data.total_mes + data.saldo_anterior).toLocaleString('es-AR', {maximumFractionDigits:0});
     
-    // 3. Renderizamos los botones si NO es grupo y el mes está cerrado
     const accionesDiv = document.getElementById('detMovilAcciones');
     accionesDiv.innerHTML = ''; 
 
@@ -592,14 +607,9 @@ function abrirDetalle(id) {
         }
     }
     
-    // 4. Mostramos el modal
     var myModal = new bootstrap.Modal(document.getElementById('modalDetalleMovil'));
     myModal.show();
 }
-
-// ==========================================
-// RESTO DE FUNCIONES EXISTENTES
-// ==========================================
 
 function desbloquearFila(id) {
     document.getElementById(`bloqueo-${id}`).classList.add('d-none');

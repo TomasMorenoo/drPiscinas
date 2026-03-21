@@ -37,16 +37,30 @@
                             {% if barrio.activo %}
                                 <span class="badge rounded-pill bg-success-subtle text-success border border-success">Activo</span>
                             {% else %}
-                                <span class="badge rounded-pill bg-danger-subtle text-danger border border-danger">Inactivo</span>
+                                <span class="badge rounded-pill bg-danger-subtle text-danger border border-danger">Pausado</span>
                             {% endif %}
                         </td>
                         <td class="text-end pe-4">
-                            <a href="{{ url_for('barrio.toggle_barrio', id=barrio.id) }}" 
-                               class="btn btn-sm {{ 'btn-outline-danger' if barrio.activo else 'btn-outline-success' }}"
-                               title="Cambiar Estado">
-                                <i class="bi {{ 'bi-slash-circle' if barrio.activo else 'bi-check-circle' }}"></i>
-                                <span class="d-none d-md-inline ms-1">{{ 'Desactivar' if barrio.activo else 'Activar' }}</span>
-                            </a>
+                            <div class="d-flex justify-content-end gap-2">
+                                {# BOTÓN PAUSAR / ACTIVAR #}
+                                <a href="{{ url_for('barrio.toggle_barrio', id=barrio.id) }}" 
+                                   class="btn btn-sm {{ 'btn-outline-warning' if barrio.activo else 'btn-outline-success' }}"
+                                   title="Cambiar Estado">
+                                    <i class="bi {{ 'bi-pause-circle' if barrio.activo else 'bi-play-circle' }}"></i>
+                                    <span class="d-none d-md-inline ms-1">{{ 'Pausar' if barrio.activo else 'Activar' }}</span>
+                                </a>
+
+                                {# BOTÓN BORRAR (SOLO APARECE SI ESTÁ PAUSADO) #}
+                                {% if not barrio.activo %}
+                                <form action="{{ url_for('barrio.eliminar_barrio', id=barrio.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar este Barrio? Solo se podrá si no tiene propiedades asociadas.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar">
+                                        <i class="bi bi-trash"></i>
+                                        <span class="d-none d-md-inline ms-1">Borrar</span>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
                         </td>
                     </tr>
                     {% else %}
