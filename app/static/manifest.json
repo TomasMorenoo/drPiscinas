@@ -1,8 +1,10 @@
 {
+  "id": "/drpiscinas-app/",
   "name": "Dr. Piscinas",
   "short_name": "Dr. Piscinas",
   "description": "Gestión de mantenimiento de piscinas",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#e9ecef",
   "theme_color": "#212529",
