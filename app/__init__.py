@@ -24,9 +24,11 @@ def create_app():
 
     app = Flask(__name__)
 
-    # --- CONFIGURACIÓN DE BASE DE DATOS ---
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+# --- CONFIGURACIÓN DE BASE DE DATOS FINAL ---
+    app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://drPiscinas:administrador@127.0.0.1:5433/drPiscinas_db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    
+    print("🚀 CONECTADO EXITOSAMENTE AL DOCKER DE DR PISCINAS")
     
     # --- CONFIGURACIÓN DE SEGURIDAD ---
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")

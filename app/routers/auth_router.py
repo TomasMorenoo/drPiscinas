@@ -16,10 +16,12 @@ def login():
         return redirect(url_for('main.home'))
 
     if request.method == 'POST':
-        username = request.form.get('username')
+        # Le quitamos los espacios en blanco al principio y al final por las dudas con .strip()
+        username = request.form.get('username').strip()
         password = request.form.get('password')
         
-        user = User.query.filter_by(username=username).first()
+        # CAMBIO CLAVE: Usamos .ilike() para que ignore mayúsculas y minúsculas
+        user = User.query.filter(User.username.ilike(username)).first()
 
         # Verificamos credenciales
         if user and user.check_password(password):

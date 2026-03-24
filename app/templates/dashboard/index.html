@@ -68,10 +68,10 @@
             </form>
 
             <div class="d-flex gap-2">
-                {# BOTÓN DE IMPRESIÓN MÁGICO #}
-                <button onclick="window.print()" class="btn btn-sm btn-outline-secondary fw-bold shadow-sm d-print-none" title="Imprimir o Guardar como PDF">
-                    <i class="bi bi-printer-fill me-1"></i> IMPRIMIR
-                </button>
+                {# BOTÓN DE HOJA DE RUTA PARA IMPRIMIR #}
+                <a href="{{ url_for('dashboard.planilla_impresion', mes=mes, anio=anio) }}" target="_blank" class="btn btn-sm btn-outline-secondary fw-bold shadow-sm d-print-none" title="Generar Planilla para Lapicera">
+                    <i class="bi bi-file-earmark-pdf-fill me-1"></i> HOJA DE RUTA
+                </a>
 
                 <a href="{{ url_for('grupos.crear_grupo') }}" class="btn btn-sm btn-outline-dark fw-bold shadow-sm d-print-none">
                     <i class="bi bi-collection-fill me-1"></i> AGRUPAR
@@ -381,6 +381,9 @@
                                 <th class="ps-4 py-2 text-uppercase small">Propiedad</th>
                                 <th class="text-end py-2 text-uppercase small d-none d-md-table-cell d-print-table-cell">Abono Base</th>
                                 <th class="text-end py-2 text-uppercase small d-none d-md-table-cell d-print-table-cell">Extras</th>
+                                
+                                <th class="text-end py-2 text-uppercase small d-none d-md-table-cell d-print-table-cell">Saldo Ant.</th>
+                                
                                 <th class="text-end py-2 text-uppercase small">Total Mes</th>
                                 <th class="text-center pe-3 py-2 text-uppercase small d-none d-md-table-cell d-print-table-cell">Estado Indiv.</th>
                             </tr>
@@ -397,6 +400,16 @@
                                 
                                 <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">${{ "{:,.0f}".format(item.abono) }}</td>
                                 <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">${{ "{:,.0f}".format(item.extras) }}</td>
+                                
+                                <td class="text-end font-monospace d-none d-md-table-cell d-print-table-cell">
+                                    {% if item.saldo_anterior < -0.1 %}
+                                        <span class="text-success fw-bold" title="A favor">+${{ "{:,.0f}".format(item.saldo_anterior | abs) }}</span>
+                                    {% elif item.saldo_anterior > 0.1 %}
+                                        <span class="text-danger fw-bold" title="Arrastra deuda">-${{ "{:,.0f}".format(item.saldo_anterior) }}</span>
+                                    {% else %}
+                                        <span class="text-muted">$0</span>
+                                    {% endif %}
+                                </td>
                                 
                                 <td class="text-end font-monospace fw-bold text-dark fs-6 text-nowrap pe-md-4">
                                     ${{ "{:,.0f}".format(item.total_mes) }}

@@ -9,8 +9,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5433:5432"
     volumes:
-      - /vps/clientes/drPiscinas/db_data:/var/lib/postgresql/data
+      # EL TRUCO ESTÁ ACÁ: Al poner "./", funciona tanto en Windows como en Linux
+      - ./db_data:/var/lib/postgresql/data
 
   web:
     build: .

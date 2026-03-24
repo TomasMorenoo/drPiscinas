@@ -469,3 +469,45 @@ def registrar_pago_grupo(grupo_id):
 
     db.session.commit()
     return jsonify({"success": True})
+
+@dashboard_bp.route("/planilla-impresion")
+@login_required
+@admin_required
+def planilla_impresion():
+    mes = int(request.args.get("mes", datetime.now().month))
+    anio = int(request.args.get("anio", datetime.now().year))
+    
+    # Respetamos si el mes está cerrado o abierto
+    registro_congelado = CierreMes.query.filter_by(mes=mes, anio=anio).first()
+    if registro_congelado:
+        historiales = AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()
+        casas = [h.casa for h in historiales]
+    else:
+        casas = Casa.query.filter_by(activo=True).all()
+
+    # Ordenamos alfabéticamente usando la función que ya existe en este archivo
+    casas.sort(key=natural_sort_key)
+    
+    filas = []
+    for casa in casas:
+        datos = casa.obtener_gastos_mensuales(mes, anio)
+        producto = float(datos.get("extras", 0))
+        
+        historial = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
+        abono = float(historial.monto) if historial else float(casa.precio_base or 0)
+        
+        saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
+        total_a_pagar = abono + producto + saldo_anterior
+            
+        filas.append({
+            "cliente": casa.nombre_formateado(),
+            "producto": producto,
+            "abono": abono,
+            "saldo_anterior": saldo_anterior,
+            "total_a_pagar": total_a_pagar
+        })
+        
+    nombres_meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+    nombre_mes = nombres_meses[mes - 1]
+
+    return render_template("dashboard/planilla.html", filas=filas, mes_nombre=nombre_mes, anio=anio)

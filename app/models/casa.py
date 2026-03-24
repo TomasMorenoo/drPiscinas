@@ -67,7 +67,7 @@ class Casa(db.Model):
         return f"{self.country.nombre} {self.numero}"
     
     def obtener_saldo_anterior(self, mes, anio):
-        """Calcula la deuda o saldo a favor acumulado revisando el historial mes a mes"""
+        """Calcula la deuda o saldo a favor acumulado usando los precios históricos congelados"""
         saldo = 0.0
         
         # Ordenamos cronológicamente para que la plata fluya en el tiempo
@@ -75,18 +75,28 @@ class Casa(db.Model):
         
         for hist in historiales_ordenados:
             if hist.anio < anio or (hist.anio == anio and hist.mes < mes):
-                gastos = self.obtener_gastos_mensuales(hist.mes, hist.anio)
-                total_hist = gastos['total']
+                # FIX CRÍTICO: Usamos el MONTO HISTÓRICO CONGELADO, no el precio actual
+                abono_hist = float(hist.monto)
+                
+                # Calculamos los extras usando solo las visitas de ese mes específico
+                extras_hist = 0.0
+                for visita in self.visitas:
+                    if visita.fecha.month == hist.mes and visita.fecha.year == hist.anio:
+                        for vp in visita.productos:
+                            if vp.precio_unitario:
+                                extras_hist += float(vp.cantidad) * float(vp.precio_unitario)
+                            else:
+                                extras_hist += float(vp.cantidad) * float(vp.product.precio)
+                        if visita.promo:
+                            extras_hist += float(visita.promo.precio)
+                
+                total_hist = abono_hist + extras_hist
                 pagado_hist = float(getattr(hist, 'monto_pagado', 0) or 0)
                 
-                # REGLA 1: Sumamos la deuda de ese mes y le restamos la plata que ingresó
                 saldo += total_hist
                 saldo -= pagado_hist
                 
-                # REGLA 2: Compatibilidad con botones viejos.
-                # Si el mes figura como "Pagado" (con el tilde verde), pero nunca se le cargó un monto_pagado numérico,
-                # y actualmente la cuenta dice que nos debe plata (saldo > 0), asumimos que lo pagó exacto y reseteamos la deuda a 0.
-                # OJO: Si el saldo es negativo (saldo <= 0), no lo tocamos, dejamos que pase al mes siguiente.
+                # Compatibilidad: Si se marcó como pagado con el botón viejo (sin monto), reseteamos la deuda
                 if getattr(hist, 'pagado', False) and pagado_hist == 0 and saldo > 0.01:
                     saldo = 0.0
                     
