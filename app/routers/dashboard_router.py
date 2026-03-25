@@ -42,9 +42,19 @@ def index():
 
     if mes_congelado:
         historiales = AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()
-        casas = [h.casa for h in historiales]
+        casas_raw = [h.casa for h in historiales]
     else:
-        casas = Casa.query.filter_by(activo=True).all()
+        casas_raw = Casa.query.all()
+
+    casas = []
+    # FIX 1: Clientes de BAJA solo aparecen si consumieron Extras (Visitas) en este mes específico
+    for c in casas_raw:
+        if c.activo:
+            casas.append(c)
+        else:
+            datos = c.obtener_gastos_mensuales(mes, anio)
+            if float(datos.get("extras", 0)) > 0:
+                casas.append(c)
 
     casas.sort(key=natural_sort_key)
 
@@ -55,6 +65,7 @@ def index():
     total_abono = 0.0
     total_extras = 0.0
     total_recaudado = 0.0 
+    total_deuda_anterior = 0.0 
     
     hubo_cambios = False
 
@@ -63,18 +74,32 @@ def index():
         extras = float(datos.get("extras", 0))
 
         historial = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
-        abono_mes = float(historial.monto) if historial else float(casa.precio_base or 0)
+        
+        if mes_congelado and historial:
+            abono_mes = float(historial.monto)
+        else:
+            abono_mes = float(casa.precio_base or 0)
         
         total_mes = abono_mes + extras
         saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
-        monto_pagado = float(getattr(historial, 'monto_pagado', 0) or 0)
         
+        if saldo_anterior > 0:
+            total_deuda_anterior += saldo_anterior
+
+        # FIX 2: Autocorrector de Grupos/Casas Pagadas. 
+        if mes_congelado and historial and getattr(historial, 'pagado', False):
+            monto_ideal = total_mes + saldo_anterior
+            monto_actual = float(getattr(historial, 'monto_pagado', 0) or 0)
+            if abs(monto_actual - monto_ideal) > 0.01:
+                historial.monto_pagado = monto_ideal
+                hubo_cambios = True
+
+        monto_pagado = float(getattr(historial, 'monto_pagado', 0) or 0)
         saldo_restante = (total_mes + saldo_anterior) - monto_pagado
 
         esta_pagado = getattr(historial, 'pagado', False) if historial else False
         mensaje_enviado = getattr(historial, 'mensaje_enviado', False) if historial else False
 
-        # SOLO AUTO-PAGAMOS SI EL MES ESTÁ CERRADO Y HAY UN HISTORIAL
         if mes_congelado and historial:
             if not casa.grupo_id:
                 if saldo_restante <= 0.01:
@@ -133,10 +158,9 @@ def index():
         else:
             total_recaudado += monto_pagado
 
-    total_general = total_abono + total_extras
+    total_general = total_abono + total_extras + total_deuda_anterior
 
     for g_id, g in reporte_grupos.items():
-        # SOLO AUTO-PAGAMOS GRUPOS SI EL MES ESTÁ CERRADO
         if mes_congelado and g["saldo_restante"] <= 0.01:
             g["pagado"] = True
             g["mensaje_enviado"] = True
@@ -156,15 +180,12 @@ def index():
             num_tel = limpiar_telefono(g["telefono"])
             cant = len(g["casas"])
             texto_wa = f"Hola! *{g['nombre']}* Te paso el resumen de las {cant} propiedades.\n\n"
-            
             for c in g["casas"]:
                 texto_wa += f"• {c['casa'].nombre_formateado()}: Abono ${format_money(c['abono'])} + Productos ${format_money(c['extras'])} = ${format_money(c['total_mes'])}\n"
-            
             if g['saldo_anterior'] < -0.1:
                 texto_wa += f"\nSaldo a favor (Mes anterior): *${format_money(abs(g['saldo_anterior']))}*"
             elif g['saldo_anterior'] > 0.1:
                 texto_wa += f"\nDeuda pendiente (Mes anterior): *${format_money(g['saldo_anterior'])}*"
-
             texto_wa += f"\n*TOTAL A PAGAR: ${format_money(g['total_mes'] + g['saldo_anterior'])}*"
             g["url_wa"] = f"https://wa.me/{num_tel}?text={urllib.parse.quote(texto_wa)}"
 
@@ -183,12 +204,13 @@ def index():
         kpi_clientes=total_clientes,
         kpi_abono=total_abono,
         kpi_extras=total_extras,
+        kpi_deuda=total_deuda_anterior,
         kpi_recaudado=total_recaudado,
         kpi_pendiente=total_general - total_recaudado,
         kpi_total=total_general
     )
 
-@dashboard_bp.route("/marcar-mensaje/<int:id>", methods=["POST"])
+
 @login_required
 @admin_required
 def marcar_mensaje(id):
@@ -256,18 +278,21 @@ def sync_abonos():
     if not cierre:
         db.session.add(CierreMes(mes=mes, anio=anio))
     
+    # --- 1. FIX DE ABONOS ---
+    # Sacamos SIEMPRE la foto del precio base actual al momento de cerrar,
+    # sin importar si el cliente ya pagó una parte o está al día.
     for casa in Casa.query.filter_by(activo=True).all():
         hist = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
         if not hist:
             db.session.add(AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=float(casa.precio_base or 0)))
         else:
-            if hist.monto_pagado == 0 and not hist.pagado:
-                hist.monto = float(casa.precio_base or 0)
+            # Eliminamos el IF restrictivo que arruinaba los 4 millones
+            hist.monto = float(casa.precio_base or 0)
             
-    visitas_mes = Visit.query.filter(extract('month', Visit.fecha) == mes, extract('year', Visit.fecha) == anio).all()
-    for visita in visitas_mes:
-        for vp in visita.productos:
-            vp.precio_unitario = vp.product.precio 
+    # --- 2. FIX DE PRODUCTOS (EXTRAS) ---
+    # Se ELIMINÓ el bucle destructivo que sobreescribía los precios unitarios 
+    # de las visitas pasadas con los precios actuales del catálogo.
+    # Ahora los productos mantienen el precio que tenían el día de la visita.
             
     db.session.commit()
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
@@ -280,34 +305,17 @@ def unsync_abonos():
     anio = request.form.get("anio", type=int)
     if mes and anio:
         CierreMes.query.filter_by(mes=mes, anio=anio).delete()
+        
+        # FIX 3: Limpieza profunda y agresiva al reabrir el mes
+        fantasmas = AbonoHistorico.query.filter_by(mes=mes, anio=anio, pagado=False).all()
+        for f in fantasmas:
+            # Si el monto_pagado es nulo, vacío, o menor a un centavo, se extermina.
+            if not f.monto_pagado or float(f.monto_pagado) <= 0.01:
+                db.session.delete(f)
+                
         db.session.commit()
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
 
-@dashboard_bp.route("/registrar-pago-especial/<int:id_historial>", methods=["POST"])
-@login_required
-@admin_required
-def registrar_pago_especial(id_historial):
-    registro = AbonoHistorico.query.get_or_404(id_historial)
-    monto_ingresado = float(request.json.get("monto", 0))
-    
-    registro.monto_pagado += monto_ingresado
-    
-    casa = registro.casa
-    total_mes = float(registro.monto) + float(casa.obtener_gastos_mensuales(registro.mes, registro.anio)['extras'])
-    saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
-    
-    if registro.monto_pagado >= ((total_mes + saldo_ant) - 0.1): 
-        registro.pagado = True
-        registro.mensaje_enviado = True
-    else:
-        registro.pagado = False
-        
-    db.session.commit()
-    return jsonify({"success": True})
-
-# ==========================================
-# NUEVAS RUTAS EXCLUSIVAS PARA GRUPOS
-# ==========================================
 
 @dashboard_bp.route("/marcar-mensaje-grupo/<int:grupo_id>", methods=["POST"])
 @login_required
@@ -352,7 +360,6 @@ def toggle_pago_grupo(grupo_id):
     url_wa = None
 
     if not all_pagado and not all_enviado:
-        # Pasa a Enviado y genera la URL
         for h in historiales:
             h.mensaje_enviado = True
             h.pagado = False
@@ -390,7 +397,6 @@ def toggle_pago_grupo(grupo_id):
             url_wa = f"https://wa.me/{tel}?text={urllib.parse.quote(texto_wa)}"
 
     elif not all_pagado and all_enviado:
-        # Pasa a Pagado (Pagan el total exacto)
         for h in historiales:
             h.pagado = True
             h.mensaje_enviado = True
@@ -399,7 +405,6 @@ def toggle_pago_grupo(grupo_id):
             saldo_ant = c.obtener_saldo_anterior(mes, anio)
             h.monto_pagado = total_mes + saldo_ant
     else:
-        # Resetea a Pendiente
         for h in historiales:
             h.pagado = False
             h.mensaje_enviado = False
@@ -427,7 +432,6 @@ def registrar_pago_grupo(grupo_id):
     deudas = []
     total_deuda_grupo = 0
     
-    # 1. Calculamos la deuda real de cada casa del grupo
     for h in historiales:
         c = h.casa
         total_mes = float(h.monto) + float(c.obtener_gastos_mensuales(mes, anio)['extras'])
@@ -438,9 +442,7 @@ def registrar_pago_grupo(grupo_id):
         total_deuda_grupo += deuda_restante
         deudas.append({"hist": h, "restante": deuda_restante})
 
-    # 2. Distribución del dinero ingresado
     if monto_ingresado >= total_deuda_grupo:
-        # Alcanza para saldar a todos y sobra (Distribución equitativa del saldo a favor)
         sobrante = monto_ingresado - total_deuda_grupo
         sobrante_por_casa = sobrante / len(deudas) if len(deudas) > 0 else 0
         
@@ -450,7 +452,6 @@ def registrar_pago_grupo(grupo_id):
             h.pagado = True
             h.mensaje_enviado = True
     else:
-        # No alcanza, distribuimos hasta donde llegue el dinero (en orden)
         plata_disponible = monto_ingresado
         for d in deudas:
             h = d["hist"]
@@ -477,7 +478,6 @@ def planilla_impresion():
     mes = int(request.args.get("mes", datetime.now().month))
     anio = int(request.args.get("anio", datetime.now().year))
     
-    # Respetamos si el mes está cerrado o abierto
     registro_congelado = CierreMes.query.filter_by(mes=mes, anio=anio).first()
     if registro_congelado:
         historiales = AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()
@@ -485,7 +485,6 @@ def planilla_impresion():
     else:
         casas = Casa.query.filter_by(activo=True).all()
 
-    # Ordenamos alfabéticamente usando la función que ya existe en este archivo
     casas.sort(key=natural_sort_key)
     
     filas = []
@@ -494,7 +493,7 @@ def planilla_impresion():
         producto = float(datos.get("extras", 0))
         
         historial = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
-        abono = float(historial.monto) if historial else float(casa.precio_base or 0)
+        abono = float(historial.monto) if (registro_congelado and historial) else float(casa.precio_base or 0)
         
         saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
         total_a_pagar = abono + producto + saldo_anterior

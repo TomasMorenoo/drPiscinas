@@ -6,13 +6,13 @@ services:
     container_name: dr_piscinas_db
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      # Aquí usamos las variables que coinciden con tu VPS y tu PC
+      POSTGRES_USER: ${DB_USER:-drPiscinas}
+      POSTGRES_PASSWORD: ${DB_PASS:-administrador}
+      POSTGRES_DB: ${DB_NAME:-drPiscinas_db}
     ports:
-      - "5433:5432"
+      - "5433:5432"  # En tu PC usás 5433, en la VPS no molesta.
     volumes:
-      # EL TRUCO ESTÁ ACÁ: Al poner "./", funciona tanto en Windows como en Linux
       - ./db_data:/var/lib/postgresql/data
 
   web:
