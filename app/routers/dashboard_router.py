@@ -47,7 +47,7 @@ def index():
         casas_raw = Casa.query.all()
 
     casas = []
-    # FIX 1: Clientes de BAJA solo aparecen si consumieron Extras (Visitas) en este mes específico
+    # Clientes de BAJA solo aparecen si consumieron Extras (Visitas) en este mes específico
     for c in casas_raw:
         if c.activo:
             casas.append(c)
@@ -86,7 +86,7 @@ def index():
         if saldo_anterior > 0:
             total_deuda_anterior += saldo_anterior
 
-        # FIX 2: Autocorrector de Grupos/Casas Pagadas. 
+        # Autocorrector de Grupos/Casas Pagadas
         if mes_congelado and historial and getattr(historial, 'pagado', False):
             monto_ideal = total_mes + saldo_anterior
             monto_actual = float(getattr(historial, 'monto_pagado', 0) or 0)
@@ -211,6 +211,7 @@ def index():
     )
 
 
+@dashboard_bp.route("/marcar-mensaje/<int:id>", methods=["POST"])
 @login_required
 @admin_required
 def marcar_mensaje(id):
@@ -263,6 +264,24 @@ def toggle_pago(id):
     db.session.commit()
     return jsonify({"success": True, "url_wa": url_wa})
 
+@dashboard_bp.route("/marcar-pagado-directo/<int:id>", methods=["POST"])
+@login_required
+@admin_required
+def marcar_pagado_directo(id):
+    registro = AbonoHistorico.query.get_or_404(id)
+    
+    casa = registro.casa
+    total_mes = float(registro.monto) + float(casa.obtener_gastos_mensuales(registro.mes, registro.anio)['extras'])
+    saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
+    
+    registro.pagado = True
+    registro.mensaje_enviado = True
+    registro.monto_pagado = total_mes + saldo_ant
+    
+    db.session.commit()
+    return jsonify({"success": True})
+
+
 @dashboard_bp.route("/sync-abonos", methods=["POST"])
 @login_required
 @admin_required
@@ -278,21 +297,12 @@ def sync_abonos():
     if not cierre:
         db.session.add(CierreMes(mes=mes, anio=anio))
     
-    # --- 1. FIX DE ABONOS ---
-    # Sacamos SIEMPRE la foto del precio base actual al momento de cerrar,
-    # sin importar si el cliente ya pagó una parte o está al día.
     for casa in Casa.query.filter_by(activo=True).all():
         hist = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
         if not hist:
             db.session.add(AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=float(casa.precio_base or 0)))
         else:
-            # Eliminamos el IF restrictivo que arruinaba los 4 millones
             hist.monto = float(casa.precio_base or 0)
-            
-    # --- 2. FIX DE PRODUCTOS (EXTRAS) ---
-    # Se ELIMINÓ el bucle destructivo que sobreescribía los precios unitarios 
-    # de las visitas pasadas con los precios actuales del catálogo.
-    # Ahora los productos mantienen el precio que tenían el día de la visita.
             
     db.session.commit()
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
@@ -306,10 +316,8 @@ def unsync_abonos():
     if mes and anio:
         CierreMes.query.filter_by(mes=mes, anio=anio).delete()
         
-        # FIX 3: Limpieza profunda y agresiva al reabrir el mes
         fantasmas = AbonoHistorico.query.filter_by(mes=mes, anio=anio, pagado=False).all()
         for f in fantasmas:
-            # Si el monto_pagado es nulo, vacío, o menor a un centavo, se extermina.
             if not f.monto_pagado or float(f.monto_pagado) <= 0.01:
                 db.session.delete(f)
                 
@@ -470,6 +478,29 @@ def registrar_pago_grupo(grupo_id):
 
     db.session.commit()
     return jsonify({"success": True})
+
+@dashboard_bp.route("/registrar-pago-especial/<int:id_historial>", methods=["POST"])
+@login_required
+@admin_required
+def registrar_pago_especial(id_historial):
+    registro = AbonoHistorico.query.get_or_404(id_historial)
+    monto_ingresado = float(request.json.get("monto", 0))
+    
+    registro.monto_pagado += monto_ingresado
+    
+    casa = registro.casa
+    total_mes = float(registro.monto) + float(casa.obtener_gastos_mensuales(registro.mes, registro.anio)['extras'])
+    saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
+    
+    if registro.monto_pagado >= ((total_mes + saldo_ant) - 0.1): 
+        registro.pagado = True
+        registro.mensaje_enviado = True
+    else:
+        registro.pagado = False
+        
+    db.session.commit()
+    return jsonify({"success": True})
+
 
 @dashboard_bp.route("/planilla-impresion")
 @login_required

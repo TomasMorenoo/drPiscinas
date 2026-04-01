@@ -233,7 +233,7 @@
                                 </button>
                             </td>
 
-                            <td class="p-1 align-middle d-none d-md-table-cell d-print-none" style="width: 130px;">
+                            <td class="p-1 align-middle d-none d-md-table-cell d-print-none" style="width: 140px;">
                                 {% if mes_congelado and item.id_historial %}
                                     {% if item.pagado %}
                                     <div id="bloqueo-{{ item.id_historial }}">
@@ -244,18 +244,24 @@
                                     </div>
                                     {% endif %}
                                     <div id="acciones-{{ item.id_historial }}" class="{% if item.pagado %}d-none{% else %}d-flex flex-column{% endif %} gap-1">
-                                        <button onclick="togglePago({{ item.id_historial }}, this, false)" class="btn btn-sm border shadow-sm py-2 {% if item.pagado %}btn-success{% elif item.mensaje_enviado %}btn-primary{% else %}btn-light{% endif %}" title="Cambiar estado">
-                                            {% if item.pagado %}<i class="bi bi-check-circle-fill fs-5"></i>
-                                            {% elif item.mensaje_enviado %}<i class="bi bi-send-check-fill fs-5"></i>
-                                            {% else %}<i class="bi bi-clock-fill fs-5 text-danger"></i>{% endif %}
-                                        </button>
+                                        
+                                        <div class="d-flex gap-1">
+                                            <button onclick="togglePago({{ item.id_historial }}, this, false)" class="btn btn-sm border shadow-sm py-2 flex-grow-1 {% if item.mensaje_enviado %}btn-primary{% else %}btn-light{% endif %}" title="Avanzar de Estado (Pendiente -> Notificado)">
+                                                {% if item.mensaje_enviado %}<i class="bi bi-send-check-fill fs-5 text-white"></i>
+                                                {% else %}<i class="bi bi-clock-fill fs-5 text-danger"></i>{% endif %}
+                                            </button>
+                                            <button onclick="marcarPagadoDirecto({{ item.id_historial }}, this)" class="btn btn-sm btn-success border shadow-sm py-2 px-3 flex-grow-0" title="Marcar todo como Pagado">
+                                                <i class="bi bi-check-circle-fill fs-5"></i>
+                                            </button>
+                                        </div>
+                                        
                                         <div class="d-flex gap-1">
                                             {% if item.url_wa %}
-                                            <a href="{{ item.url_wa }}" target="_blank" onclick="marcarEnviado({{ item.id_historial }})" class="btn btn-sm btn-outline-success flex-grow-1 py-1 px-0"><i class="bi bi-whatsapp"></i></a>
+                                            <a href="{{ item.url_wa }}" target="_blank" onclick="marcarEnviado({{ item.id_historial }})" class="btn btn-sm btn-outline-success flex-grow-1 py-1 px-0" title="Enviar WhatsApp"><i class="bi bi-whatsapp"></i></a>
                                             {% else %}
                                             <button class="btn btn-sm btn-outline-secondary opacity-25 flex-grow-1 py-1 px-0" disabled><i class="bi bi-whatsapp"></i></button>
                                             {% endif %}
-                                            <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-secondary flex-grow-1 py-1 px-0"><i class="bi bi-cash-stack"></i></button>
+                                            <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-secondary flex-grow-1 py-1 px-0" title="Pago Parcial o Personalizado"><i class="bi bi-cash-stack"></i></button>
                                         </div>
                                     </div>
                                 {% else %}
@@ -441,11 +447,18 @@
                                         
                                         <td class="p-1 align-middle text-center pe-3 d-none d-md-table-cell d-print-none">
                                             {% if mes_congelado and item.id_historial %}
-                                                <button onclick="togglePago({{ item.id_historial }}, this, true)" class="btn btn-sm shadow-sm py-1 px-2 {% if item.pagado %}btn-success{% elif item.mensaje_enviado %}btn-primary{% else %}btn-light border text-danger{% endif %}" title="Tocar para cambiar estado sin WhatsApp">
-                                                    {% if item.pagado %}<i class="bi bi-check-circle-fill"></i> Pagado
-                                                    {% elif item.mensaje_enviado %}<i class="bi bi-send-check-fill"></i> Notificado
-                                                    {% else %}<i class="bi bi-clock-fill"></i> Pendte.{% endif %}
-                                                </button>
+                                                <div class="d-flex justify-content-center gap-1">
+                                                    <button onclick="togglePago({{ item.id_historial }}, this, true)" class="btn btn-sm shadow-sm py-1 px-2 {% if item.pagado %}btn-success{% elif item.mensaje_enviado %}btn-primary{% else %}btn-light border text-danger{% endif %}" title="Cambiar Estado">
+                                                        {% if item.pagado %}<i class="bi bi-check-circle-fill"></i>
+                                                        {% elif item.mensaje_enviado %}<i class="bi bi-send-check-fill text-white"></i>
+                                                        {% else %}<i class="bi bi-clock-fill"></i>{% endif %}
+                                                    </button>
+                                                    {% if not item.pagado %}
+                                                    <button onclick="marcarPagadoDirecto({{ item.id_historial }}, this)" class="btn btn-sm btn-success shadow-sm py-1 px-2" title="Marcar Pagado Directo">
+                                                        <i class="bi bi-check-lg"></i>
+                                                    </button>
+                                                    {% endif %}
+                                                </div>
                                             {% else %}
                                                 {% if item.pagado %}
                                                     <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Pagado</span>
@@ -660,7 +673,7 @@ function marcarEnviado(id) {
     }).then(() => setTimeout(() => location.reload(), 1500));
 }
 
-function togglePago(id, btn, omitirWa = false) {
+function togglePago(id, btn) {
     const contenidoOriginal = btn.innerHTML;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm text-secondary my-1"></span>';
     btn.disabled = true;
@@ -672,9 +685,27 @@ function togglePago(id, btn, omitirWa = false) {
     .then(res => res.json())
     .then(data => { 
         if (data.success) {
-            if (data.url_wa && !omitirWa) {
-                window.open(data.url_wa, '_blank');
-            }
+            location.reload(); 
+        }
+    })
+    .catch(() => { 
+        btn.innerHTML = contenidoOriginal; 
+        btn.disabled = false; 
+    });
+}
+
+function marcarPagadoDirecto(id, btn) {
+    const contenidoOriginal = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm text-white my-1"></span>';
+    btn.disabled = true;
+
+    fetch(`/dashboard/marcar-pagado-directo/${id}`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(data => { 
+        if (data.success) {
             location.reload(); 
         }
     })
