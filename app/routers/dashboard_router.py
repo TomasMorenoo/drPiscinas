@@ -5,9 +5,12 @@ from app import db
 from app.models import Casa, Country, Barrio
 from app.models.abono_historico import AbonoHistorico
 from app.models.cierre_mes import CierreMes
+from app.models.visit import Visit
 from datetime import datetime
 import re
 import urllib.parse
+from sqlalchemy.orm import joinedload
+from sqlalchemy import func, extract, and_, or_ # <-- Herramientas de matemáticas SQL
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
@@ -40,20 +43,91 @@ def index():
     registro_congelado = CierreMes.query.filter_by(mes=mes, anio=anio).first()
     mes_congelado = True if registro_congelado else False
 
+    # 1. Traemos historiales y casas de base en 1 sola consulta
+    historiales_del_mes = AbonoHistorico.query.filter_by(mes=mes, anio=anio).options(
+        joinedload(AbonoHistorico.casa).joinedload(Casa.country),
+        joinedload(AbonoHistorico.casa).joinedload(Casa.barrio),
+        joinedload(AbonoHistorico.casa).joinedload(Casa.grupo)
+    ).all()
+    
+    historial_dict = {h.casa_id: h for h in historiales_del_mes}
+
     if mes_congelado:
-        historiales = AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()
-        casas_raw = [h.casa for h in historiales]
+        casas_raw = [h.casa for h in historiales_del_mes]
     else:
-        casas_raw = Casa.query.all()
+        casas_raw = Casa.query.options(
+            joinedload(Casa.country),
+            joinedload(Casa.barrio),
+            joinedload(Casa.grupo)
+        ).all()
+
+    # --- INICIO MAGIA SQL: EXTRAS Y SALDOS ---
+    
+    # A. Diccionario Rápido de EXTRAS (Productos) de ESTE mes
+    # (Calculamos todo directo en la base de datos sin instanciar objetos)
+    visitas_mes = Visit.query.filter(
+        extract('month', Visit.fecha) == mes,
+        extract('year', Visit.fecha) == anio
+    ).options(joinedload(Visit.productos), joinedload(Visit.promo)).all()
+    
+    diccionario_extras = {}
+    for v in visitas_mes:
+        total_v = 0.0
+        for vp in v.productos:
+            # Si el mes está congelado o ya tiene precio histórico, usamos ese. Si no, el actual.
+            precio = vp.precio_unitario if (mes_congelado and vp.precio_unitario) else vp.product.precio
+            total_v += float(vp.cantidad) * float(precio)
+        if v.promo:
+            total_v += float(v.promo.precio)
+            
+        diccionario_extras[v.casa_id] = diccionario_extras.get(v.casa_id, 0.0) + total_v
+
+    # B. Diccionario Rápido de SALDOS ANTERIORES
+    # Primero buscamos toda la plata que DEBÍAN pagar en la historia (antes de este mes)
+    saldos_hist = db.session.query(
+        AbonoHistorico.casa_id,
+        func.sum(AbonoHistorico.monto).label('total_abonos'),
+        func.sum(AbonoHistorico.monto_pagado).label('total_pagado')
+    ).filter(
+        or_(
+            AbonoHistorico.anio < anio,
+            and_(AbonoHistorico.anio == anio, AbonoHistorico.mes < mes)
+        )
+    ).group_by(AbonoHistorico.casa_id).all()
+
+    # Buscamos todos los extras consumidos en la historia antes de este mes
+    visitas_viejas = Visit.query.filter(
+        or_(
+            extract('year', Visit.fecha) < anio,
+            and_(extract('year', Visit.fecha) == anio, extract('month', Visit.fecha) < mes)
+        )
+    ).options(joinedload(Visit.productos), joinedload(Visit.promo)).all()
+    
+    extras_historicos = {}
+    for v in visitas_viejas:
+        total_v = 0.0
+        for vp in v.productos:
+            precio = vp.precio_unitario if vp.precio_unitario else vp.product.precio
+            total_v += float(vp.cantidad) * float(precio)
+        if v.promo:
+            total_v += float(v.promo.precio)
+        extras_historicos[v.casa_id] = extras_historicos.get(v.casa_id, 0.0) + total_v
+
+    # Consolidamos ambos en un diccionario final: {casa_id: deuda_total}
+    diccionario_saldos = {}
+    for row in saldos_hist:
+        casa_id = row.casa_id
+        deuda = (float(row.total_abonos or 0) + extras_historicos.get(casa_id, 0.0)) - float(row.total_pagado or 0)
+        diccionario_saldos[casa_id] = round(deuda, 2)
+        
+    # --- FIN MAGIA SQL ---
 
     casas = []
-    # Clientes de BAJA solo aparecen si consumieron Extras (Visitas) en este mes específico
     for c in casas_raw:
         if c.activo:
             casas.append(c)
         else:
-            datos = c.obtener_gastos_mensuales(mes, anio)
-            if float(datos.get("extras", 0)) > 0:
+            if diccionario_extras.get(c.id, 0.0) > 0:
                 casas.append(c)
 
     casas.sort(key=natural_sort_key)
@@ -70,10 +144,11 @@ def index():
     hubo_cambios = False
 
     for casa in casas:
-        datos = casa.obtener_gastos_mensuales(mes, anio)
-        extras = float(datos.get("extras", 0))
+        # OPTIMIZACIÓN LECTURA EXTRAS Y SALDO: Lectura instantánea de RAM O(1)
+        extras = round(diccionario_extras.get(casa.id, 0.0), 2)
+        saldo_anterior = diccionario_saldos.get(casa.id, 0.0)
 
-        historial = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
+        historial = historial_dict.get(casa.id)
         
         if mes_congelado and historial:
             abono_mes = float(historial.monto)
@@ -81,7 +156,6 @@ def index():
             abono_mes = float(casa.precio_base or 0)
         
         total_mes = abono_mes + extras
-        saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
         
         if saldo_anterior > 0:
             total_deuda_anterior += saldo_anterior
@@ -541,3 +615,119 @@ def planilla_impresion():
     nombre_mes = nombres_meses[mes - 1]
 
     return render_template("dashboard/planilla.html", filas=filas, mes_nombre=nombre_mes, anio=anio)
+
+@dashboard_bp.route("/api/totales")
+@login_required
+@admin_required
+def api_totales():
+    mes = int(request.args.get("mes", datetime.now().month))
+    anio = int(request.args.get("anio", datetime.now().year))
+    
+    registro_congelado = CierreMes.query.filter_by(mes=mes, anio=anio).first()
+    mes_congelado = True if registro_congelado else False
+
+    # 1. Traemos historiales
+    historiales_del_mes = AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()
+    historial_dict = {h.casa_id: h for h in historiales_del_mes}
+
+    if mes_congelado:
+        casas_raw = [h.casa for h in historiales_del_mes]
+    else:
+        casas_raw = Casa.query.all()
+
+    # 2. Diccionario de Extras (CORREGIDO)
+    visitas_mes = Visit.query.filter(
+        extract('month', Visit.fecha) == mes,
+        extract('year', Visit.fecha) == anio
+    ).options(joinedload(Visit.productos), joinedload(Visit.promo)).all()
+    
+    diccionario_extras = {}
+    for v in visitas_mes:
+        total_v = 0.0
+        for vp in v.productos:
+            precio = vp.precio_unitario if (mes_congelado and vp.precio_unitario) else vp.product.precio
+            total_v += float(vp.cantidad) * float(precio)
+        if v.promo:
+            total_v += float(v.promo.precio)
+        diccionario_extras[v.casa_id] = diccionario_extras.get(v.casa_id, 0.0) + total_v
+
+    # 3. Diccionario de Saldos (CORREGIDO)
+    saldos_hist = db.session.query(
+        AbonoHistorico.casa_id,
+        func.sum(AbonoHistorico.monto).label('total_abonos'),
+        func.sum(AbonoHistorico.monto_pagado).label('total_pagado')
+    ).filter(
+        or_(
+            AbonoHistorico.anio < anio,
+            and_(AbonoHistorico.anio == anio, AbonoHistorico.mes < mes)
+        )
+    ).group_by(AbonoHistorico.casa_id).all()
+
+    visitas_viejas = Visit.query.filter(
+        or_(
+            extract('year', Visit.fecha) < anio,
+            and_(extract('year', Visit.fecha) == anio, extract('month', Visit.fecha) < mes)
+        )
+    ).options(joinedload(Visit.productos), joinedload(Visit.promo)).all()
+    
+    extras_historicos = {}
+    for v in visitas_viejas:
+        total_v = 0.0
+        for vp in v.productos:
+            precio = vp.precio_unitario if vp.precio_unitario else vp.product.precio
+            total_v += float(vp.cantidad) * float(precio)
+        if v.promo:
+            total_v += float(v.promo.precio)
+        extras_historicos[v.casa_id] = extras_historicos.get(v.casa_id, 0.0) + total_v
+
+    diccionario_saldos = {}
+    for row in saldos_hist:
+        casa_id = row.casa_id
+        deuda = (float(row.total_abonos or 0) + extras_historicos.get(casa_id, 0.0)) - float(row.total_pagado or 0)
+        diccionario_saldos[casa_id] = round(deuda, 2)
+
+    casas = []
+    for c in casas_raw:
+        if c.activo:
+            casas.append(c)
+        else:
+            if diccionario_extras.get(c.id, 0.0) > 0:
+                casas.append(c)
+
+    total_abono = 0.0
+    total_extras = 0.0
+    total_recaudado = 0.0 
+    total_deuda_anterior = 0.0 
+
+    for casa in casas:
+        extras = round(diccionario_extras.get(casa.id, 0.0), 2)
+        saldo_anterior = diccionario_saldos.get(casa.id, 0.0)
+
+        historial = historial_dict.get(casa.id)
+        
+        abono_mes = float(historial.monto) if (mes_congelado and historial) else float(casa.precio_base or 0)
+        total_mes = abono_mes + extras
+        
+        if saldo_anterior > 0:
+            total_deuda_anterior += saldo_anterior
+
+        esta_pagado = getattr(historial, 'pagado', False) if historial else False
+        monto_pagado = float(getattr(historial, 'monto_pagado', 0) or 0)
+
+        total_abono += abono_mes
+        total_extras += extras
+        
+        if esta_pagado and monto_pagado == 0:
+            total_recaudado += total_mes
+        else:
+            total_recaudado += monto_pagado
+
+    total_general = total_abono + total_extras + total_deuda_anterior
+    kpi_pendiente = total_general - total_recaudado
+
+    return jsonify({
+        "kpi_deuda": f"${format_money(total_deuda_anterior)}",
+        "kpi_recaudado": f"${format_money(total_recaudado)}",
+        "kpi_pendiente": f"${format_money(kpi_pendiente)}",
+        "kpi_total": f"${format_money(total_general)}"
+    })

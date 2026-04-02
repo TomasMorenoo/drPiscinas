@@ -146,7 +146,7 @@
                 <div class="card-body px-3">
                     <div class="text-muted small text-uppercase fw-bold mb-1">Dinero que Deben</div>
                     <div class="d-flex align-items-center justify-content-between">
-                        <h4 class="mb-0 fw-bold text-danger">${{ "{:,.0f}".format(kpi_deuda) }}</h4>
+                        <h4 class="mb-0 fw-bold text-danger" id="kpi-deuda">${{ "{:,.0f}".format(kpi_deuda) }}</h4>
                     </div>
                 </div>
             </div>
@@ -157,7 +157,7 @@
                 <div class="card-body px-3">
                     <div class="text-success small text-uppercase fw-bold mb-1">Total a Cobrar</div>
                     <div class="d-flex align-items-center justify-content-between">
-                        <h3 class="mb-0 fw-bold text-success">${{ "{:,.0f}".format(kpi_total) }}</h3>
+                        <h3 class="mb-0 fw-bold text-success" id="kpi-total">${{ "{:,.0f}".format(kpi_total) }}</h3>
                     </div>
                 </div>
             </div>
@@ -235,26 +235,24 @@
 
                             <td class="p-1 align-middle d-none d-md-table-cell d-print-none" style="width: 140px;">
                                 {% if mes_congelado and item.id_historial %}
-                                    {% if item.pagado %}
-                                    <div id="bloqueo-{{ item.id_historial }}">
-                                        <button onclick="desbloquearFila({{ item.id_historial }})" class="btn btn-sm btn-outline-success w-100 d-flex flex-column justify-content-center align-items-center shadow-sm" style="border-style: dashed; height: 74px;" title="Pago registrado. Tocar para desbloquear.">
-                                            <i class="bi bi-lock-fill fs-5 mb-1"></i>
+                                    
+                                    <div id="bloqueo-{{ item.id_historial }}" class="{% if not item.pagado %}d-none{% endif %}">
+                                        <button id="btn-deshacer-{{ item.id_historial }}" onclick="togglePago({{ item.id_historial }}, 'undo')" class="btn btn-sm btn-outline-success w-100 d-flex flex-column justify-content-center align-items-center shadow-sm" style="border-style: dashed; height: 74px;" title="Pago registrado. Tocar para destildar.">
+                                            <i class="bi bi-check-circle-fill fs-4 mb-1" id="icon-bloqueo-{{ item.id_historial }}"></i>
                                             <small class="fw-bold" style="font-size: 0.7rem;">PAGADO</small>
                                         </button>
                                     </div>
-                                    {% endif %}
+
                                     <div id="acciones-{{ item.id_historial }}" class="{% if item.pagado %}d-none{% else %}d-flex flex-column{% endif %} gap-1">
-                                        
                                         <div class="d-flex gap-1">
-                                            <button onclick="togglePago({{ item.id_historial }}, this, false)" class="btn btn-sm border shadow-sm py-2 flex-grow-1 {% if item.mensaje_enviado %}btn-primary{% else %}btn-light{% endif %}" title="Avanzar de Estado (Pendiente -> Notificado)">
+                                            <button id="btn-estado-{{ item.id_historial }}" onclick="togglePago({{ item.id_historial }}, 'advance')" class="btn btn-sm border shadow-sm py-2 flex-grow-1 {% if item.mensaje_enviado %}btn-primary{% else %}btn-light{% endif %}" title="Avanzar estado">
                                                 {% if item.mensaje_enviado %}<i class="bi bi-send-check-fill fs-5 text-white"></i>
                                                 {% else %}<i class="bi bi-clock-fill fs-5 text-danger"></i>{% endif %}
                                             </button>
-                                            <button onclick="marcarPagadoDirecto({{ item.id_historial }}, this)" class="btn btn-sm btn-success border shadow-sm py-2 px-3 flex-grow-0" title="Marcar todo como Pagado">
+                                            <button id="btn-directo-{{ item.id_historial }}" onclick="marcarPagadoDirecto({{ item.id_historial }})" class="btn btn-sm btn-success border shadow-sm py-2 px-3 flex-grow-0" title="Marcar todo como Pagado">
                                                 <i class="bi bi-check-circle-fill fs-5"></i>
                                             </button>
                                         </div>
-                                        
                                         <div class="d-flex gap-1">
                                             {% if item.url_wa %}
                                             <a href="{{ item.url_wa }}" target="_blank" onclick="marcarEnviado({{ item.id_historial }})" class="btn btn-sm btn-outline-success flex-grow-1 py-1 px-0" title="Enviar WhatsApp"><i class="bi bi-whatsapp"></i></a>
@@ -264,6 +262,7 @@
                                             <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-secondary flex-grow-1 py-1 px-0" title="Pago Parcial o Personalizado"><i class="bi bi-cash-stack"></i></button>
                                         </div>
                                     </div>
+
                                 {% else %}
                                     <button class="btn btn-light btn-sm w-100 border opacity-50 fs-5 d-flex align-items-center justify-content-center" style="height: 74px;" disabled><i class="bi bi-lock-fill text-secondary"></i></button>
                                 {% endif %}
@@ -673,45 +672,109 @@ function marcarEnviado(id) {
     }).then(() => setTimeout(() => location.reload(), 1500));
 }
 
-function togglePago(id, btn) {
-    const contenidoOriginal = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm text-secondary my-1"></span>';
-    btn.disabled = true;
+function togglePago(id, actionType) {
+    let btnEstado = document.getElementById(`btn-estado-${id}`);
+    let btnDeshacer = document.getElementById(`btn-deshacer-${id}`);
+    let iconBloqueo = document.getElementById(`icon-bloqueo-${id}`);
+    
+    // Guardamos cómo estaba el botón antes de tocarlo por si la DB tira error
+    let prevClass = btnEstado.className;
+    let prevHtml = btnEstado.innerHTML;
+    
+    // Ponemos los loaders
+    if (actionType === 'advance') {
+        btnEstado.innerHTML = '<span class="spinner-border spinner-border-sm my-1"></span>';
+        btnEstado.disabled = true;
+    } else {
+        iconBloqueo.className = "spinner-border spinner-border-sm mb-1 text-success";
+        btnDeshacer.disabled = true;
+    }
 
     fetch(`/dashboard/toggle-pago/${id}`, {
         method: 'POST',
         headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }
     })
-    .then(res => res.json())
+    .then(res => {
+        if (!res.ok) throw new Error("Base de datos ocupada");
+        return res.json();
+    })
     .then(data => { 
         if (data.success) {
-            location.reload(); 
+            if (actionType === 'undo') {
+                // DESTILDAMOS: Vuelve a ser un relojito rojo (Pendiente)
+                document.getElementById(`bloqueo-${id}`).classList.add('d-none');
+                let divAcciones = document.getElementById(`acciones-${id}`);
+                divAcciones.classList.remove('d-none');
+                divAcciones.classList.add('d-flex', 'flex-column');
+                
+                btnEstado.className = "btn btn-sm border shadow-sm py-2 flex-grow-1 btn-light";
+                btnEstado.innerHTML = '<i class="bi bi-clock-fill fs-5 text-danger"></i>';
+                
+                btnEstado.disabled = false;
+                btnDeshacer.disabled = false;
+                iconBloqueo.className = "bi bi-check-circle-fill fs-4 mb-1";
+            } else {
+                // AVANZAMOS ESTADO
+                if (prevClass.includes('btn-light')) {
+                    // Era reloj, pasa a avioncito azul
+                    btnEstado.className = "btn btn-sm border shadow-sm py-2 flex-grow-1 btn-primary";
+                    btnEstado.innerHTML = '<i class="bi bi-send-check-fill fs-5 text-white"></i>';
+                    btnEstado.disabled = false;
+                } else if (prevClass.includes('btn-primary')) {
+                    // Era avioncito azul, pasa a PAGADO (Muestra el botón punteado)
+                    btnEstado.className = prevClass; 
+                    btnEstado.innerHTML = prevHtml;
+                    btnEstado.disabled = false;
+                    
+                    document.getElementById(`acciones-${id}`).classList.remove('d-flex', 'flex-column');
+                    document.getElementById(`acciones-${id}`).classList.add('d-none');
+                    document.getElementById(`bloqueo-${id}`).classList.remove('d-none');
+                }
+            }
+            actualizarTotalesEnVivo();
         }
     })
     .catch(() => { 
-        btn.innerHTML = contenidoOriginal; 
-        btn.disabled = false; 
+        // SI FALLA LA DB (Error 500 por clics rápidos), REVERTIMOS SIN RECARGAR LA PÁGINA
+        if (actionType === 'advance') {
+            btnEstado.className = prevClass;
+            btnEstado.innerHTML = prevHtml;
+            btnEstado.disabled = false;
+        } else {
+            iconBloqueo.className = "bi bi-check-circle-fill fs-4 mb-1";
+            btnDeshacer.disabled = false;
+        }
     });
 }
 
-function marcarPagadoDirecto(id, btn) {
-    const contenidoOriginal = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm text-white my-1"></span>';
-    btn.disabled = true;
+function marcarPagadoDirecto(id) {
+    let btnDirecto = document.getElementById(`btn-directo-${id}`);
+    btnDirecto.innerHTML = '<span class="spinner-border spinner-border-sm text-white my-1"></span>';
+    btnDirecto.disabled = true;
 
     fetch(`/dashboard/marcar-pagado-directo/${id}`, {
         method: 'POST',
         headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }
     })
-    .then(res => res.json())
+    .then(res => {
+        if (!res.ok) throw new Error("Base de datos ocupada");
+        return res.json();
+    })
     .then(data => { 
         if (data.success) {
-            location.reload(); 
+            btnDirecto.innerHTML = '<i class="bi bi-check-circle-fill fs-5"></i>';
+            btnDirecto.disabled = false;
+            
+            document.getElementById(`acciones-${id}`).classList.remove('d-flex', 'flex-column');
+            document.getElementById(`acciones-${id}`).classList.add('d-none');
+            document.getElementById(`bloqueo-${id}`).classList.remove('d-none');
+            
+            actualizarTotalesEnVivo();
         }
     })
     .catch(() => { 
-        btn.innerHTML = contenidoOriginal; 
-        btn.disabled = false; 
+        btnDirecto.innerHTML = '<i class="bi bi-check-circle-fill fs-5"></i>'; 
+        btnDirecto.disabled = false; 
     });
 }
 
@@ -736,7 +799,24 @@ function togglePagoGrupo(grupo_id, mes, anio, btn) {
     .then(res => res.json())
     .then(data => { 
         if (data.success) {
-            location.reload(); 
+            // Cambiamos a verde en el menú
+            btn.classList.remove('text-danger', 'text-primary');
+            btn.classList.add('text-success');
+            btn.innerHTML = '<i class="bi bi-check-circle-fill me-2 fs-5 align-middle"></i> Pago Registrado';
+            btn.disabled = false;
+
+            // Plegamos la tabla del grupo
+            let el = document.getElementById(`collapseGrupo${grupo_id}`);
+            if (el) {
+                let bsCollapse = bootstrap.Collapse.getInstance(el);
+                if (!bsCollapse) {
+                    bsCollapse = new bootstrap.Collapse(el, {toggle: false});
+                }
+                bsCollapse.hide(); 
+            }
+
+            // Actualizamos KPIs en vivo
+            actualizarTotalesEnVivo();
         }
     })
     .catch(() => { 
@@ -775,6 +855,7 @@ function enviarPagoParcial() {
     }
 
     let btn = document.getElementById('btn-guardar-pago');
+    const contenidoOriginal = btn.innerHTML;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Guardando...';
     btn.disabled = true;
 
@@ -792,7 +873,56 @@ function enviarPagoParcial() {
         body: JSON.stringify(bodyData)
     })
     .then(res => res.json())
-    .then(data => { if(data.success) location.reload(); });
+    .then(data => { 
+        if(data.success) {
+            // 1. Escondemos el modal al instante
+            bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
+            
+            // 2. Actualizamos la tarjeta de deuda global arriba
+            actualizarTotalesEnVivo();
+            
+            // 3. Recargamos la página después de medio segundo para que 
+            // la fila individual recalcule su saldo restante correcto
+            setTimeout(() => location.reload(), 500);
+        } 
+    })
+    .catch(() => {
+        btn.innerHTML = contenidoOriginal; 
+        btn.disabled = false;
+    });
 }
+
+function actualizarTotalesEnVivo() {
+    const urlParams = new URLSearchParams(window.location.search);
+    // Usamos Jinja para inyectar el mes y año actual de la vista
+    const mes = urlParams.get('mes') || {{ mes }};
+    const anio = urlParams.get('anio') || {{ anio }};
+
+    fetch(`/dashboard/api/totales?mes=${mes}&anio=${anio}`)
+        .then(response => response.json())
+        .then(data => {
+            let elDeuda = document.getElementById('kpi-deuda');
+            let elTotal = document.getElementById('kpi-total');
+
+            // Solo actualizamos y animamos si el valor realmente cambió
+            if (elDeuda && elDeuda.innerText !== data.kpi_deuda) {
+                elDeuda.innerText = data.kpi_deuda;
+                animarCambio(elDeuda);
+            }
+            if (elTotal && elTotal.innerText !== data.kpi_total) {
+                elTotal.innerText = data.kpi_total;
+                animarCambio(elTotal);
+            }
+        })
+        .catch(error => console.error("Error actualizando totales:", error));
+}
+
+function animarCambio(elemento) {
+    elemento.style.transition = 'opacity 0.2s ease-in-out';
+    elemento.style.opacity = '0.3';
+    setTimeout(() => { elemento.style.opacity = '1'; }, 200);
+}
+
+
 </script>
 {% endblock %}
