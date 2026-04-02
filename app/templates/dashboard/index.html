@@ -1136,8 +1136,10 @@ function marcarPagadoDirecto(id) {
 
 /* ---- CASAS DENTRO DE GRUPOS ---- */
 function togglePagoSimple(id, btn) {
-    const prevClass = btn.className;
-    const prevHtml  = btn.innerHTML;
+    let prevClass = btn.className;
+    let prevHtml = btn.innerHTML;
+    
+    // Ponemos el loader girando
     btn.innerHTML = '<span class="spinner-border spinner-border-sm my-1"></span>';
     btn.disabled = true;
 
@@ -1147,33 +1149,24 @@ function togglePagoSimple(id, btn) {
     })
     .then(res => res.json())
     .then(data => {
-        if (data.success) {
-            const nextBtn = btn.nextElementSibling;
-            if (prevClass.includes('btn-light') || prevClass.includes('btn-outline-secondary')) {
-                btn.className = prevClass.replace('btn-light', 'btn-primary').replace('btn-outline-secondary', 'btn-primary');
-                btn.innerHTML = '<i class="bi bi-send-check-fill text-white"></i>';
-            } else if (prevClass.includes('btn-primary')) {
-                btn.className = prevClass.replace('btn-primary', 'btn-success');
-                btn.innerHTML = '<i class="bi bi-check-circle-fill"></i>';
-                if (nextBtn) nextBtn.classList.add('d-none');
-            } else {
-                btn.className = prevClass.replace('btn-success', 'btn-light border text-danger').replace('btn-success', 'btn-outline-secondary');
-                btn.innerHTML = '<i class="bi bi-clock-fill"></i>';
-                if (nextBtn) nextBtn.classList.remove('d-none');
-            }
-            btn.disabled = false;
-            actualizarTotalesEnVivo();
-        } else {
+        if(data.success) {
+            // F5 automático: actualiza el botón y recalcula el titular del grupo
             location.reload();
         }
     })
-    .catch(() => { btn.className = prevClass; btn.innerHTML = prevHtml; btn.disabled = false; });
+    .catch(() => {
+        // Si falla, restauramos el botón
+        btn.className = prevClass;
+        btn.innerHTML = prevHtml;
+        btn.disabled = false;
+    });
 }
 
 function marcarPagadoDirectoSimple(id, btn) {
-    const mainBtn = btn.previousElementSibling;
-    const prevHtml = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm text-white my-1"></span>';
+    let prevHtml = btn.innerHTML;
+    
+    // Ponemos el loader girando
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm my-1 text-white"></span>';
     btn.disabled = true;
 
     fetch(`/dashboard/marcar-pagado-directo/${id}`, {
@@ -1182,16 +1175,16 @@ function marcarPagadoDirectoSimple(id, btn) {
     })
     .then(res => res.json())
     .then(data => {
-        if (data.success) {
-            if (mainBtn) {
-                mainBtn.className = mainBtn.className.replace(/btn-(light|primary|outline-secondary)[\s]*/g, '') + ' btn-success';
-                mainBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i>';
-            }
-            btn.classList.add('d-none');
-            actualizarTotalesEnVivo();
+        if(data.success) {
+            // F5 automático: actualiza el botón y recalcula el titular del grupo al instante
+            location.reload();
         }
     })
-    .catch(() => { btn.innerHTML = prevHtml; btn.disabled = false; });
+    .catch(() => {
+        // Si falla, restauramos el botón
+        btn.innerHTML = prevHtml;
+        btn.disabled = false;
+    });
 }
 
 /* ---- GRUPOS ---- */
