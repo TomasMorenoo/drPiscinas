@@ -5,3 +5,4 @@ sueltos/
 .env
 venv/
 db_data
+preindex.html

@@ -67,6 +67,7 @@ def crear_visit():
         fecha_str = request.form.get("fecha")
         fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d')
 
+        # Verificación de seguridad: No cargar visitas en meses ya cerrados
         if is_mes_cerrado(fecha_obj.month, fecha_obj.year):
             flash("❌ No podés cargar una visita en un mes que ya está cerrado y facturado. Descongelalo desde el Dashboard primero.", "error")
             return redirect(url_for("visits.listar_visits"))
@@ -80,6 +81,7 @@ def crear_visit():
             flash("Casa y fecha son obligatorios", "error")
             return redirect(url_for("visits.crear_visit"))
 
+        # Crear la visita principal
         visit = Visit(
             casa_id=casa_id,
             fecha=fecha_obj,
@@ -90,6 +92,7 @@ def crear_visit():
         db.session.add(visit)
         db.session.commit()
 
+        # Cargar los productos asociados (VisitProduct)
         for p_id, cant in zip(product_ids, cantidades):
             if p_id and cant:
                 prod = Product.query.get(p_id)
@@ -98,7 +101,7 @@ def crear_visit():
                         visit_id=visit.id, 
                         product_id=p_id, 
                         cantidad=float(cant),
-                        precio_unitario=prod.precio
+                        precio_unitario=prod.precio  # Congelamos el precio actual aquí
                     )
                     db.session.add(vp)
         
@@ -106,9 +109,15 @@ def crear_visit():
         flash("Visita registrada correctamente", "success")
         return redirect(url_for("visits.listar_visits"))
         
-    casas = Casa.query.filter_by(activo=True).all()
+    # --- MÉTODO GET: CARGA DE FORMULARIO ---
+    
+    # FILTRO OPERATIVO: Solo traemos las casas que NO están de baja para el select
+    casas = Casa.query.filter_by(activo=True).order_by(Casa.numero).all()
+    
+    # También filtramos productos y promos activas por las dudas
     products = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
     promos = Promo.query.filter_by(activo=True).order_by(Promo.nombre).all()
+    
     return render_template("visits/create.html", casas=casas, products=products, promos=promos)
 
 @visit_bp.route("/delete/<int:id>", methods=["POST"])

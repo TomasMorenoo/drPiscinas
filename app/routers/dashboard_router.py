@@ -9,8 +9,8 @@ from app.models.visit import Visit
 from datetime import datetime
 import re
 import urllib.parse
-from sqlalchemy.orm import joinedload
-from sqlalchemy import func, extract, and_, or_ # <-- Herramientas de matemáticas SQL
+from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy import func, extract, and_, or_
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
@@ -43,124 +43,58 @@ def index():
     registro_congelado = CierreMes.query.filter_by(mes=mes, anio=anio).first()
     mes_congelado = True if registro_congelado else False
 
-    # 1. Traemos historiales y casas de base en 1 sola consulta
-    historiales_del_mes = AbonoHistorico.query.filter_by(mes=mes, anio=anio).options(
-        joinedload(AbonoHistorico.casa).joinedload(Casa.country),
-        joinedload(AbonoHistorico.casa).joinedload(Casa.barrio),
-        joinedload(AbonoHistorico.casa).joinedload(Casa.grupo)
-    ).all()
-    
-    historial_dict = {h.casa_id: h for h in historiales_del_mes}
+    query_casas = Casa.query.options(
+        joinedload(Casa.country),
+        joinedload(Casa.barrio),
+        joinedload(Casa.grupo),
+        selectinload(Casa.historial_abonos),
+        selectinload(Casa.visitas).selectinload(Visit.productos),
+        selectinload(Casa.visitas).joinedload(Visit.promo)
+    )
 
-    if mes_congelado:
-        casas_raw = [h.casa for h in historiales_del_mes]
-    else:
-        casas_raw = Casa.query.options(
-            joinedload(Casa.country),
-            joinedload(Casa.barrio),
-            joinedload(Casa.grupo)
-        ).all()
-
-    # --- INICIO MAGIA SQL: EXTRAS Y SALDOS ---
-    
-    # A. Diccionario Rápido de EXTRAS (Productos) de ESTE mes
-    # (Calculamos todo directo en la base de datos sin instanciar objetos)
-    visitas_mes = Visit.query.filter(
-        extract('month', Visit.fecha) == mes,
-        extract('year', Visit.fecha) == anio
-    ).options(joinedload(Visit.productos), joinedload(Visit.promo)).all()
-    
-    diccionario_extras = {}
-    for v in visitas_mes:
-        total_v = 0.0
-        for vp in v.productos:
-            # Si el mes está congelado o ya tiene precio histórico, usamos ese. Si no, el actual.
-            precio = vp.precio_unitario if (mes_congelado and vp.precio_unitario) else vp.product.precio
-            total_v += float(vp.cantidad) * float(precio)
-        if v.promo:
-            total_v += float(v.promo.precio)
-            
-        diccionario_extras[v.casa_id] = diccionario_extras.get(v.casa_id, 0.0) + total_v
-
-    # B. Diccionario Rápido de SALDOS ANTERIORES
-    # Primero buscamos toda la plata que DEBÍAN pagar en la historia (antes de este mes)
-    saldos_hist = db.session.query(
-        AbonoHistorico.casa_id,
-        func.sum(AbonoHistorico.monto).label('total_abonos'),
-        func.sum(AbonoHistorico.monto_pagado).label('total_pagado')
-    ).filter(
-        or_(
-            AbonoHistorico.anio < anio,
-            and_(AbonoHistorico.anio == anio, AbonoHistorico.mes < mes)
-        )
-    ).group_by(AbonoHistorico.casa_id).all()
-
-    # Buscamos todos los extras consumidos en la historia antes de este mes
-    visitas_viejas = Visit.query.filter(
-        or_(
-            extract('year', Visit.fecha) < anio,
-            and_(extract('year', Visit.fecha) == anio, extract('month', Visit.fecha) < mes)
-        )
-    ).options(joinedload(Visit.productos), joinedload(Visit.promo)).all()
-    
-    extras_historicos = {}
-    for v in visitas_viejas:
-        total_v = 0.0
-        for vp in v.productos:
-            precio = vp.precio_unitario if vp.precio_unitario else vp.product.precio
-            total_v += float(vp.cantidad) * float(precio)
-        if v.promo:
-            total_v += float(v.promo.precio)
-        extras_historicos[v.casa_id] = extras_historicos.get(v.casa_id, 0.0) + total_v
-
-    # Consolidamos ambos en un diccionario final: {casa_id: deuda_total}
-    diccionario_saldos = {}
-    for row in saldos_hist:
-        casa_id = row.casa_id
-        deuda = (float(row.total_abonos or 0) + extras_historicos.get(casa_id, 0.0)) - float(row.total_pagado or 0)
-        diccionario_saldos[casa_id] = round(deuda, 2)
-        
-    # --- FIN MAGIA SQL ---
+    casas_raw = query_casas.all()
+    historial_dict = {h.casa_id: h for h in AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()}
 
     casas = []
     for c in casas_raw:
-        if c.activo:
-            casas.append(c)
-        else:
-            if diccionario_extras.get(c.id, 0.0) > 0:
-                casas.append(c)
+        datos_v = c.obtener_gastos_mensuales(mes, anio)
+        extras_v = float(datos_v.get("extras", 0))
+        saldo_ant_v = c.obtener_saldo_anterior(mes, anio)
+        hist_v = historial_dict.get(c.id)
+        
+        # EL ARREGLO: Si el mes está abierto, abono es 0 para inactivos.
+        ab_v = float(hist_v.monto) if (mes_congelado and hist_v) else (float(c.precio_base or 0) if c.activo else 0.0)
+        
+        # Caso 1 y 2: Si es BAJA, solo se oculta si Abono + Productos + DEUDA es cero.
+        if not c.activo and (ab_v + extras_v + saldo_ant_v) <= 0.1:
+            continue
+            
+        casas.append(c)
 
     casas.sort(key=natural_sort_key)
 
     reporte_sueltas = []
     reporte_grupos = {} 
-    
     total_clientes = 0
     total_abono = 0.0
     total_extras = 0.0
     total_recaudado = 0.0 
     total_deuda_anterior = 0.0 
-    
     hubo_cambios = False
 
     for casa in casas:
-        # OPTIMIZACIÓN LECTURA EXTRAS Y SALDO: Lectura instantánea de RAM O(1)
-        extras = round(diccionario_extras.get(casa.id, 0.0), 2)
-        saldo_anterior = diccionario_saldos.get(casa.id, 0.0)
-
+        datos = casa.obtener_gastos_mensuales(mes, anio)
+        extras = float(datos.get("extras", 0))
+        saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
         historial = historial_dict.get(casa.id)
         
-        if mes_congelado and historial:
-            abono_mes = float(historial.monto)
-        else:
-            abono_mes = float(casa.precio_base or 0)
-        
+        # EL ARREGLO APLICADO A LA TABLA
+        abono_mes = float(historial.monto) if (mes_congelado and historial) else (float(casa.precio_base or 0) if casa.activo else 0.0)
         total_mes = abono_mes + extras
         
         if saldo_anterior > 0:
             total_deuda_anterior += saldo_anterior
 
-        # Autocorrector de Grupos/Casas Pagadas
         if mes_congelado and historial and getattr(historial, 'pagado', False):
             monto_ideal = total_mes + saldo_anterior
             monto_actual = float(getattr(historial, 'monto_pagado', 0) or 0)
@@ -170,19 +104,16 @@ def index():
 
         monto_pagado = float(getattr(historial, 'monto_pagado', 0) or 0)
         saldo_restante = (total_mes + saldo_anterior) - monto_pagado
-
         esta_pagado = getattr(historial, 'pagado', False) if historial else False
         mensaje_enviado = getattr(historial, 'mensaje_enviado', False) if historial else False
 
-        if mes_congelado and historial:
-            if not casa.grupo_id:
-                if saldo_restante <= 0.01:
-                    esta_pagado = True
-                    mensaje_enviado = True
-                    if not historial.pagado:
-                        historial.pagado = True
-                        historial.mensaje_enviado = True
-                        hubo_cambios = True
+        if mes_congelado and historial and not casa.grupo_id:
+            if saldo_restante <= 0.01 and not historial.pagado:
+                esta_pagado = True
+                mensaje_enviado = True
+                historial.pagado = True
+                historial.mensaje_enviado = True
+                hubo_cambios = True
 
         item_casa = {
             "id_historial": historial.id if historial else None,
@@ -202,14 +133,9 @@ def index():
         if casa.grupo_id:
             if casa.grupo_id not in reporte_grupos:
                 reporte_grupos[casa.grupo_id] = {
-                    "grupo_id": casa.grupo_id,
-                    "nombre": casa.grupo.nombre,
-                    "casas": [],
-                    "total_mes": 0.0,
-                    "saldo_anterior": 0.0,
-                    "saldo_restante": 0.0,
-                    "monto_pagado": 0.0,
-                    "telefono": casa.telefono
+                    "grupo_id": casa.grupo_id, "nombre": casa.grupo.nombre, "casas": [],
+                    "total_mes": 0.0, "saldo_anterior": 0.0, "saldo_restante": 0.0,
+                    "monto_pagado": 0.0, "telefono": casa.telefono
                 }
             g = reporte_grupos[casa.grupo_id]
             g["casas"].append(item_casa)
@@ -220,15 +146,20 @@ def index():
         else:
             if casa.telefono:
                 num_tel = limpiar_telefono(casa.telefono)
-                texto_wa = f"Hola! Te paso el resumen: Abono ${format_money(abono_mes)} + Productos ${format_money(extras)}. Total a pagar: ${format_money(total_mes + saldo_anterior)}."
+                nombre_wa = casa.nombre_cliente if casa.nombre_cliente else casa.nombre_formateado()
+                texto_wa = f"Hola! {nombre_wa}. Te paso el resumen: Abono ${format_money(abono_mes)} + Productos ${format_money(extras)}. Total a pagar: ${format_money(total_mes + saldo_anterior)}."
                 item_casa["url_wa"] = f"https://wa.me/{num_tel}?text={urllib.parse.quote(texto_wa)}"
             reporte_sueltas.append(item_casa)
 
         total_clientes += 1
         total_abono += abono_mes
         total_extras += extras
-        if esta_pagado and monto_pagado == 0:
-            total_recaudado += total_mes
+        
+        if esta_pagado:
+            if monto_pagado == 0:
+                total_recaudado += (total_mes + saldo_anterior)
+            else:
+                total_recaudado += monto_pagado
         else:
             total_recaudado += monto_pagado
 
@@ -239,13 +170,10 @@ def index():
             g["pagado"] = True
             g["mensaje_enviado"] = True
             for c in g["casas"]:
-                c["pagado"] = True
-                c["mensaje_enviado"] = True
+                c["pagado"] = True; c["mensaje_enviado"] = True
                 hist_obj = c["historial_obj"]
                 if hist_obj and not hist_obj.pagado:
-                    hist_obj.pagado = True
-                    hist_obj.mensaje_enviado = True
-                    hubo_cambios = True
+                    hist_obj.pagado = True; hist_obj.mensaje_enviado = True; hubo_cambios = True
         else:
             g["pagado"] = all(c["pagado"] for c in g["casas"])
             g["mensaje_enviado"] = all(c["mensaje_enviado"] for c in g["casas"])
@@ -266,24 +194,15 @@ def index():
     if hubo_cambios:
         db.session.commit()
 
-    lista_grupos = list(reporte_grupos.values())
-
     return render_template(
         "dashboard/index.html",
         reporte_sueltas=reporte_sueltas,
-        reporte_grupos=lista_grupos,
-        mes=mes,
-        anio=anio,
-        mes_congelado=mes_congelado,
-        kpi_clientes=total_clientes,
-        kpi_abono=total_abono,
-        kpi_extras=total_extras,
-        kpi_deuda=total_deuda_anterior,
-        kpi_recaudado=total_recaudado,
-        kpi_pendiente=total_general - total_recaudado,
-        kpi_total=total_general
+        reporte_grupos=list(reporte_grupos.values()),
+        mes=mes, anio=anio, mes_congelado=mes_congelado,
+        kpi_clientes=total_clientes, kpi_abono=total_abono, kpi_extras=total_extras,
+        kpi_deuda=total_deuda_anterior, kpi_recaudado=total_recaudado,
+        kpi_pendiente=total_general - total_recaudado, kpi_total=total_general
     )
-
 
 @dashboard_bp.route("/marcar-mensaje/<int:id>", methods=["POST"])
 @login_required
@@ -301,35 +220,25 @@ def toggle_pago(id):
     registro = AbonoHistorico.query.get_or_404(id)
     pagado = getattr(registro, 'pagado', False)
     enviado = getattr(registro, 'mensaje_enviado', False)
-    
     url_wa = None 
 
     if not pagado and not enviado:
         registro.mensaje_enviado = True
         registro.pagado = False
-        
         casa = registro.casa
         if casa.telefono:
             datos = casa.obtener_gastos_mensuales(registro.mes, registro.anio)
-            total_mes = datos['total']
             saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
-            
             nombre_wa = casa.nombre_cliente if casa.nombre_cliente else casa.nombre_formateado()
-            texto_wa = f"Hola! {nombre_wa} Te paso el resumen: Total a pagar ${format_money(total_mes + saldo_ant)}. Gracias"
-            
-            texto_codificado = urllib.parse.quote(texto_wa)
-            tel = re.sub(r'\D', '', casa.telefono)
-            if len(tel) == 10: tel = "549" + tel
-            url_wa = f"https://wa.me/{tel}?text={texto_codificado}"
+            texto_wa = f"Hola! {nombre_wa}. Te paso el resumen: Total a pagar ${format_money(float(datos['total']) + saldo_ant)}. Gracias."
+            url_wa = f"https://wa.me/{limpiar_telefono(casa.telefono)}?text={urllib.parse.quote(texto_wa)}"
 
     elif not pagado and enviado:
         registro.pagado = True
         registro.mensaje_enviado = True
         casa = registro.casa
-        total_mes = float(registro.monto) + float(casa.obtener_gastos_mensuales(registro.mes, registro.anio)['extras'])
-        saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
-        registro.monto_pagado = total_mes + saldo_ant
-
+        datos = casa.obtener_gastos_mensuales(registro.mes, registro.anio)
+        registro.monto_pagado = float(registro.monto) + float(datos['extras']) + casa.obtener_saldo_anterior(registro.mes, registro.anio)
     else:
         registro.pagado = False
         registro.mensaje_enviado = False
@@ -343,15 +252,11 @@ def toggle_pago(id):
 @admin_required
 def marcar_pagado_directo(id):
     registro = AbonoHistorico.query.get_or_404(id)
-    
     casa = registro.casa
-    total_mes = float(registro.monto) + float(casa.obtener_gastos_mensuales(registro.mes, registro.anio)['extras'])
-    saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
-    
+    datos = casa.obtener_gastos_mensuales(registro.mes, registro.anio)
     registro.pagado = True
     registro.mensaje_enviado = True
-    registro.monto_pagado = total_mes + saldo_ant
-    
+    registro.monto_pagado = float(registro.monto) + float(datos['extras']) + casa.obtener_saldo_anterior(registro.mes, registro.anio)
     db.session.commit()
     return jsonify({"success": True})
 
@@ -371,12 +276,22 @@ def sync_abonos():
     if not cierre:
         db.session.add(CierreMes(mes=mes, anio=anio))
     
-    for casa in Casa.query.filter_by(activo=True).all():
+    for casa in Casa.query.all():
+        datos_v = casa.obtener_gastos_mensuales(mes, anio)
+        extras_v = float(datos_v.get("extras", 0))
+        
+        # Caso 1: Baja sin productos -> se ignora, no hay historial.
+        if not casa.activo and extras_v <= 0:
+            continue
+            
+        # EL ARREGLO PARA LA BASE DE DATOS: Inactivos guardan $0 de abono
+        abono_a_guardar = float(casa.precio_base or 0) if casa.activo else 0.0
+            
         hist = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
         if not hist:
-            db.session.add(AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=float(casa.precio_base or 0)))
+            db.session.add(AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=abono_a_guardar))
         else:
-            hist.monto = float(casa.precio_base or 0)
+            hist.monto = abono_a_guardar
             
     db.session.commit()
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
@@ -389,12 +304,10 @@ def unsync_abonos():
     anio = request.form.get("anio", type=int)
     if mes and anio:
         CierreMes.query.filter_by(mes=mes, anio=anio).delete()
-        
         fantasmas = AbonoHistorico.query.filter_by(mes=mes, anio=anio, pagado=False).all()
         for f in fantasmas:
             if not f.monto_pagado or float(f.monto_pagado) <= 0.01:
                 db.session.delete(f)
-                
         db.session.commit()
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
 
@@ -405,17 +318,14 @@ def unsync_abonos():
 def marcar_mensaje_grupo(grupo_id):
     mes = request.json.get("mes")
     anio = request.json.get("anio")
-    
     casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).all()
     historiales = AbonoHistorico.query.filter(
         AbonoHistorico.casa_id.in_([c.id for c in casas_grupo]),
         AbonoHistorico.mes == mes,
         AbonoHistorico.anio == anio
     ).all()
-    
     for h in historiales:
         h.mensaje_enviado = True
-        
     db.session.commit()
     return jsonify({"success": True})
 
@@ -426,7 +336,6 @@ def marcar_mensaje_grupo(grupo_id):
 def toggle_pago_grupo(grupo_id):
     mes = request.json.get("mes")
     anio = request.json.get("anio")
-    
     casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).all()
     historiales = AbonoHistorico.query.filter(
         AbonoHistorico.casa_id.in_([c.id for c in casas_grupo]),
@@ -460,11 +369,9 @@ def toggle_pago_grupo(grupo_id):
                 abono = float(h.monto)
                 extras = float(c.obtener_gastos_mensuales(mes, anio)['extras'])
                 saldo_ant = c.obtener_saldo_anterior(mes, anio)
-                
                 total_c = abono + extras
                 total_grupo_mes += total_c
                 total_grupo_saldo_ant += saldo_ant
-                
                 texto_wa += f"• {c.nombre_formateado()}: Abono ${format_money(abono)} + Productos ${format_money(extras)} = ${format_money(total_c)}\n"
             
             if total_grupo_saldo_ant < -0.1:
@@ -473,7 +380,6 @@ def toggle_pago_grupo(grupo_id):
                 texto_wa += f"\nDeuda pendiente (Mes anterior): *${format_money(total_grupo_saldo_ant)}*"
                 
             texto_wa += f"\n*TOTAL A PAGAR: ${format_money(total_grupo_mes + total_grupo_saldo_ant)}*"
-            
             tel = re.sub(r'\D', '', telefono_repr)
             if len(tel) == 10: tel = "549" + tel
             url_wa = f"https://wa.me/{tel}?text={urllib.parse.quote(texto_wa)}"
@@ -494,7 +400,6 @@ def toggle_pago_grupo(grupo_id):
 
     db.session.commit()
     return jsonify({"success": True, "url_wa": url_wa})
-
 
 @dashboard_bp.route("/registrar-pago-grupo/<int:grupo_id>", methods=["POST"])
 @login_required
@@ -559,7 +464,6 @@ def registrar_pago_grupo(grupo_id):
 def registrar_pago_especial(id_historial):
     registro = AbonoHistorico.query.get_or_404(id_historial)
     monto_ingresado = float(request.json.get("monto", 0))
-    
     registro.monto_pagado += monto_ingresado
     
     casa = registro.casa
@@ -575,7 +479,6 @@ def registrar_pago_especial(id_historial):
     db.session.commit()
     return jsonify({"success": True})
 
-
 @dashboard_bp.route("/planilla-impresion")
 @login_required
 @admin_required
@@ -584,11 +487,17 @@ def planilla_impresion():
     anio = int(request.args.get("anio", datetime.now().year))
     
     registro_congelado = CierreMes.query.filter_by(mes=mes, anio=anio).first()
-    if registro_congelado:
-        historiales = AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()
-        casas = [h.casa for h in historiales]
-    else:
-        casas = Casa.query.filter_by(activo=True).all()
+    mes_congelado = True if registro_congelado else False
+
+    casas_raw = Casa.query.all()
+    historial_dict = {h.casa_id: h for h in AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()}
+    
+    casas = []
+    for c in casas_raw:
+        datos_v = c.obtener_gastos_mensuales(mes, anio)
+        if not c.activo and float(datos_v.get("extras", 0)) <= 0:
+            continue
+        casas.append(c)
 
     casas.sort(key=natural_sort_key)
     
@@ -596,12 +505,16 @@ def planilla_impresion():
     for casa in casas:
         datos = casa.obtener_gastos_mensuales(mes, anio)
         producto = float(datos.get("extras", 0))
+        historial = historial_dict.get(casa.id)
         
-        historial = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
-        abono = float(historial.monto) if (registro_congelado and historial) else float(casa.precio_base or 0)
+        # EL ARREGLO APLICADO A LA IMPRESIÓN
+        abono = float(historial.monto) if (mes_congelado and historial) else (float(casa.precio_base or 0) if casa.activo else 0.0)
         
         saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
         total_a_pagar = abono + producto + saldo_anterior
+
+        if not casa.activo and total_a_pagar <= 0.1:
+            continue
             
         filas.append({
             "cliente": casa.nombre_formateado(),
@@ -626,87 +539,37 @@ def api_totales():
     registro_congelado = CierreMes.query.filter_by(mes=mes, anio=anio).first()
     mes_congelado = True if registro_congelado else False
 
-    # 1. Traemos historiales
-    historiales_del_mes = AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()
-    historial_dict = {h.casa_id: h for h in historiales_del_mes}
+    query_casas = Casa.query.options(
+        selectinload(Casa.historial_abonos),
+        selectinload(Casa.visitas).selectinload(Visit.productos),
+        selectinload(Casa.visitas).joinedload(Visit.promo)
+    )
 
-    if mes_congelado:
-        casas_raw = [h.casa for h in historiales_del_mes]
-    else:
-        casas_raw = Casa.query.all()
-
-    # 2. Diccionario de Extras (CORREGIDO)
-    visitas_mes = Visit.query.filter(
-        extract('month', Visit.fecha) == mes,
-        extract('year', Visit.fecha) == anio
-    ).options(joinedload(Visit.productos), joinedload(Visit.promo)).all()
-    
-    diccionario_extras = {}
-    for v in visitas_mes:
-        total_v = 0.0
-        for vp in v.productos:
-            precio = vp.precio_unitario if (mes_congelado and vp.precio_unitario) else vp.product.precio
-            total_v += float(vp.cantidad) * float(precio)
-        if v.promo:
-            total_v += float(v.promo.precio)
-        diccionario_extras[v.casa_id] = diccionario_extras.get(v.casa_id, 0.0) + total_v
-
-    # 3. Diccionario de Saldos (CORREGIDO)
-    saldos_hist = db.session.query(
-        AbonoHistorico.casa_id,
-        func.sum(AbonoHistorico.monto).label('total_abonos'),
-        func.sum(AbonoHistorico.monto_pagado).label('total_pagado')
-    ).filter(
-        or_(
-            AbonoHistorico.anio < anio,
-            and_(AbonoHistorico.anio == anio, AbonoHistorico.mes < mes)
-        )
-    ).group_by(AbonoHistorico.casa_id).all()
-
-    visitas_viejas = Visit.query.filter(
-        or_(
-            extract('year', Visit.fecha) < anio,
-            and_(extract('year', Visit.fecha) == anio, extract('month', Visit.fecha) < mes)
-        )
-    ).options(joinedload(Visit.productos), joinedload(Visit.promo)).all()
-    
-    extras_historicos = {}
-    for v in visitas_viejas:
-        total_v = 0.0
-        for vp in v.productos:
-            precio = vp.precio_unitario if vp.precio_unitario else vp.product.precio
-            total_v += float(vp.cantidad) * float(precio)
-        if v.promo:
-            total_v += float(v.promo.precio)
-        extras_historicos[v.casa_id] = extras_historicos.get(v.casa_id, 0.0) + total_v
-
-    diccionario_saldos = {}
-    for row in saldos_hist:
-        casa_id = row.casa_id
-        deuda = (float(row.total_abonos or 0) + extras_historicos.get(casa_id, 0.0)) - float(row.total_pagado or 0)
-        diccionario_saldos[casa_id] = round(deuda, 2)
-
-    casas = []
-    for c in casas_raw:
-        if c.activo:
-            casas.append(c)
-        else:
-            if diccionario_extras.get(c.id, 0.0) > 0:
-                casas.append(c)
+    casas_raw = query_casas.all()
+    historial_dict = {h.casa_id: h for h in AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()}
 
     total_abono = 0.0
     total_extras = 0.0
     total_recaudado = 0.0 
     total_deuda_anterior = 0.0 
 
-    for casa in casas:
-        extras = round(diccionario_extras.get(casa.id, 0.0), 2)
-        saldo_anterior = diccionario_saldos.get(casa.id, 0.0)
-
+    for casa in casas_raw:
+        datos = casa.obtener_gastos_mensuales(mes, anio)
+        extras_v = float(datos.get("extras", 0))
+        
+        if not casa.activo and extras_v <= 0:
+            continue
+            
+        saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
         historial = historial_dict.get(casa.id)
         
-        abono_mes = float(historial.monto) if (mes_congelado and historial) else float(casa.precio_base or 0)
-        total_mes = abono_mes + extras
+        # EL ARREGLO APLICADO A LOS TOTALES
+        abono_mes = float(historial.monto) if (mes_congelado and historial) else (float(casa.precio_base or 0) if casa.activo else 0.0)
+        
+        if not casa.activo and (abono_mes + extras_v + saldo_anterior) <= 0.1:
+            continue
+            
+        total_mes = abono_mes + extras_v
         
         if saldo_anterior > 0:
             total_deuda_anterior += saldo_anterior
@@ -715,7 +578,7 @@ def api_totales():
         monto_pagado = float(getattr(historial, 'monto_pagado', 0) or 0)
 
         total_abono += abono_mes
-        total_extras += extras
+        total_extras += extras_v
         
         if esta_pagado and monto_pagado == 0:
             total_recaudado += total_mes
@@ -723,11 +586,9 @@ def api_totales():
             total_recaudado += monto_pagado
 
     total_general = total_abono + total_extras + total_deuda_anterior
-    kpi_pendiente = total_general - total_recaudado
-
     return jsonify({
         "kpi_deuda": f"${format_money(total_deuda_anterior)}",
         "kpi_recaudado": f"${format_money(total_recaudado)}",
-        "kpi_pendiente": f"${format_money(kpi_pendiente)}",
+        "kpi_pendiente": f"${format_money(total_general - total_recaudado)}",
         "kpi_total": f"${format_money(total_general)}"
     })
