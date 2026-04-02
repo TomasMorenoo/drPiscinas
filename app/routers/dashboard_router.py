@@ -62,10 +62,12 @@ def index():
         saldo_ant_v = c.obtener_saldo_anterior(mes, anio)
         hist_v = historial_dict.get(c.id)
         
-        # EL ARREGLO: Si el mes está abierto, abono es 0 para inactivos.
-        ab_v = float(hist_v.monto) if (mes_congelado and hist_v) else (float(c.precio_base or 0) if c.activo else 0.0)
+        # CASO 2: Si está activa, o si está de baja PERO consumió productos, se le cobra el abono normal.
+        if mes_congelado and hist_v:
+            ab_v = float(hist_v.monto)
+        else:
+            ab_v = float(c.precio_base or 0) if (c.activo or extras_v > 0) else 0.0
         
-        # Caso 1 y 2: Si es BAJA, solo se oculta si Abono + Productos + DEUDA es cero.
         if not c.activo and (ab_v + extras_v + saldo_ant_v) <= 0.1:
             continue
             
@@ -88,8 +90,12 @@ def index():
         saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
         historial = historial_dict.get(casa.id)
         
-        # EL ARREGLO APLICADO A LA TABLA
-        abono_mes = float(historial.monto) if (mes_congelado and historial) else (float(casa.precio_base or 0) if casa.activo else 0.0)
+        # APLICACIÓN DE CASO 2 EN LA VISTA
+        if mes_congelado and historial:
+            abono_mes = float(historial.monto)
+        else:
+            abono_mes = float(casa.precio_base or 0) if (casa.activo or extras > 0) else 0.0
+            
         total_mes = abono_mes + extras
         
         if saldo_anterior > 0:
@@ -260,7 +266,6 @@ def marcar_pagado_directo(id):
     db.session.commit()
     return jsonify({"success": True})
 
-
 @dashboard_bp.route("/sync-abonos", methods=["POST"])
 @login_required
 @admin_required
@@ -280,12 +285,11 @@ def sync_abonos():
         datos_v = casa.obtener_gastos_mensuales(mes, anio)
         extras_v = float(datos_v.get("extras", 0))
         
-        # Caso 1: Baja sin productos -> se ignora, no hay historial.
         if not casa.activo and extras_v <= 0:
             continue
             
-        # EL ARREGLO PARA LA BASE DE DATOS: Inactivos guardan $0 de abono
-        abono_a_guardar = float(casa.precio_base or 0) if casa.activo else 0.0
+        # APLICACIÓN DE CASO 2 EN EL GUARDADO
+        abono_a_guardar = float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0
             
         hist = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
         if not hist:
@@ -311,7 +315,6 @@ def unsync_abonos():
         db.session.commit()
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
 
-
 @dashboard_bp.route("/marcar-mensaje-grupo/<int:grupo_id>", methods=["POST"])
 @login_required
 @admin_required
@@ -328,7 +331,6 @@ def marcar_mensaje_grupo(grupo_id):
         h.mensaje_enviado = True
     db.session.commit()
     return jsonify({"success": True})
-
 
 @dashboard_bp.route("/toggle-pago-grupo/<int:grupo_id>", methods=["POST"])
 @login_required
@@ -507,9 +509,12 @@ def planilla_impresion():
         producto = float(datos.get("extras", 0))
         historial = historial_dict.get(casa.id)
         
-        # EL ARREGLO APLICADO A LA IMPRESIÓN
-        abono = float(historial.monto) if (mes_congelado and historial) else (float(casa.precio_base or 0) if casa.activo else 0.0)
-        
+        # APLICACIÓN DE CASO 2 EN LA IMPRESIÓN
+        if mes_congelado and historial:
+            abono = float(historial.monto)
+        else:
+            abono = float(casa.precio_base or 0) if (casa.activo or producto > 0) else 0.0
+            
         saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
         total_a_pagar = abono + producto + saldo_anterior
 
@@ -563,8 +568,11 @@ def api_totales():
         saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
         historial = historial_dict.get(casa.id)
         
-        # EL ARREGLO APLICADO A LOS TOTALES
-        abono_mes = float(historial.monto) if (mes_congelado and historial) else (float(casa.precio_base or 0) if casa.activo else 0.0)
+        # APLICACIÓN DE CASO 2 EN LOS TOTALES
+        if mes_congelado and historial:
+            abono_mes = float(historial.monto)
+        else:
+            abono_mes = float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0
         
         if not casa.activo and (abono_mes + extras_v + saldo_anterior) <= 0.1:
             continue
