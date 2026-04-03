@@ -108,24 +108,24 @@
 
     {% if current_user.is_admin() %}
     <div class="col-md-6 col-xl-3">
-        <div class="card h-100 border shadow-sm bg-light" style="opacity: 0.8; cursor: not-allowed;">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-center mb-3">
-                    <div class="bg-white p-3 rounded-1 me-3 border">
-                        <i class="bi bi-graph-up-arrow fs-3 text-muted"></i>
+        <a href="{{ url_for('estadisticas.index') }}" class="text-decoration-none text-dark">
+            <div class="card h-100 border shadow-sm hover-card">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-light p-3 rounded-1 me-3">
+                            <i class="bi bi-bar-chart-fill fs-3 text-warning"></i>
+                        </div>
+                        <h4 class="fw-bold mb-0">Estadísticas</h4>
                     </div>
-                    <h4 class="fw-bold mb-0 text-muted">Estadísticas</h4>
+                    <p class="text-muted small mb-0">
+                        Análisis de consumo de químicos y proyección anual de ingresos.
+                    </p>
                 </div>
-                <p class="text-muted small mb-0">
-                    Análisis de consumo de químicos y proyección anual de ingresos.
-                </p>
+                <div class="card-footer bg-white border-top-0 pt-0 pb-4">
+                    <span class="text-warning fw-bold small text-uppercase">Ver Reportes <i class="bi bi-arrow-right ms-1"></i></span>
+                </div>
             </div>
-            <div class="card-footer bg-light border-top-0 pt-0 pb-4">
-                <span class="badge bg-secondary text-uppercase fw-normal px-3 py-2">
-                    <i class="bi bi-lock-fill me-1"></i> Próximamente
-                </span>
-            </div>
-        </div>
+        </a>
     </div>
     {% endif %}
 

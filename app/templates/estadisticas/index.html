@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+{% block title %}Estadísticas - Dr. Piscinas{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800 fw-bold"><i class="bi bi-bar-chart-fill me-2 text-primary"></i>Estadísticas {{ anio_actual }}</h1>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+            <div class="card h-100 border-0 shadow-sm border-start border-4 border-success">
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <div class="text-muted small text-uppercase fw-bold mb-1">Clientes Activos</div>
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-people-fill fs-1 text-success opacity-50 me-3"></i>
+                        <h2 class="mb-0 fw-bold text-dark">{{ kpi_clientes }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <div class="card h-100 border-0 shadow-sm border-start border-4 border-info">
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <div class="text-muted small text-uppercase fw-bold mb-1">Total Countries</div>
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-houses-fill fs-1 text-info opacity-50 me-3"></i>
+                        <h2 class="mb-0 fw-bold text-dark">{{ kpi_countries }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <div class="card h-100 border-0 shadow-sm border-start border-4 border-warning">
+                <div class="card-body d-flex flex-column justify-content-center text-center">
+                    <div class="text-muted small text-uppercase fw-bold mb-3">Distribución por Countries</div>
+                    
+                    <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded shadow-sm border">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="cambiarCountry(-1)" title="Anterior"><i class="bi bi-chevron-left"></i></button>
+                        
+                        <div class="px-1 w-100">
+                            <h5 class="mb-2 fw-bold text-dark text-truncate mx-auto" id="sliderCountryNombre" style="max-width: 150px;">-</h5>
+                            <div class="d-flex justify-content-center gap-2 flex-wrap" id="sliderCountryStats">
+                            </div>
+                        </div>
+
+                        <button class="btn btn-sm btn-outline-secondary" onclick="cambiarCountry(1)" title="Siguiente"><i class="bi bi-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 pt-4 pb-2 d-flex justify-content-between align-items-end">
+                    <h5 class="fw-bold text-dark mb-0"><i class="bi bi-currency-dollar text-success me-1"></i>Abonos Anual</h5>
+                    <div class="text-end">
+                        <span class="d-block small text-muted text-uppercase fw-bold">Total Acumulado</span>
+                        <span class="badge bg-success fs-5 shadow-sm">${{ "{:,.0f}".format(total_anual_abonos).replace(',', '.') }}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartAbonos" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 pt-4 pb-2 d-flex justify-content-between align-items-end">
+                    <h5 class="fw-bold text-dark mb-0"><i class="bi bi-box-seam text-info me-1"></i>Productos Anual</h5>
+                    <div class="text-end">
+                        <span class="d-block small text-muted text-uppercase fw-bold">Total Acumulado</span>
+                        <span class="badge bg-info text-dark fs-5 shadow-sm">${{ "{:,.0f}".format(total_anual_productos).replace(',', '.') }}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartProductos" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        
+        <div class="col-12">
+            <div class="card border-0 shadow-sm bg-dark text-white">
+                <div class="card-body py-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-calendar-range me-2"></i>Gestión de Consumo por Temporadas:</h6>
+                    
+                    <div class="dropdown">
+                        <button class="btn btn-light dropdown-toggle fw-bold shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                            <i class="bi bi-funnel-fill me-1 text-primary"></i> Seleccionar Meses Temporada Alta
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end p-3 shadow" style="min-width: 250px; max-height: 350px; overflow-y: auto;" id="listaMesesSelector">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-6">
+            <div class="card border-0 shadow-sm border-top border-4 border-danger h-100">
+                <div class="card-header bg-white border-0 pt-4 pb-2 d-flex flex-column gap-2">
+                    <h5 class="fw-bold text-danger mb-0"><i class="bi bi-sun-fill me-1"></i>Temporada Alta</h5>
+                    <span class="text-muted small fw-bold" id="badgeAlta" style="line-height: 1.4;"></span>
+                </div>
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr><th>Producto</th><th class="text-end">Unidades Usadas</th></tr>
+                        </thead>
+                        <tbody id="tablaTemporadaAlta">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-6">
+            <div class="card border-0 shadow-sm border-top border-4 border-primary h-100">
+                <div class="card-header bg-white border-0 pt-4 pb-2 d-flex flex-column gap-2">
+                    <h5 class="fw-bold text-primary mb-0"><i class="bi bi-snow me-1"></i>Temporada Baja</h5>
+                    <span class="text-muted small fw-bold" id="badgeBaja" style="line-height: 1.4;"></span>
+                </div>
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr><th>Producto</th><th class="text-end">Unidades Usadas</th></tr>
+                        </thead>
+                        <tbody id="tablaTemporadaBaja">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+// --- 1. DATOS Y CARGA DE SLIDER DE COUNTRIES ---
+    const listaCountries = JSON.parse('{{ lista_countries | safe }}');
+    let currentCountryIdx = 0;
+
+    function renderCountrySlider() {
+        const statsContainer = document.getElementById('sliderCountryStats');
+        
+        if(listaCountries.length === 0) {
+            document.getElementById('sliderCountryNombre').innerText = "Sin datos";
+            statsContainer.innerHTML = '<span class="badge bg-light text-muted border">0 Casas</span>';
+            return;
+        }
+        
+        const data = listaCountries[currentCountryIdx];
+        document.getElementById('sliderCountryNombre').innerText = data.nombre;
+        
+        // Armamos la "mini-card" de las Casas
+        const textoCasas = data.casas + (data.casas === 1 ? " Casa" : " Casas");
+        const badgeCasas = `<span class="badge bg-white text-dark border shadow-sm px-2 py-1"><i class="bi bi-house-door-fill text-success me-1"></i>${textoCasas}</span>`;
+        
+        // Verificamos si tiene barrios
+        if (data.barrios > 0) {
+            const textoBarrios = data.barrios + (data.barrios === 1 ? " Barrio" : " Barrios");
+            const badgeBarrios = `<span class="badge bg-white text-dark border shadow-sm px-2 py-1"><i class="bi bi-signpost-split-fill text-warning me-1"></i>${textoBarrios}</span>`;
+            
+            // Mostramos ambas cards separadas
+            statsContainer.innerHTML = badgeBarrios + badgeCasas;
+        } else {
+            // Si tiene 0 barrios, mostramos SOLO la card de Casas
+            statsContainer.innerHTML = badgeCasas;
+        }
+    }
+
+    function cambiarCountry(dir) {
+        if(listaCountries.length === 0) return;
+        currentCountryIdx += dir;
+        if(currentCountryIdx < 0) currentCountryIdx = listaCountries.length - 1;
+        if(currentCountryIdx >= listaCountries.length) currentCountryIdx = 0;
+        renderCountrySlider();
+    }
+    
+    renderCountrySlider(); // Iniciar slider
+
+    // --- 2. GRÁFICOS ANUALES DE DINERO ---
+    const nombresMeses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const datosAbonos = JSON.parse('{{ meses_abonos | safe }}');
+    const datosProductos = JSON.parse('{{ meses_productos | safe }}');
+
+    const chartConfig = {
+        type: 'line',
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, ticks: { callback: function(value) { return '$' + value.toLocaleString('es-AR'); } } } },
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) { return '$ ' + context.parsed.y.toLocaleString('es-AR'); } } } }
+        }
+    };
+
+    new Chart(document.getElementById('chartAbonos'), { ...chartConfig, data: { labels: nombresMeses, datasets: [{ label: 'Abonos', data: datosAbonos, borderColor: '#198754', backgroundColor: 'rgba(25, 135, 84, 0.2)', fill: true, tension: 0.4 }] }});
+    new Chart(document.getElementById('chartProductos'), { ...chartConfig, data: { labels: nombresMeses, datasets: [{ label: 'Productos', data: datosProductos, borderColor: '#0dcaf0', backgroundColor: 'rgba(13, 202, 240, 0.2)', fill: true, tension: 0.4 }] }});
+
+
+    // --- 3. LÓGICA DE TEMPORADA ALTA Y BAJA ---
+    const usoProductosDB = JSON.parse('{{ uso_productos_mes | safe }}');
+    
+    const anioActual = {{ anio_actual }};
+    const anioAnterior = {{ anio_anterior }};
+
+    // Definimos el "Ciclo Operativo" estricto (De Noviembre a Noviembre)
+    const availableKeys = [
+        `${anioAnterior}-11`,
+        `${anioAnterior}-12`,
+        `${anioActual}-01`,
+        `${anioActual}-02`,
+        `${anioActual}-03`,
+        `${anioActual}-04`,
+        `${anioActual}-05`,
+        `${anioActual}-06`,
+        `${anioActual}-07`,
+        `${anioActual}-08`,
+        `${anioActual}-09`,
+        `${anioActual}-10`,
+        `${anioActual}-11`
+    ];
+    
+    // Por defecto: Dic, Ene, Feb
+    let mesesAlta = [
+        `${anioAnterior}-12`,
+        `${anioActual}-01`,
+        `${anioActual}-02`
+    ];
+
+    // Helper: Pasa de "2026-01" a "Ene 26"
+    function formatearMesCorto(key) {
+        const [y, m] = key.split('-');
+        return nombresMeses[parseInt(m)-1] + ' ' + y.slice(2);
+    }
+
+    // Helper: Resume un array de meses en "Inicio - Fin"
+    function resumirRango(keysArray) {
+        if (!keysArray || keysArray.length === 0) return 'Ningún mes';
+        if (keysArray.length === 1) return formatearMesCorto(keysArray[0]);
+        
+        keysArray.sort(); // Aseguramos orden cronológico
+        return formatearMesCorto(keysArray[0]) + ' - ' + formatearMesCorto(keysArray[keysArray.length - 1]);
+    }
+
+    function renderizarSelector() {
+        const container = document.getElementById('listaMesesSelector');
+        container.innerHTML = '';
+        
+        availableKeys.forEach(key => {
+            const isChecked = mesesAlta.includes(key) ? 'checked' : '';
+            const nombreMes = formatearMesCorto(key); // Ahora dice "Nov 25", "Ene 26", etc.
+            
+            // Destacamos los meses de calor
+            const mesNum = key.split('-')[1];
+            const esMesClave = ['11', '12', '01', '02', '03'].includes(mesNum);
+            const labelStyle = esMesClave ? 'text-danger' : 'text-primary';
+            
+            container.innerHTML += `
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input border-secondary" type="checkbox" role="switch" id="switch-${key}" value="${key}" ${isChecked} onchange="toggleMes('${key}')">
+                    <label class="form-check-label fw-bold ${labelStyle}" for="switch-${key}">${nombreMes}</label>
+                </div>
+            `;
+        });
+    }
+
+    function toggleMes(key) {
+        if (mesesAlta.includes(key)) {
+            mesesAlta = mesesAlta.filter(k => k !== key);
+        } else {
+            mesesAlta.push(key);
+        }
+        actualizarTablas();
+    }
+
+    function actualizarTablas() {
+        let stockAlta = {};
+        let stockBaja = {};
+
+        // 1. ORDENAMOS LA TEMPORADA ALTA CRONOLÓGICAMENTE
+        mesesAlta.sort();
+        
+        // 2. DEFINIMOS LA TEMPORADA BAJA (Regla de negocio: solo meses POSTERIORES a la Alta)
+        let mesesBaja = [];
+        if (mesesAlta.length > 0) {
+            let ultimoMesAlta = mesesAlta[mesesAlta.length - 1];
+            mesesBaja = availableKeys.filter(key => key > ultimoMesAlta);
+        } else {
+            mesesBaja = [...availableKeys];
+        }
+
+        // 3. Acumulamos productos para Temporada Alta
+        mesesAlta.forEach(key => {
+            const productosDelMes = usoProductosDB[key] || {};
+            for (const [producto, data] of Object.entries(productosDelMes)) {
+                if(!stockAlta[producto]) stockAlta[producto] = {cant: 0, uni: data.unidad};
+                stockAlta[producto].cant += data.cantidad;
+            }
+        });
+
+        // 4. Acumulamos productos para Temporada Baja
+        mesesBaja.forEach(key => {
+            const productosDelMes = usoProductosDB[key] || {};
+            for (const [producto, data] of Object.entries(productosDelMes)) {
+                if(!stockBaja[producto]) stockBaja[producto] = {cant: 0, uni: data.unidad};
+                stockBaja[producto].cant += data.cantidad;
+            }
+        });
+
+        // 5. Actualizamos los textos resumidos (Ej: "Dic 25 - Feb 26")
+        document.getElementById('badgeAlta').innerText = resumirRango(mesesAlta);
+        document.getElementById('badgeBaja').innerText = resumirRango(mesesBaja);
+
+        // 6. Dibujamos las tablas
+        pintarTabla('tablaTemporadaAlta', stockAlta);
+        pintarTabla('tablaTemporadaBaja', stockBaja);
+    }
+
+    function pintarTabla(idTabla, datosStock) {
+        const tbody = document.getElementById(idTabla);
+        tbody.innerHTML = '';
+        
+        // Ordenamos de mayor cantidad a menor cantidad
+        const productosOrdenados = Object.entries(datosStock).sort((a, b) => b[1].cant - a[1].cant);
+
+        if (productosOrdenados.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted fst-italic">Sin movimientos registrados.</td></tr>';
+            return;
+        }
+
+        productosOrdenados.forEach(([nombre, data]) => {
+            tbody.innerHTML += `
+                <tr>
+                    <td class="fw-bold text-dark">${nombre}</td>
+                    <td class="text-end font-monospace text-muted fs-5">
+                        ${data.cant.toLocaleString('es-AR')} 
+                        <span class="fs-6 fw-bold text-secondary ms-1">${data.uni}</span>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    // Inicializamos
+    renderizarSelector();
+    actualizarTablas();
+</script>
+{% endblock %}
