@@ -153,8 +153,48 @@ def index():
             if casa.telefono:
                 num_tel = limpiar_telefono(casa.telefono)
                 nombre_wa = casa.nombre_cliente if casa.nombre_cliente else casa.nombre_formateado()
-                texto_wa = f"Hola! {nombre_wa}. Te paso el resumen: Abono ${format_money(abono_mes)} + Productos ${format_money(extras)}. Total a pagar: ${format_money(total_mes + saldo_anterior)}."
-                item_casa["url_wa"] = f"https://wa.me/{num_tel}?text={urllib.parse.quote(texto_wa)}"
+                
+                # 1. Saludo y Total General
+                total_final = total_mes + saldo_anterior
+                texto_wa = f"Buenos Dias {nombre_wa} como te va, te recuerdo el abono de la pile\n\n"
+                texto_wa += f"*-- Total ${format_money(total_final)} --*\n\n"
+                
+                # 2. Detalle de Mantenimiento
+                texto_wa += f"Mes de mantenimiento ${format_money(abono_mes)}\n"
+                
+                # 3. Detalle de Productos
+                if extras > 0:
+                    texto_wa += f"Productos Utilizados $ {format_money(extras)}\n"
+                    for v in casa.visitas:
+                        if v.fecha.month == mes and v.fecha.year == anio:
+                            for vp in v.productos:
+                                p_precio = vp.precio_unitario if vp.precio_unitario else vp.product.precio
+                                p_subtotal = float(vp.cantidad) * float(p_precio)
+                                p_unidad = vp.product.unidad if vp.product.unidad else ""
+                                texto_wa += f"* {vp.cantidad}{p_unidad} de {vp.product.nombre} ${format_money(p_subtotal)}\n"
+                
+                # 4. Deuda Acumulada
+                if saldo_anterior > 0.1:
+                    hist_deuda = [h for h in casa.historial_abonos if not getattr(h, 'pagado', False) and (h.anio < anio or (h.anio == anio and h.mes < mes))]
+                    meses_nombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+                    
+                    texto_wa += f"\nDeuda Acumulada $ {format_money(saldo_anterior)}\n"
+                    
+                    if len(hist_deuda) == 1:
+                        mes_txt = f"{meses_nombres[hist_deuda[0].mes-1]} {hist_deuda[0].anio}"
+                        texto_wa += f"* Correspondiente al mes de {mes_txt}\n"
+                    elif len(hist_deuda) > 1:
+                        meses_txt = ", ".join([f"{meses_nombres[h.mes-1]} {h.anio}" for h in hist_deuda])
+                        texto_wa += f"* Correspondiente a los meses de {meses_txt}\n"
+                    else:
+                        texto_wa += "* Correspondiente a meses anteriores\n"
+                
+                # 5. Cierre
+                texto_wa += "\nMuchas Gracias."
+
+                # --- NUEVO LINK WHATSAPP DIRECTO ---
+                item_casa["url_wa"] = f"whatsapp://send?phone={num_tel}&text={urllib.parse.quote(texto_wa)}"
+            
             reporte_sueltas.append(item_casa)
 
         total_clientes += 1
@@ -195,7 +235,7 @@ def index():
             elif g['saldo_anterior'] > 0.1:
                 texto_wa += f"\nDeuda pendiente (Mes anterior): *${format_money(g['saldo_anterior'])}*"
             texto_wa += f"\n*TOTAL A PAGAR: ${format_money(g['total_mes'] + g['saldo_anterior'])}*"
-            g["url_wa"] = f"https://wa.me/{num_tel}?text={urllib.parse.quote(texto_wa)}"
+            g["url_wa"] = f"whatsapp://send?phone={num_tel}&text={urllib.parse.quote(texto_wa)}"
 
     if hubo_cambios:
         db.session.commit()
@@ -237,7 +277,7 @@ def toggle_pago(id):
             saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
             nombre_wa = casa.nombre_cliente if casa.nombre_cliente else casa.nombre_formateado()
             texto_wa = f"Hola! {nombre_wa}. Te paso el resumen: Total a pagar ${format_money(float(datos['total']) + saldo_ant)}. Gracias."
-            url_wa = f"https://wa.me/{limpiar_telefono(casa.telefono)}?text={urllib.parse.quote(texto_wa)}"
+            url_wa = f"whatsapp://send?phone={limpiar_telefono(casa.telefono)}&text={urllib.parse.quote(texto_wa)}"
 
     elif not pagado and enviado:
         registro.pagado = True
@@ -384,7 +424,7 @@ def toggle_pago_grupo(grupo_id):
             texto_wa += f"\n*TOTAL A PAGAR: ${format_money(total_grupo_mes + total_grupo_saldo_ant)}*"
             tel = re.sub(r'\D', '', telefono_repr)
             if len(tel) == 10: tel = "549" + tel
-            url_wa = f"https://wa.me/{tel}?text={urllib.parse.quote(texto_wa)}"
+            url_wa = f"whatsapp://send?phone={tel}&text={urllib.parse.quote(texto_wa)}"
 
     elif not all_pagado and all_enviado:
         for h in historiales:
@@ -520,10 +560,24 @@ def planilla_impresion():
 
         if not casa.activo and total_a_pagar <= 0.1:
             continue
+
+        # --- NUEVO: RECOLECTOR DE NOMBRES DE PRODUCTOS PARA LA PLANILLA ---
+        detalle_prods = []
+        for v in casa.visitas:
+            if v.fecha.month == mes and v.fecha.year == anio:
+                for vp in v.productos:
+                    unidad = vp.product.unidad if vp.product.unidad else ""
+                    # Agrega "(Agregado)" si es un extra manual cargado desde el perfil
+                    extra_tag = " (Agregado)" if v.observaciones == "[EXTRA_MANUAL]" else ""
+                    detalle_prods.append(f"{vp.cantidad}{unidad} {vp.product.nombre}{extra_tag}")
+        
+        texto_detalle = ", ".join(detalle_prods)
+        # ------------------------------------------------------------------
             
         filas.append({
             "cliente": casa.nombre_formateado(),
             "producto": producto,
+            "detalle_productos": texto_detalle, # <-- Se agrega al diccionario
             "abono": abono,
             "saldo_anterior": saldo_anterior,
             "total_a_pagar": total_a_pagar
@@ -533,6 +587,7 @@ def planilla_impresion():
     nombre_mes = nombres_meses[mes - 1]
 
     return render_template("dashboard/planilla.html", filas=filas, mes_nombre=nombre_mes, anio=anio)
+
 
 @dashboard_bp.route("/api/totales")
 @login_required

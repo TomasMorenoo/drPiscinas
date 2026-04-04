@@ -31,13 +31,16 @@ def listar_visits():
 
     mes_congelado = is_mes_cerrado(mes_sel, anio_sel)
 
+    # --- 1. OCULTAMOS LOS EXTRAS DE LA LISTA PRINCIPAL ---
     visits = Visit.query.filter(
         extract('month', Visit.fecha) == mes_sel,
-        extract('year', Visit.fecha) == anio_sel
+        extract('year', Visit.fecha) == anio_sel,
+        db.or_(Visit.observaciones != '[EXTRA_MANUAL]', Visit.observaciones.is_(None)) # <-- MAGIA ACÁ
     ).order_by(Visit.fecha.desc()).all()
 
     total_mes = sum(v.calcular_total() for v in visits)
 
+    # --- 2. OCULTAMOS LOS EXTRAS DEL TOP PRODUCTOS ---
     top_productos = db.session.query(
         Product.nombre, 
         Product.unidad,
@@ -46,6 +49,7 @@ def listar_visits():
      .join(Visit, Visit.id == VisitProduct.visit_id)\
      .filter(extract('month', Visit.fecha) == mes_sel)\
      .filter(extract('year', Visit.fecha) == anio_sel)\
+     .filter(db.or_(Visit.observaciones != '[EXTRA_MANUAL]', Visit.observaciones.is_(None)))\
      .group_by(Product.nombre, Product.unidad)\
      .order_by(func.sum(VisitProduct.cantidad).desc())\
      .limit(5).all()
@@ -59,7 +63,8 @@ def listar_visits():
         anio_sel=anio_sel,
         mes_congelado=mes_congelado 
     )
-
+    
+    
 @visit_bp.route("/create", methods=["GET", "POST"])
 @login_required
 def crear_visit():
@@ -181,3 +186,29 @@ def editar_visit(id):
 def detalle_visit(id):
     visit = Visit.query.get_or_404(id)
     return render_template("visits/detalle.html", visit=visit)
+
+@visit_bp.route("/check_duplicate")
+@login_required
+def check_duplicate():
+    casa_id = request.args.get('casa_id')
+    fecha = request.args.get('fecha')
+    
+    if not casa_id or not fecha:
+        return jsonify({"exists": False})
+
+    # Buscamos si existe una visita para esa casa en esa fecha exacta
+    # Nota: Filtramos para que NO tome como duplicado un [EXTRA_MANUAL] o [DEUDA_ANTERIOR] 
+    # ya que eso sí podría convivir con una visita real.
+    existente = Visit.query.filter_by(casa_id=casa_id, fecha=fecha).filter(
+        db.or_(Visit.observaciones == None, ~Visit.observaciones.in_(['[EXTRA_MANUAL]', '[DEUDA_ANTERIOR]']))
+    ).first()
+
+    if existente:
+        # Preparamos el detalle de lo que ya se cargó para el cartel
+        detalles_prod = ", ".join([f"{vp.cantidad} {vp.product.nombre}" for vp in existente.productos])
+        return jsonify({
+            "exists": True,
+            "detalles": f"Observaciones: {existente.observaciones or 'Ninguna'}. Productos: {detalles_prod or 'Sin productos'}."
+        })
+    
+    return jsonify({"exists": False})

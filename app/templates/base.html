@@ -89,7 +89,7 @@
                     <a class="nav-link" href="{{ url_for('casas.listar_casas') }}"><i class="bi bi-house-door"></i> Clientes</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('estadisticas.index') }}"><i class="bi bi-bar-chart-fill text-warning"></i> Estadísticas</a>
+                    <a class="nav-link" href="{{ url_for('estadisticas.index') }}"><i class="bi bi-bar-chart"></i> Estadísticas</a>
                 </li>
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
@@ -100,6 +100,8 @@
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="{{ url_for('products.listar_products') }}">Productos</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('promo.listar_promos') }}">Promociones</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item fw-bold text-success" href="{{ url_for('grupos.listar_grupos') }}"><i class="bi bi-collection-fill me-1"></i> Grupos de Clientes</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="{{ url_for('country.listar_countries') }}">Countries</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('barrio.listar_barrios') }}">Barrios</a></li>

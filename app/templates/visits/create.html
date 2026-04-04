@@ -144,8 +144,40 @@
     </div>
 </template>
 
+<div class="modal fade" id="modalDuplicado" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-warning border-3 shadow-lg">
+            <div class="modal-header bg-warning text-dark border-0">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-exclamation-triangle-fill fs-4 me-2 align-middle"></i>¡Atención! Posible Duplicado
+                </h5>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <p class="fs-5 text-dark mb-3">Ya existe una visita cargada para esta propiedad el <strong>mismo día</strong>.</p>
+                
+                <div class="alert alert-secondary border-0 shadow-sm">
+                    <h6 class="fw-bold text-uppercase small text-muted mb-2"><i class="bi bi-info-circle me-1"></i>Detalle de la visita existente:</h6>
+                    <span id="detalle-duplicado" class="font-monospace text-dark d-block mb-0" style="white-space: pre-wrap;"></span>
+                </div>
+                
+                <p class="mb-0 mt-4 fw-bold text-danger text-center">
+                    ¿Estás SEGURO de que querés cargar otra visita adicional encima?
+                </p>
+            </div>
+            <div class="modal-footer border-0 bg-light d-flex justify-content-center gap-2 pb-4">
+                <button type="button" class="btn btn-secondary fw-bold px-4 shadow-sm" id="btn-cancelar-duplicado">
+                    <i class="bi bi-x-circle me-1"></i> No, me equivoqué
+                </button>
+                <button type="button" class="btn btn-warning text-dark fw-bold px-4 shadow-sm" id="btn-aceptar-duplicado">
+                    <i class="bi bi-check2-circle me-1"></i> Sí, cargar igual
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-    // 1. Fecha automática (solo si es nueva visita y el campo está vacío)
+    // 1. Fecha automática
     const fechaInput = document.getElementById('fecha_visita');
     if (!fechaInput.value) {
         fechaInput.valueAsDate = new Date();
@@ -156,7 +188,6 @@
     const hiddenInput = document.getElementById('casa_id_hidden');
     const autocompleteList = document.getElementById('custom-autocomplete-list');
 
-    // Pasamos los datos de Jinja a un array de JavaScript
     const casasData = [
         {% for casa in casas %}
         { id: "{{ casa.id }}", nombre: "{{ casa.nombre_formateado() | escape }}" }{% if not loop.last %},{% endif %}
@@ -165,8 +196,8 @@
 
     searchInput.addEventListener('input', function() {
         const val = this.value.toLowerCase();
-        autocompleteList.innerHTML = ''; // Limpiar resultados anteriores
-        hiddenInput.value = ''; // Borrar el ID oculto si el usuario cambia el texto
+        autocompleteList.innerHTML = ''; 
+        hiddenInput.value = ''; 
         searchInput.classList.remove('is-valid');
 
         if (!val) {
@@ -174,7 +205,6 @@
             return;
         }
 
-        // Filtrar las casas que coincidan
         let matches = casasData.filter(casa => casa.nombre.toLowerCase().includes(val));
 
         if (matches.length > 0) {
@@ -185,7 +215,6 @@
                 item.className = 'dropdown-item py-2 border-bottom text-wrap';
                 item.href = 'javascript:void(0)';
                 
-                // Resaltar la parte del texto que coincide
                 const regex = new RegExp(`(${val})`, "gi");
                 const highlightedName = match.nombre.replace(regex, "<strong class='text-primary'>$1</strong>");
 
@@ -197,6 +226,9 @@
                     hiddenInput.value = match.id;
                     searchInput.classList.add('is-valid');
                     autocompleteList.style.display = 'none';
+                    
+                    // --- DISPARAMOS LA VERIFICACIÓN DE DUPLICADO ACÁ ---
+                    verificarDuplicado();
                 });
                 
                 autocompleteList.appendChild(item);
@@ -207,7 +239,6 @@
         }
     });
 
-    // Cerrar el menú si se hace clic afuera
     document.addEventListener('click', function(e) {
         if (e.target !== searchInput && e.target !== autocompleteList) {
             autocompleteList.style.display = 'none';
@@ -229,5 +260,44 @@
             document.getElementById("empty-products").classList.remove("d-none");
         }
     }
+
+    // --- 4. LÓGICA DE CHEQUEO DE DUPLICADOS CON MODAL ---
+    function verificarDuplicado() {
+        // Si estamos editando (ya hay una ID de visita en la URL), NO verificamos
+        {% if visit %}
+        return;
+        {% endif %}
+
+        const casaId = hiddenInput.value; 
+        const fecha = fechaInput.value;
+
+        if (casaId && fecha) {
+            fetch(`/visits/check_duplicate?casa_id=${casaId}&fecha=${fecha}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.exists) {
+                        let textoDetalle = data.detalles.replace("Productos:", "\nProductos:");
+                        document.getElementById('detalle-duplicado').innerText = textoDetalle;
+                        
+                        const modalEl = document.getElementById('modalDuplicado');
+                        const modalObj = new bootstrap.Modal(modalEl);
+                        modalObj.show();
+
+                        document.getElementById('btn-cancelar-duplicado').onclick = function() {
+                            searchInput.value = "";
+                            hiddenInput.value = "";
+                            searchInput.classList.remove('is-valid');
+                            modalObj.hide();
+                        };
+
+                        document.getElementById('btn-aceptar-duplicado').onclick = function() {
+                            modalObj.hide();
+                        };
+                    }
+                });
+        }
+    }
+
+    fechaInput.addEventListener('change', verificarDuplicado);
 </script>
 {% endblock %}

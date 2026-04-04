@@ -380,9 +380,9 @@
                         <span class="d-none d-sm-inline ms-1">HOJA</span>
                     </a>
 
-                    <a href="{{ url_for('grupos.crear_grupo') }}" class="btn btn-sm btn-outline-dark fw-bold" title="Agrupar">
+                    <a href="{{ url_for('grupos.listar_grupos') }}" class="btn btn-sm btn-outline-dark fw-bold" title="Gestionar Grupos">
                         <i class="bi bi-collection-fill"></i>
-                        <span class="d-none d-sm-inline ms-1">AGRUPAR</span>
+                        <span class="d-none d-sm-inline ms-1">GRUPOS</span>
                     </a>
 
                     {% if mes_congelado %}
@@ -462,11 +462,25 @@
     </div>
 
     {# ---- BUSCADOR ---- #}
-    <div class="buscador-wrapper d-print-none mb-3">
-        <div class="input-group shadow-sm">
-            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-            <input type="text" id="busquedaRealTime" class="form-control border-start-0"
-                   placeholder="Filtrar por lote, barrio o country...">
+    <div class="mb-4 d-print-none bg-white p-3 rounded border shadow-sm">
+        <div class="row g-2">
+            <div class="col-md-8">
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" id="busquedaRealTime" class="form-control border-start-0" placeholder="Filtrar por Lote, Barrio o Country en este mes...">
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-funnel text-muted"></i></span>
+                    <select id="filtroEstado" class="form-select border-start-0 fw-bold text-secondary">
+                        <option value="todos">Todos los estados</option>
+                        <option value="pendiente">🕒 Pendientes</option>
+                        <option value="notificado">✉️ Notificados</option>
+                        <option value="pagado">✅ Pagados</option>
+                    </select>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -503,7 +517,11 @@
 
                     <tbody>
                         {% for item in reporte_sueltas %}
-                        <tr>
+                        
+                        {# CALCULAMOS EL ESTADO PARA EL FILTRO #}
+                        {% set estado_clase = 'pagado' if item.pagado else ('notificado' if item.mensaje_enviado else 'pendiente') %}
+                        
+                        <tr class="fila-busqueda" data-estado="{{ estado_clase }}">
 
                             {# --- NOMBRE --- #}
                             <td class="ps-3 td-nombre" style="max-width: 200px;">
@@ -573,7 +591,7 @@
                                             </button>
                                         {% else %}
                                             {% if item.url_wa %}
-                                            <a href="{{ item.url_wa }}" target="_blank"
+                                            <a href="{{ item.url_wa }}"
                                                onclick="marcarEnviado({{ item.id_historial }})"
                                                class="btn btn-sm btn-outline-success" title="WhatsApp">
                                                 <i class="bi bi-whatsapp"></i>
@@ -638,7 +656,7 @@
                                         </div>
                                         <div class="d-flex gap-1">
                                             {% if item.url_wa %}
-                                            <a href="{{ item.url_wa }}" target="_blank"
+                                            <a href="{{ item.url_wa }}"
                                                onclick="marcarEnviado({{ item.id_historial }})"
                                                class="btn btn-sm btn-outline-success flex-grow-1 py-1 px-0" title="WhatsApp">
                                                 <i class="bi bi-whatsapp"></i>
@@ -709,7 +727,11 @@
 
     <div class="collapse show" id="collapseGruposMain">
         {% for g in reporte_grupos %}
-        <div class="card border-0 shadow-sm border-start border-4 border-primary mb-3">
+        
+        {# CALCULAMOS EL ESTADO PARA EL FILTRO #}
+        {% set estado_clase_g = 'pagado' if g.pagado else ('notificado' if g.mensaje_enviado else 'pendiente') %}
+        
+        <div class="card border-0 shadow-sm border-start border-4 border-primary mb-3 fila-busqueda" data-estado="{{ estado_clase_g }}">
 
             {# CARD HEADER DEL GRUPO #}
             <div class="card-header bg-white py-3">
@@ -1006,18 +1028,33 @@
 
 <script>
 /* ============================================================
-   BUSCADOR
+   BUSCADOR Y FILTROS
    ============================================================ */
 const buscador = document.getElementById('busquedaRealTime');
-if (buscador) {
-    buscador.addEventListener('keyup', function() {
-        const filtro = this.value.toLowerCase();
-        document.querySelectorAll('.buscar-tabla tbody tr').forEach(fila => {
-            const texto = fila.cells[0] ? fila.cells[0].textContent.toLowerCase() : '';
-            fila.style.display = texto.includes(filtro) ? '' : 'none';
-        });
+const filtroEstado = document.getElementById('filtroEstado');
+
+function filtrarDashboard() {
+    let texto = buscador ? buscador.value.toLowerCase() : '';
+    let estado = filtroEstado ? filtroEstado.value : 'todos';
+
+    // Buscamos todas las filas etiquetadas (casas sueltas y grupos enteros)
+    let contenedores = document.querySelectorAll('.fila-busqueda');
+    
+    contenedores.forEach(fila => {
+        let textoFila = fila.textContent.toLowerCase();
+        let estadoFila = fila.getAttribute('data-estado');
+        
+        let matchTexto = textoFila.includes(texto);
+        let matchEstado = (estado === 'todos') || (estadoFila === estado);
+        
+        // Si cumple AMBAS condiciones, se muestra. Si no, se oculta.
+        fila.style.display = (matchTexto && matchEstado) ? '' : 'none';
     });
 }
+
+// Escuchamos cuando el usuario escribe en el buscador o cambia el selector
+if(buscador) buscador.addEventListener('keyup', filtrarDashboard);
+if(filtroEstado) filtroEstado.addEventListener('change', filtrarDashboard);
 
 /* ============================================================
    INPUT MONTO — formateo es-AR

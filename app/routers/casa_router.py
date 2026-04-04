@@ -1,13 +1,16 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from flask_login import login_required
+from flask_login import login_required, current_user
 from app.decorators import admin_required
 from app import db
 from app.models import Casa, Country, Barrio
 from app.models.visit import Visit
 from app.models.visit_product import VisitProduct
+from app.models.products import Product
 from app.models.abono_historico import AbonoHistorico
 from sqlalchemy.exc import IntegrityError
 import re
+import calendar
+from datetime import datetime
 
 casa_bp = Blueprint("casas", __name__, url_prefix="/casas")
 
@@ -17,7 +20,6 @@ casa_bp = Blueprint("casas", __name__, url_prefix="/casas")
 def natural_sort_key(casa):
     k_country = casa.country.nombre.lower() if casa.country else "zzz"
     k_barrio = casa.barrio.nombre.lower() if casa.barrio else ""
-    # Aseguramos que numero sea string por si viene vacío o raro
     k_numero = [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', str(casa.numero))]
     return (k_country, k_barrio, k_numero)
 
@@ -28,18 +30,14 @@ def natural_sort_key(casa):
 @login_required
 @admin_required
 def listar_casas():
-    # 1. Atrapamos los parámetros
     buscar = request.args.get("buscar", "").strip()
     estado = request.args.get("estado", "todo")
     country_id = request.args.get("country_id", "")
     barrio_id = request.args.get("barrio_id", "")
 
-    # 2. Empezamos a armar la consulta
     query = Casa.query
 
-    # Filtro de texto libre (Lote/Número)
     if buscar:
-        # Esto permite buscar "Acacias" y que traiga los lotes de ese barrio
         query = query.join(Country).outerjoin(Barrio).filter(
             db.or_(
                 Casa.numero.ilike(f"%{buscar}%"),
@@ -49,32 +47,26 @@ def listar_casas():
             )
         )
 
-    # Filtro por Estado
     if estado == "activos":
         query = query.filter(Casa.activo == True)
     elif estado == "inactivos":
         query = query.filter(Casa.activo == False)
 
-    # Filtro por Country
     if country_id:
         query = query.filter(Casa.country_id == country_id)
 
-    # Filtro por Barrio
     if barrio_id:
         query = query.filter(Casa.barrio_id == barrio_id)
 
-    # Ejecutamos la búsqueda Y ORDENAMOS
     casas = query.all()
     casas.sort(key=natural_sort_key)
 
-    # 3. Traemos datos para los Selects
     countries = Country.query.filter_by(activo=True).order_by(Country.nombre).all()
     
     barrios = []
     if country_id:
         barrios = Barrio.query.filter_by(country_id=country_id, activo=True).order_by(Barrio.nombre).all()
 
-    # Le pasamos todo al HTML
     return render_template(
         "casas/list.html", 
         casas=casas, 
@@ -281,29 +273,75 @@ def crear_casa():
     barrios = Barrio.query.filter_by(activo=True).order_by(Barrio.nombre).all()
     return render_template("casas/create.html", countries=countries, barrios=barrios)
 
-@casa_bp.route("/create_form", methods=["GET"]) 
-@login_required
-@admin_required
-def form_crear_casa():
-    return crear_casa()
-
 # ==========================================
-# UTILIDADES
+# EXTRAS MANUALES
 # ==========================================
-@casa_bp.route("/barrios/<int:country_id>")
+@casa_bp.route("/perfil/<int:id>/agregar_extra", methods=["POST"])
 @login_required
-def barrios_por_country(country_id):
-    barrios = Barrio.query.filter_by(country_id=country_id, activo=True).order_by(Barrio.nombre).all()
-    return jsonify([{"id": b.id, "nombre": b.nombre} for b in barrios])
-
-@casa_bp.route("/toggle/<int:id>")
-@login_required
-@admin_required
-def toggle_casa(id):
+def agregar_extra(id):
     casa = Casa.query.get_or_404(id)
-    casa.activo = not casa.activo
-    db.session.commit()
-    return redirect(url_for("casas.listar_casas"))
+    product_id = request.form.get("product_id")
+    cantidad = request.form.get("cantidad")
+    mes = int(request.form.get("mes"))
+    anio = int(request.form.get("anio"))
+
+    if product_id and cantidad:
+        producto = Product.query.get(product_id)
+        
+        # Fecha en el último día del mes
+        ultimo_dia = calendar.monthrange(anio, mes)[1]
+        fecha_fantasma = datetime(anio, mes, ultimo_dia, 12, 0, 0)
+
+        nueva_visita = Visit(
+            casa_id=casa.id,
+            usuario_id=current_user.id,
+            fecha=fecha_fantasma,
+            observaciones="[EXTRA_MANUAL]"
+        )
+        db.session.add(nueva_visita)
+        db.session.flush()
+
+        nuevo_vp = VisitProduct(
+            visit_id=nueva_visita.id,
+            product_id=producto.id,
+            cantidad=float(cantidad),
+            precio_unitario=producto.precio
+        )
+        db.session.add(nuevo_vp)
+        
+        # --- MAGIA PARA MESES CERRADOS ---
+        # Si el mes ya estaba cerrado, le inyectamos la plata del producto al total congelado
+        historial = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
+        if historial:
+            historial.monto += float(cantidad) * float(producto.precio)
+        # ---------------------------------
+
+        db.session.commit()
+        flash("Producto extra cargado exitosamente.", "success")
+        
+    return redirect(url_for('casas.perfil', id=casa.id))
+
+@casa_bp.route("/eliminar_extra/<int:visit_id>", methods=["POST"])
+@login_required
+@admin_required
+def eliminar_extra(visit_id):
+    visita = Visit.query.get_or_404(visit_id)
+    casa_id = visita.casa_id
+    if visita.observaciones == "[EXTRA_MANUAL]":
+        
+        # --- MAGIA PARA MESES CERRADOS ---
+        # Si borramos el extra, le restamos la plata al mes congelado
+        historial = AbonoHistorico.query.filter_by(casa_id=casa_id, mes=visita.fecha.month, anio=visita.fecha.year).first()
+        if historial:
+            for vp in visita.productos:
+                historial.monto -= float(vp.cantidad) * float(vp.precio_unitario or vp.product.precio)
+        # ---------------------------------
+
+        VisitProduct.query.filter_by(visit_id=visita.id).delete()
+        db.session.delete(visita)
+        db.session.commit()
+        flash("Producto extra eliminado.", "info")
+    return redirect(url_for('casas.perfil', id=casa_id))
 
 # ==========================================
 # PERFIL DEL CLIENTE
@@ -316,6 +354,8 @@ def perfil(id):
     visitas = sorted(casa.visitas, key=lambda v: v.fecha, reverse=True)
     historial_asc = AbonoHistorico.query.filter_by(casa_id=casa.id).order_by(AbonoHistorico.anio.asc(), AbonoHistorico.mes.asc()).all()
     
+    productos = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
+    
     detalles_pagos = []
     saldo_acumulado = 0.0
     nombres_meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -325,17 +365,10 @@ def perfil(id):
         total_mes = gastos['total']
         pagado_real = float(getattr(h, 'monto_pagado', 0) or 0)
         
-        # Guardamos la foto del saldo antes de aplicarle los gastos de este mes
         saldo_anterior_iter = saldo_acumulado
-        
-        # 1. Sumamos la deuda de este mes y le restamos lo que pagó
         saldo_acumulado += total_mes
         saldo_acumulado -= pagado_real
         
-        # 2. Regla de compatibilidad / Tilde Verde Manual
-        # Si tiene el tilde verde (pagado), no hay registro de plata real, y LA CUENTA DA DEUDA:
-        # Significa que lo perdonamos o lo marcó manual tu tío. Simula que pagó el total.
-        # Pero si la cuenta da SALDO A FAVOR, no se mete, así la plata sigue bajando de mes a mes.
         if getattr(h, 'pagado', False) and pagado_real == 0 and saldo_acumulado > 0.01:
             pagado_simulado = saldo_acumulado 
             saldo_acumulado = 0.0
@@ -353,11 +386,26 @@ def perfil(id):
         
     detalles_pagos.reverse()
     
-    return render_template("casas/perfil.html", casa=casa, visitas=visitas, detalles_pagos=detalles_pagos)
+    return render_template("casas/perfil.html", casa=casa, visitas=visitas, detalles_pagos=detalles_pagos, productos=productos)
 
 # ==========================================
-# BORRADO FÍSICO A TODA COSTA (TERMINATOR)
+# OTRAS RUTAS
 # ==========================================
+@casa_bp.route("/barrios/<int:country_id>")
+@login_required
+def barrios_por_country(country_id):
+    barrios = Barrio.query.filter_by(country_id=country_id, activo=True).order_by(Barrio.nombre).all()
+    return jsonify([{"id": b.id, "nombre": b.nombre} for b in barrios])
+
+@casa_bp.route("/toggle/<int:id>")
+@login_required
+@admin_required
+def toggle_casa(id):
+    casa = Casa.query.get_or_404(id)
+    casa.activo = not casa.activo
+    db.session.commit()
+    return redirect(url_for("casas.listar_casas"))
+
 @casa_bp.route("/delete/<int:id>", methods=["POST"])
 @login_required
 @admin_required
@@ -371,9 +419,14 @@ def eliminar_casa(id):
         Visit.query.filter_by(casa_id=id).delete()
         db.session.delete(casa)
         db.session.commit()
-        flash("Cliente y TODO su historial fueron eliminados definitivamente.", "success")
+        flash("Cliente eliminado definitivamente.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Error al intentar borrar: {str(e)}", "error")
-        
+        flash(f"Error: {str(e)}", "error")
     return redirect(url_for("casas.listar_casas"))
+
+@casa_bp.route("/create_form", methods=["GET"]) 
+@login_required
+@admin_required
+def form_crear_casa():
+    return crear_casa()
