@@ -11,7 +11,7 @@
                 </h2>
             </div>
             <div class="card-body p-4">
-                <form method="POST" action="{{ url_for('casas.crear_casa') }}">
+                <form id="formCrear" method="POST" action="{{ url_for('casas.crear_casa') }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     
                     <div class="mb-3">
@@ -32,10 +32,26 @@
                         <div class="form-text small"><i class="bi bi-info-circle"></i> Se habilitará automáticamente si el country tiene barrios.</div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="numero" class="form-label fw-bold text-secondary small text-uppercase">Número o Lotes <span class="text-danger">*</span></label>
-                        <input type="text" name="numero" id="numero" class="form-control border-primary" placeholder="Ej: 43, 15, 20, E44" required>
-                        <div class="form-text small text-primary"><i class="bi bi-info-circle"></i> <strong>Carga múltiple:</strong> Podés ingresar varios lotes separados por coma para crearlos todos juntos con el mismo precio.</div>
+                    <div class="row mb-3">
+                        <div class="col-md-7">
+                            <label for="numero" class="form-label fw-bold text-secondary small text-uppercase">Número o Lotes <span class="text-danger">*</span></label>
+                            <div class="input-group shadow-sm">
+                                <input type="text" name="numero" id="numero" class="form-control border-primary" placeholder="Ej: 43, 15, 20, E44" required>
+                                <div class="input-group-text bg-white border-primary">
+                                    <input class="form-check-input mt-0 me-2" type="checkbox" name="sin_numero" id="sinNumeroCheck" value="1" onchange="toggleNumero()">
+                                    <label class="form-check-label fw-bold small text-primary" for="sinNumeroCheck">S/N</label>
+                                </div>
+                            </div>
+                            <div class="form-text small text-primary" id="helpNumero"><strong>Carga múltiple:</strong> Varios separados por coma.</div>
+                        </div>
+                        
+                        <div class="col-md-5">
+                            <label for="precio_base" class="form-label fw-bold text-secondary small text-uppercase">Abono Mensual <span class="text-danger">*</span></label>
+                            <div class="input-group shadow-sm">
+                                <span class="input-group-text bg-light text-secondary">$</span>
+                                <input type="text" name="precio_base" id="precio_base" class="form-control fw-bold border-secondary text-end" placeholder="Ej: 150.000" required oninput="formatearMoneda(this)">
+                            </div>
+                        </div>
                     </div>
 
                     <div class="row">
@@ -57,18 +73,18 @@
                     </div>
 
                     <div class="mb-4">
-                        <label for="precio_base" class="form-label fw-bold text-secondary small text-uppercase">Abono Base Mensual <span class="text-danger">*</span></label>
+                        <label class="form-label fw-bold text-secondary small text-uppercase">Email del Cliente (Opcional)</label>
                         <div class="input-group">
-                            <span class="input-group-text bg-light text-muted fw-bold">$</span>
-                            <input type="number" name="precio_base" id="precio_base" class="form-control font-monospace fs-5" step="0.01" placeholder="Ej: 35000" required>
+                            <span class="input-group-text bg-light"><i class="bi bi-envelope text-primary"></i></span>
+                            <input type="email" name="email" class="form-control" placeholder="Ej: cliente@correo.com">
                         </div>
                     </div>
 
-                    <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
-                        <a href="{{ url_for('casas.listar_casas') }}" class="btn btn-outline-secondary">
-                            <i class="bi bi-arrow-left me-1"></i> Cancelar
-                        </a>
-                        <button type="submit" class="btn btn-primary fw-bold px-4 shadow-sm">
+                    <hr class="text-muted">
+
+                    <div class="d-flex justify-content-end mt-4">
+                        <a href="{{ url_for('casas.listar_casas') }}" class="btn btn-outline-secondary me-2 px-4 fw-bold shadow-sm">Cancelar</a>
+                        <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm">
                             <i class="bi bi-save me-1"></i> Guardar Cliente
                         </button>
                     </div>
@@ -79,6 +95,24 @@
 </div>
 
 <script>
+// 1. Lógica para el checkbox S/N
+function toggleNumero() {
+    const check = document.getElementById('sinNumeroCheck');
+    const input = document.getElementById('numero');
+    const help = document.getElementById('helpNumero');
+    if (check.checked) {
+        input.value = '';
+        input.disabled = true;
+        input.required = false;
+        help.style.display = 'none';
+    } else {
+        input.disabled = false;
+        input.required = true;
+        help.style.display = 'block';
+    }
+}
+
+// 2. Carga de barrios dinámica dependiente del Country
 document.addEventListener('DOMContentLoaded', function() {
     const countrySelect = document.getElementById('countrySelect');
     const barrioSelect = document.getElementById('barrioSelect');
@@ -86,7 +120,6 @@ document.addEventListener('DOMContentLoaded', function() {
     countrySelect.addEventListener('change', function() {
         const countryId = this.value;
 
-        // Limpiar y deshabilitar select barrio si no hay country
         barrioSelect.innerHTML = '<option value="">Sin Barrio</option>';
         barrioSelect.disabled = true;
         barrioSelect.classList.add('bg-light');
@@ -110,6 +143,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 .catch(err => console.error(err));
         }
     });
+});
+
+// 3. Formateo de moneda argentina visual (Puntos para mil, coma para decimal)
+function formatearMoneda(input) {
+    let value = input.value;
+    let parts = value.split(',');
+    let integerPart = parts[0].replace(/\D/g, "");
+    integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+    let newValue = integerPart;
+    if (parts.length > 1) {
+        let decimalPart = parts[1].replace(/\D/g, "").substring(0, 2);
+        newValue += "," + decimalPart;
+    } else if (value.includes(',')) {
+        newValue += ",";
+    }
+    input.value = newValue;
+}
+
+// 4. Limpieza para Python (Quitar puntos, cambiar coma por punto al enviar form)
+document.getElementById('formCrear').addEventListener('submit', function(e) {
+    const input = document.getElementById('precio_base');
+    if (input) {
+        let valor = input.value;
+        valor = valor.replace(/\./g, ""); // Borra todos los puntos
+        valor = valor.replace(",", ".");  // Cambia la coma por punto decimal para Python
+        input.value = valor;
+    }
 });
 </script>
 {% endblock %}

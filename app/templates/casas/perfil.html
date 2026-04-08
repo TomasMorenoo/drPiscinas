@@ -7,11 +7,27 @@
         <h1 class="h3 mb-0 text-gray-800 fw-bold">
             <i class="bi bi-house-door me-2"></i>{{ casa.nombre_formateado() }}
         </h1>
-        <div>
-            <button type="button" class="btn btn-warning fw-bold shadow-sm me-2" data-bs-toggle="modal" data-bs-target="#modalExtra">
-                <i class="bi bi-box-seam me-1"></i> Agregar Producto Extra
+        <div class="d-flex flex-wrap gap-2">
+            {% if not request.referrer or '/dashboard' not in request.referrer %}
+            <form method="POST" action="{{ url_for('casas.eliminar_casa', id=casa.id) }}" onsubmit="return confirm('ATENCIÓN: ¿Estás seguro de eliminar este cliente por completo? Se borrará todo su historial y pagos. Esta acción NO se puede deshacer.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-danger fw-bold shadow-sm">
+                    <i class="bi bi-trash me-1"></i> Borrar
+                </button>
+            </form>
+            {% endif %}
+
+            <button type="button" class="btn btn-info text-white fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalAumentoIndividual">
+                <i class="bi bi-graph-up-arrow me-1"></i> Aumento Indiv.
             </button>
-            <a href="{{ url_for('casas.listar_casas') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Volver</a>
+
+            <button type="button" class="btn btn-warning fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalExtra">
+                <i class="bi bi-box-seam me-1"></i> Producto Extra
+            </button>
+
+            <a href="javascript:void(0);" onclick="if(document.referrer) { window.history.back(); } else { window.location.href='{{ url_for('casas.listar_casas') }}'; }" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Volver
+            </a>
         </div>
     </div>
 
@@ -32,6 +48,20 @@
                             <span class="fs-5"><i class="bi bi-whatsapp text-success me-1"></i> {{ casa.telefono }}</span>
                         {% else %}
                             <span class="fs-5 text-danger"><i class="bi bi-exclamation-triangle me-1"></i> Faltante</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <small class="text-muted d-block text-uppercase fw-bold">Email</small>
+                        {% if casa.email %}
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fs-5 text-truncate" style="max-width: 200px;" title="{{ casa.email }}"><i class="bi bi-envelope text-primary me-1"></i> {{ casa.email }}</span>
+                                <a href="mailto:{{ casa.email }}?subject=Facturación%20Mantenimiento%20-%20Dr.%20Piscinas" class="btn btn-sm btn-outline-primary shadow-sm" title="Enviar correo">
+                                    <i class="bi bi-send-fill"></i> Enviar
+                                </a>
+                            </div>
+                        {% else %}
+                            <span class="fs-5 text-muted"><i class="bi bi-envelope-x me-1"></i> No registrado</span>
                         {% endif %}
                     </div>
 
@@ -144,7 +174,7 @@
                                             <th class="text-end py-3 text-white text-uppercase small fw-bold">Saldo Anterior</th>
                                             <th class="text-end py-3 text-white text-uppercase small fw-bold">Costo del Mes</th>
                                             <th class="text-end py-3 text-white text-uppercase small fw-bold">Dinero Entregado</th>
-                                            <th class="text-end pe-4 py-3 text-white text-uppercase small fw-bold" style="width: 160px;">Saldo Resultante</th>
+                                            <th class="text-end pe-4 py-3 text-white text-uppercase small fw-bold" style="width: 160px;">Estado</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -166,9 +196,19 @@
                                                 {% if d.saldo > 0.1 %}
                                                     <span class="badge bg-danger fs-6 w-100 py-2 shadow-sm">Debe: ${{ "{:,.0f}".format(d.saldo) }}</span>
                                                 {% elif d.saldo < -0.1 %}
-                                                    <span class="badge bg-success fs-6 w-100 py-2 shadow-sm">A favor: ${{ "{:,.0f}".format(d.saldo | abs) }}</span>
+                                                    <span class="badge bg-info fs-6 w-100 py-2 shadow-sm">A favor: ${{ "{:,.0f}".format(d.saldo | abs) }}</span>
                                                 {% else %}
-                                                    <span class="badge bg-secondary fs-6 w-100 py-2 text-uppercase shadow-sm">$0 (Al día)</span>
+                                                    <span class="badge bg-success fs-6 w-100 py-2 text-uppercase shadow-sm"
+                                                        style="cursor: help;"
+                                                        data-bs-toggle="tooltip" 
+                                                        data-bs-placement="top" 
+                                                        {% if d.historial and d.historial.cobrado_por %}
+                                                        title="Marcado por {{ d.historial.cobrado_por }} el {{ d.historial.fecha_pago.strftime('%d/%m/%Y a las %H:%M') }}"
+                                                        {% else %}
+                                                        title="Marcado como pagado antes de la implementación de esta función"
+                                                        {% endif %}>
+                                                        PAGADO
+                                                    </span>
                                                 {% endif %}
                                             </td>
                                         </tr>
@@ -181,6 +221,45 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalAumentoIndividual" tabindex="-1" aria-labelledby="modalAumentoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="{{ url_for('casas.aumento_individual', id=casa.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header bg-info text-white border-0">
+                    <h5 class="modal-title fw-bold" id="modalAumentoLabel"><i class="bi bi-graph-up-arrow me-2"></i>Aumento Personalizado</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4 bg-light">
+                    <p class="text-muted text-center mb-4">
+                        Abono Actual: <span class="badge bg-secondary fs-6">${{ "{:,.0f}".format(casa.precio_base).replace(',', '.') }}</span>
+                    </p>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-uppercase small text-muted">Tipo de Aumento</label>
+                            <select name="tipo_aumento" class="form-select border-info" id="tipoAumentoInd" required>
+                                <option value="porcentaje">Porcentaje (%)</option>
+                                <option value="fijo">Monto Fijo ($)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-uppercase small text-muted">Valor a Incrementar</label>
+                            <input type="number" name="valor_aumento" class="form-control border-info" required step="any" min="0" placeholder="Ej: 15">
+                        </div>
+                    </div>
+                    <div class="form-text mt-3 text-center text-info" id="ayudaAumentoInd">
+                        <i class="bi bi-info-circle me-1"></i> Si ponés <strong>15</strong>, el sistema sumará el <strong>15%</strong> al abono mensual.
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-outline-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-info fw-bold text-white shadow-sm" onclick="return confirm('¿Confirma que desea aplicar este aumento a este único cliente?');">Aplicar Aumento</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -243,6 +322,15 @@
         const d = new Date();
         document.getElementById('extraMes').value = d.getMonth() + 1;
         document.getElementById('extraAnio').value = d.getFullYear();
+    });
+
+    document.getElementById('tipoAumentoInd').addEventListener('change', function() {
+        const ayuda = document.getElementById('ayudaAumentoInd');
+        if(this.value === 'porcentaje') {
+            ayuda.innerHTML = '<i class="bi bi-info-circle me-1"></i> Si ponés <strong>15</strong>, el sistema sumará el <strong>15%</strong> al abono mensual.';
+        } else {
+            ayuda.innerHTML = '<i class="bi bi-info-circle me-1"></i> Si ponés <strong>15000</strong>, el sistema sumará <strong>$15.000</strong> directos al abono mensual.';
+        }
     });
 </script>
 

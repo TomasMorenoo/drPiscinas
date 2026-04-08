@@ -1,4 +1,5 @@
 from app import db
+
 class AbonoHistorico(db.Model):
     __tablename__ = 'abonos_historicos'
     id = db.Column(db.Integer, primary_key=True)
@@ -8,9 +9,16 @@ class AbonoHistorico(db.Model):
     monto = db.Column(db.Float, nullable=False)
     
     pagado = db.Column(db.Boolean, default=False)
-    # NUEVO ESTADO: Para saber si ya le mandaste el WhatsApp
     mensaje_enviado = db.Column(db.Boolean, default=False)
     
     monto_pagado = db.Column(db.Float, default=0.0)
+    
+    cobrado_por = db.Column(db.String(100), nullable=True)
+    fecha_pago = db.Column(db.DateTime, nullable=True)
+    
+    transaccion_id = db.Column(db.String(36), nullable=True)
+    
+    # LA MEMORIA INTERNA: Para que múltiples pagos en el mismo mes no se pisen
+    detalle_pagos = db.Column(db.String(500), nullable=True)
 
     casa = db.relationship('Casa', backref=db.backref('historial_abonos', lazy=True))

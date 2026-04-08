@@ -1,5 +1,6 @@
 from app import db
 from sqlalchemy import UniqueConstraint
+from datetime import datetime # <-- ASEGURATE DE TENER ESTO
 
 class Casa(db.Model):
     __tablename__ = "casas"
@@ -19,23 +20,18 @@ class Casa(db.Model):
     precio_anterior = db.Column(db.Float, nullable=True)
     activo = db.Column(db.Boolean, default=True)
     nombre_cliente = db.Column(db.String(100), nullable=True)
-    telefono = db.Column(db.String(50), nullable=True)
+    telefono = db.Column(db.String(50), nullable=True) 
+    email = db.Column(db.String(120), nullable=True)
     
-    country_id = db.Column(
-        db.Integer,
-        db.ForeignKey("countries.id"),
-        nullable=False
-    )
-
-    barrio_id = db.Column(
-        db.Integer,
-        db.ForeignKey("barrios.id"),
-        nullable=True
-    )
+    fecha_creacion = db.Column(db.DateTime, default=datetime.now)
     
+    country_id = db.Column(db.Integer, db.ForeignKey("countries.id"), nullable=False)
+    barrio_id = db.Column(db.Integer, db.ForeignKey("barrios.id"), nullable=True)
     grupo_id = db.Column(db.Integer, db.ForeignKey("grupos_clientes.id"), nullable=True)
     grupo = db.relationship("GrupoCliente", backref=db.backref("casas", lazy=True))
-
+    
+    inactivado_por = db.Column(db.String(100), nullable=True)
+    fecha_inactivacion = db.Column(db.DateTime, nullable=True)
     def __repr__(self):
         return f"<Casa {self.numero}>"
     
@@ -62,23 +58,19 @@ class Casa(db.Model):
         }
 
     def nombre_formateado(self):
+        num_str = "" if self.numero.upper() == "S/N" else f" {self.numero}"
+        
         if self.barrio:
-            return f"{self.barrio.nombre} {self.numero}"
-        return f"{self.country.nombre} {self.numero}"
+            return f"{self.barrio.nombre}{num_str}"
+        return f"{self.country.nombre}{num_str}"
     
     def obtener_saldo_anterior(self, mes, anio):
-        """Calcula la deuda o saldo a favor acumulado usando los precios históricos congelados"""
         saldo = 0.0
-        
-        # Ordenamos cronológicamente para que la plata fluya en el tiempo
         historiales_ordenados = sorted(self.historial_abonos, key=lambda x: (x.anio, x.mes))
         
         for hist in historiales_ordenados:
             if hist.anio < anio or (hist.anio == anio and hist.mes < mes):
-                # FIX CRÍTICO: Usamos el MONTO HISTÓRICO CONGELADO, no el precio actual
                 abono_hist = float(hist.monto)
-                
-                # Calculamos los extras usando solo las visitas de ese mes específico
                 extras_hist = 0.0
                 for visita in self.visitas:
                     if visita.fecha.month == hist.mes and visita.fecha.year == hist.anio:
@@ -96,7 +88,6 @@ class Casa(db.Model):
                 saldo += total_hist
                 saldo -= pagado_hist
                 
-                # Compatibilidad: Si se marcó como pagado con el botón viejo (sin monto), reseteamos la deuda
                 if getattr(hist, 'pagado', False) and pagado_hist == 0 and saldo > 0.01:
                     saldo = 0.0
                     

@@ -6,3 +6,5 @@ sueltos/
 venv/
 db_data
 preindex.html
+reset.py
+purga.py

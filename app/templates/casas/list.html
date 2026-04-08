@@ -135,7 +135,15 @@
                                 Activo
                             </span>
                         {% else %}
-                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill text-uppercase" style="font-size: 0.7rem;">
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill text-uppercase" 
+                                  style="font-size: 0.7rem; cursor: help;"
+                                  data-bs-toggle="tooltip" 
+                                  data-bs-placement="top" 
+                                  {% if casa.inactivado_por %}
+                                  title="Inactivado por {{ casa.inactivado_por }} el {{ casa.fecha_inactivacion.strftime('%d/%m/%Y a las %H:%M') }}"
+                                  {% else %}
+                                  title="Inactivado antes de la implementación de esta función"
+                                  {% endif %}>
                                 Inactivo
                             </span>
                         {% endif %}

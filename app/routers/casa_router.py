@@ -164,9 +164,16 @@ def editar_casa(id):
     casa = Casa.query.get_or_404(id)
 
     if request.method == "POST":
-        numero = request.form.get("numero", "").strip()
+        # --- LOGICA DEL S/N ---
+        sin_numero = request.form.get("sin_numero")
+        if sin_numero:
+            numero = "S/N"
+        else:
+            numero = request.form.get("numero", "").strip()
+            
         nombre_cliente = request.form.get("nombre_cliente", "").strip()
         telefono = request.form.get("telefono", "").strip()
+        email = request.form.get("email", "").strip() # NUEVO
         
         try:
             nuevo_precio = float(request.form.get("precio_base", 0))
@@ -178,7 +185,7 @@ def editar_casa(id):
         barrio_id = request.form.get("barrio_id") or None
 
         if not numero or not country_id or not telefono or nuevo_precio < 0:
-            flash("Datos inválidos. Asegurate de completar el Teléfono.", "error")
+            flash("Datos inválidos. Asegurate de completar el Teléfono y el Número.", "error")
             return redirect(url_for("casas.editar_casa", id=id))
 
         query = Casa.query.filter(Casa.id != id).filter_by(numero=numero, country_id=country_id)
@@ -202,6 +209,7 @@ def editar_casa(id):
         casa.barrio_id = barrio_id
         casa.nombre_cliente = nombre_cliente
         casa.telefono = telefono
+        casa.email = email if email else None # NUEVO
         
         db.session.commit()
         flash("Cliente actualizado.", "success")
@@ -220,12 +228,19 @@ def editar_casa(id):
 @admin_required 
 def crear_casa():
     if request.method == "POST":
-        numeros_input = request.form.get("numero", "").strip()
+        # --- LOGICA DEL S/N ---
+        sin_numero = request.form.get("sin_numero")
+        if sin_numero:
+            numeros_input = "S/N"
+        else:
+            numeros_input = request.form.get("numero", "").strip()
+            
         precio_base = request.form.get("precio_base", "").strip()
         country_id = request.form.get("country_id")
         barrio_id = request.form.get("barrio_id") or None
         nombre_cliente = request.form.get("nombre_cliente", "").strip()
         telefono = request.form.get("telefono", "").strip()
+        email = request.form.get("email", "").strip() # NUEVO
 
         if not numeros_input or not precio_base or not country_id or not telefono:
             flash("Faltan datos obligatorios (incluyendo el Teléfono).", "error")
@@ -253,7 +268,8 @@ def crear_casa():
                 country_id=country_id, 
                 barrio_id=barrio_id,
                 nombre_cliente=nombre_cliente,
-                telefono=telefono
+                telefono=telefono,
+                email=email if email else None # NUEVO
             )
             db.session.add(nueva_casa)
             creados += 1
@@ -381,7 +397,8 @@ def perfil(id):
             "saldo_anterior": saldo_anterior_iter,
             "costo_mes": total_mes,
             "pagado": dinero_mostrado,
-            "saldo": saldo_acumulado
+            "saldo": saldo_acumulado,
+            "historial": h
         })
         
     detalles_pagos.reverse()
@@ -402,7 +419,15 @@ def barrios_por_country(country_id):
 @admin_required
 def toggle_casa(id):
     casa = Casa.query.get_or_404(id)
-    casa.activo = not casa.activo
+    if casa.activo:
+        casa.activo = False
+        casa.inactivado_por = current_user.username
+        casa.fecha_inactivacion = datetime.now()
+    else:
+        casa.activo = True
+        casa.inactivado_por = None
+        casa.fecha_inactivacion = None
+        
     db.session.commit()
     return redirect(url_for("casas.listar_casas"))
 
@@ -424,6 +449,35 @@ def eliminar_casa(id):
         db.session.rollback()
         flash(f"Error: {str(e)}", "error")
     return redirect(url_for("casas.listar_casas"))
+
+#==============================================================================================00
+# AUMENTO PERSONALIZADO
+#==============================================================================================00
+
+@casa_bp.route("/aumento-individual/<int:id>", methods=["POST"])
+@login_required
+@admin_required
+def aumento_individual(id):
+    casa = Casa.query.get_or_404(id)
+    tipo = request.form.get("tipo_aumento")
+    
+    try:
+        valor = float(request.form.get("valor_aumento", 0).replace(',', '.'))
+    except ValueError:
+        flash("Valor inválido", "error")
+        return redirect(request.referrer or url_for('casas.listar_casas'))
+    
+    if valor > 0:
+        casa.precio_anterior = float(casa.precio_base)
+        if tipo == "porcentaje":
+            casa.precio_base = float(casa.precio_base) * (1 + (valor / 100))
+        else:
+            casa.precio_base = float(casa.precio_base) + valor
+            
+        db.session.commit()
+        flash(f"Aumento aplicado correctamente a {casa.nombre_formateado()}", "success")
+        
+    return redirect(request.referrer or url_for('casas.listar_casas'))
 
 @casa_bp.route("/create_form", methods=["GET"]) 
 @login_required

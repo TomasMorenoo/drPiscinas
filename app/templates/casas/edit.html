@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row justify-content-center">
+<div class="row justify-content-center mt-4">
     <div class="col-md-8 col-lg-6">
         
         <div class="card shadow border-0">
@@ -17,7 +17,7 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     
                     <div class="mb-3">
-                        <label class="form-label fw-bold small text-uppercase text-muted">Country</label>
+                        <label class="form-label fw-bold small text-uppercase text-muted">Country <span class="text-danger">*</span></label>
                         <select name="country_id" id="country_select" class="form-select" required onchange="cargarBarrios()">
                             {% for country in countries %}
                                 <option value="{{ country.id }}" {% if country.id == casa.country_id %}selected{% endif %}>
@@ -39,9 +39,25 @@
                         </select>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-uppercase text-muted">Número de Lote / Casa</label>
-                        <input type="text" name="numero" class="form-control fw-bold" value="{{ casa.numero }}" required>
+                    <div class="row mb-3">
+                        <div class="col-md-7">
+                            <label class="form-label fw-bold small text-uppercase text-muted">Número de Lote / Casa <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="text" name="numero" id="numero" class="form-control fw-bold" value="{{ casa.numero }}" {% if casa.numero == 'S/N' %}disabled{% endif %} required>
+                                <div class="input-group-text bg-white">
+                                    <input class="form-check-input mt-0 me-2" type="checkbox" name="sin_numero" id="sinNumeroCheck" value="1" {% if casa.numero == 'S/N' %}checked{% endif %} onchange="toggleNumero()">
+                                    <label class="form-check-label fw-bold small" for="sinNumeroCheck">S/N</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold small text-uppercase text-muted">Abono Mensual <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white text-secondary">$</span>
+                                <input type="text" name="precio_base" id="inputPrecio" class="form-control fw-bold text-end" value="{{ '{:,.0f}'.format(casa.precio_base).replace(',', '.') }}" required oninput="formatearMoneda(this)">
+                            </div>
+                        </div>
                     </div>
 
                     <div class="row">
@@ -62,29 +78,23 @@
                         </div>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="form-label fw-bold small text-uppercase text-muted">Abono Mensual Base ($)</label>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-uppercase text-muted">Email del Cliente (Opcional)</label>
                         <div class="input-group">
-                            <span class="input-group-text bg-white fw-bold">$</span>
-                            <input type="text" 
-                                   inputmode="decimal" 
-                                   name="precio_base" 
-                                   id="inputPrecio" 
-                                   class="form-control fw-bold text-dark fs-5" 
-                                   value="{{ '{:,.2f}'.format(casa.precio_base).replace(',', 'X').replace('.', ',').replace('X', '.') }}" 
-                                   oninput="formatearMoneda(this)"
-                                   placeholder="0,00"
-                                   required>
+                            <span class="input-group-text bg-white"><i class="bi bi-envelope text-primary"></i></span>
+                            <input type="email" name="email" class="form-control fw-bold" value="{{ casa.email if casa.email else '' }}" placeholder="Ej: cliente@correo.com">
                         </div>
-                        <div class="form-text">Use coma para los centavos (Ej: 250.000,50).</div>
                     </div>
 
-                    <hr>
-
-                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                        <a href="{{ url_for('casas.listar_casas') }}" class="btn btn-outline-secondary px-4">Cancelar</a>
-                        <button type="submit" class="btn btn-dark px-4 fw-bold">Guardar Cambios</button>
+                    <hr class="text-muted mt-4">
+                    
+                    <div class="d-flex justify-content-end">
+                        <a href="{{ url_for('casas.listar_casas') }}" class="btn btn-outline-secondary me-2 px-4 fw-bold shadow-sm">Cancelar</a>
+                        <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm">
+                            <i class="bi bi-save me-1"></i> Guardar Cambios
+                        </button>
                     </div>
+
                 </form>
             </div>
         </div>
@@ -92,7 +102,21 @@
 </div>
 
 <script>
-    // 1. CARGA DE BARRIOS DINÁMICA
+    // 1. Lógica para el checkbox S/N
+    function toggleNumero() {
+        const check = document.getElementById('sinNumeroCheck');
+        const input = document.getElementById('numero');
+        if (check.checked) {
+            input.value = ''; // Limpiamos el input si marcan S/N
+            input.disabled = true;
+            input.required = false;
+        } else {
+            input.disabled = false;
+            input.required = true;
+        }
+    }
+
+    // 2. Carga de barrios dinámica
     function cargarBarrios() {
         const countryId = document.getElementById('country_select').value;
         const barrioSelect = document.getElementById('barrio_select');
@@ -117,7 +141,7 @@
             .catch(error => { console.error(error); });
     }
 
-    // 2. FORMATEO DE MONEDA ARGENTINA (Puntos para mil, coma para decimal)
+    // 3. Formateo de moneda argentina (Puntos para mil, coma para decimal)
     function formatearMoneda(input) {
         let value = input.value;
         let parts = value.split(',');
@@ -134,13 +158,15 @@
         input.value = newValue;
     }
 
-    // 3. LIMPIEZA PARA PYTHON (Quitar puntos, cambiar coma por punto)
+    // 4. Limpieza para Python (Quitar puntos, cambiar coma por punto al enviar form)
     document.getElementById('formEditar').addEventListener('submit', function(e) {
         const input = document.getElementById('inputPrecio');
-        let valor = input.value;
-        valor = valor.replace(/\./g, "");
-        valor = valor.replace(",", ".");
-        input.value = valor;
+        if (input) {
+            let valor = input.value;
+            valor = valor.replace(/\./g, ""); // Borra los puntos
+            valor = valor.replace(",", ".");  // Cambia coma por punto para la DB
+            input.value = valor;
+        }
     });
 </script>
 {% endblock %}
