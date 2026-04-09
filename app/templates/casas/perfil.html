@@ -25,7 +25,7 @@
                 <i class="bi bi-box-seam me-1"></i> Producto Extra
             </button>
 
-            <a href="javascript:void(0);" onclick="if(document.referrer) { window.history.back(); } else { window.location.href='{{ url_for('casas.listar_casas') }}'; }" class="btn btn-outline-secondary">
+            <a href="javascript:void(0);" onclick="if(document.referrer) { window.history.back(); } else { window.location.href='{{ url_for('casas.listar_casas') }}'; }" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-arrow-left"></i> Volver
             </a>
         </div>
@@ -251,6 +251,22 @@
                             <input type="number" name="valor_aumento" class="form-control border-info" required step="any" min="0" placeholder="Ej: 15">
                         </div>
                     </div>
+
+                    <div class="row g-2 mt-2">
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-uppercase small text-muted">A partir del Mes</label>
+                            <select name="mes_desde" id="mesDesdeInd" class="form-select border-info" required>
+                                <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option>
+                                <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
+                                <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-uppercase small text-muted">Año</label>
+                            <input type="number" name="anio_desde" id="anioDesdeInd" class="form-control border-info" required>
+                        </div>
+                    </div>
+
                     <div class="form-text mt-3 text-center text-info" id="ayudaAumentoInd">
                         <i class="bi bi-info-circle me-1"></i> Si ponés <strong>15</strong>, el sistema sumará el <strong>15%</strong> al abono mensual.
                     </div>
@@ -322,6 +338,9 @@
         const d = new Date();
         document.getElementById('extraMes').value = d.getMonth() + 1;
         document.getElementById('extraAnio').value = d.getFullYear();
+        
+        document.getElementById('mesDesdeInd').value = d.getMonth() + 1;
+        document.getElementById('anioDesdeInd').value = d.getFullYear();
     });
 
     document.getElementById('tipoAumentoInd').addEventListener('change', function() {

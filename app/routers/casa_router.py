@@ -8,9 +8,11 @@ from app.models.visit_product import VisitProduct
 from app.models.products import Product
 from app.models.abono_historico import AbonoHistorico
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import or_, and_
 import re
 import calendar
 from datetime import datetime
+from app.models.casa import HistorialAumento
 
 casa_bp = Blueprint("casas", __name__, url_prefix="/casas")
 
@@ -22,6 +24,61 @@ def natural_sort_key(casa):
     k_barrio = casa.barrio.nombre.lower() if casa.barrio else ""
     k_numero = [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', str(casa.numero))]
     return (k_country, k_barrio, k_numero)
+
+# ==========================================
+# MAGIA DE REDONDEO Y LINEA DE TIEMPO
+# ==========================================
+def aplicar_redondeo(valor):
+    entero = int(round(valor))
+    resto = entero % 1000
+    if resto < 500:
+        return float(entero - resto)       
+    elif resto == 500:
+        return float(entero)               
+    else:
+        return float(entero + (1000 - resto)) 
+
+def asegurar_historial_pasado(casa, precio_viejo, mes_desde, anio_desde):
+    from datetime import datetime
+    limite_inferior = datetime(2026, 1, 1)
+    
+    if not casa.fecha_creacion:
+        fecha_inicio = limite_inferior
+    else:
+        fecha_inicio = max(casa.fecha_creacion, limite_inferior)
+        
+    m_curr = fecha_inicio.month
+    y_curr = fecha_inicio.year
+    m_end = mes_desde - 1
+    y_end = anio_desde
+    if m_end == 0:
+        m_end = 12
+        y_end -= 1
+        
+    while (y_curr < y_end) or (y_curr == y_end and m_curr <= m_end):
+        hist = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=m_curr, anio=y_curr).first()
+        if not hist:
+            nuevo_hist = AbonoHistorico(
+                casa_id=casa.id, mes=m_curr, anio=y_curr, monto=precio_viejo,
+                pagado=True, monto_pagado=precio_viejo, cobrado_por="SISTEMA (Historial Congelado)"
+            )
+            db.session.add(nuevo_hist)
+        m_curr += 1
+        if m_curr > 12:
+            m_curr = 1
+            y_curr += 1
+
+def actualizar_historial_futuro(casa, nuevo_precio, mes_desde, anio_desde):
+    futuros = AbonoHistorico.query.filter(
+        AbonoHistorico.casa_id == casa.id,
+        or_(
+            AbonoHistorico.anio > anio_desde,
+            and_(AbonoHistorico.anio == anio_desde, AbonoHistorico.mes >= mes_desde)
+        ),
+        AbonoHistorico.pagado == False
+    ).all()
+    for f in futuros:
+        f.monto = nuevo_precio
 
 # ==========================================
 # LISTADO
@@ -79,7 +136,7 @@ def listar_casas():
     )
 
 # ==========================================
-# HERRAMIENTA DE AUMENTOS
+# HERRAMIENTA DE AUMENTOS GLOBALES
 # ==========================================
 @casa_bp.route("/aumento", methods=["GET", "POST"])
 @login_required
@@ -88,9 +145,11 @@ def herramienta_aumento():
     if request.method == "POST":
         tipo = request.form.get("tipo")
         country_id = request.form.get("country_id")
+        mes_desde = int(request.form.get("mes_desde", datetime.now().month))
+        anio_desde = int(request.form.get("anio_desde", datetime.now().year))
         
         try:
-            valor = float(request.form.get("valor", 0))
+            valor = float(request.form.get("valor", 0).replace(',', '.'))
         except ValueError:
             flash("El valor ingresado no es válido.", "error")
             return redirect(url_for("casas.herramienta_aumento"))
@@ -106,52 +165,92 @@ def herramienta_aumento():
         casas_afectadas = query.all()
         count = 0
 
+        db.session.query(Casa).update({Casa.precio_anterior: None})
+
         for casa in casas_afectadas:
-            try:
-                casa.precio_anterior = float(casa.precio_base) if casa.precio_base else 0.0
-            except:
-                casa.precio_anterior = 0.0
-            
-            precio_actual = float(casa.precio_base)
-            
-            if tipo == "porcentaje":
-                nuevo = precio_actual * (1 + (valor / 100))
-            else:
-                nuevo = precio_actual + valor
-            
-            casa.precio_base = round(nuevo, 2)
-            count += 1
+            precio_actual = float(casa.precio_base) if casa.precio_base else 0.0
+            if precio_actual > 0:
+                casa.precio_anterior = precio_actual
+                if tipo == "porcentaje":
+                    nuevo_bruto = precio_actual * (1 + (valor / 100))
+                else:
+                    nuevo_bruto = precio_actual + valor
+                
+                nuevo_precio = aplicar_redondeo(nuevo_bruto)
+                casa.precio_base = nuevo_precio
+                
+                asegurar_historial_pasado(casa, precio_actual, mes_desde, anio_desde)
+                actualizar_historial_futuro(casa, nuevo_precio, mes_desde, anio_desde)
+                count += 1
 
         db.session.commit()
-        flash(f"✅ Precios actualizados en {count} propiedades.", "success")
+        
+        # --- REGISTRO DEL AUMENTO ---
+        if count > 0:
+            target = "TODOS LOS CLIENTES"
+            if country_id:
+                c_obj = Country.query.get(country_id)
+                if c_obj: target = f"COUNTRY {c_obj.nombre.upper()}"
+            
+            simbolo = "%" if tipo == "porcentaje" else "$"
+            texto_valor = f"{valor}{simbolo}" if tipo == "porcentaje" else f"{simbolo}{valor}"
+            desc = f"Aumento Global ({texto_valor}) a {target}"
+            
+            log = HistorialAumento(fecha=datetime.now(), descripcion=desc, casas_afectadas=count, mes_desde=mes_desde, anio_desde=anio_desde)
+            db.session.add(log)
+            db.session.commit()
+            
+            flash(f"✅ Precios actualizados en {count} propiedades a partir de {mes_desde}/{anio_desde}.", "success")
+        else:
+            flash("⚠️ No se encontraron propiedades con abono mayor a $0 para aumentar.", "warning")
+            
         return redirect(url_for("casas.listar_casas"))
 
     countries = Country.query.filter_by(activo=True).order_by(Country.nombre).all()
-    hay_backup = Casa.query.filter(Casa.precio_anterior.isnot(None)).first() is not None
+    hay_backup = Casa.query.filter(Casa.precio_anterior.isnot(None), Casa.precio_anterior > 0).first() is not None
     
-    return render_template("casas/aumento.html", countries=countries, hay_backup=hay_backup)
+    # Buscamos los últimos 15 movimientos
+    ultimos_aumentos = HistorialAumento.query.order_by(HistorialAumento.fecha.desc()).limit(15).all()
+    
+    return render_template("casas/aumento.html", countries=countries, hay_backup=hay_backup, ultimos_aumentos=ultimos_aumentos)
 
 # ==========================================
-# DESHACER (VOLVER A LISTA)
+# DESHACER EL ÚLTIMO AUMENTO
 # ==========================================
 @casa_bp.route("/deshacer_aumento")
 @login_required
 @admin_required
 def deshacer_aumento():
-    casas_modificadas = Casa.query.filter(Casa.precio_anterior.isnot(None)).all()
+    casas_modificadas = Casa.query.filter(Casa.precio_anterior.isnot(None), Casa.precio_anterior > 0).all()
     
     if not casas_modificadas:
-        flash("No hay cambios recientes para deshacer.", "warning")
+        flash("No hay cambios recientes válidos para deshacer.", "warning")
         return redirect(url_for("casas.listar_casas"))
     
     count = 0
     for casa in casas_modificadas:
-        casa.precio_base = casa.precio_anterior
-        casa.precio_anterior = None
+        precio_malo = float(casa.precio_base)
+        precio_bueno = float(casa.precio_anterior)
+        
+        historiales = AbonoHistorico.query.filter_by(casa_id=casa.id, pagado=False).all()
+        for h in historiales:
+            if float(h.monto) == precio_malo:
+                h.monto = precio_bueno
+        
+        casa.precio_base = precio_bueno
+        casa.precio_anterior = None 
         count += 1
         
     db.session.commit()
-    flash(f"⏪ Se deshicieron los cambios en {count} propiedades.", "info")
+    
+    # --- REGISTRO DEL DESHACER ---
+    if count > 0:
+        desc = "Reversión (Deshacer) del último aumento"
+        log = HistorialAumento(fecha=datetime.now(), descripcion=desc, casas_afectadas=count)
+        db.session.add(log)
+        db.session.commit()
+        
+    flash(f"⏪ Se restauraron los abonos originales en {count} propiedades.", "info")
     return redirect(url_for("casas.listar_casas"))
 
 # ==========================================
@@ -304,7 +403,6 @@ def agregar_extra(id):
     if product_id and cantidad:
         producto = Product.query.get(product_id)
         
-        # Fecha en el último día del mes
         ultimo_dia = calendar.monthrange(anio, mes)[1]
         fecha_fantasma = datetime(anio, mes, ultimo_dia, 12, 0, 0)
 
@@ -325,12 +423,9 @@ def agregar_extra(id):
         )
         db.session.add(nuevo_vp)
         
-        # --- MAGIA PARA MESES CERRADOS ---
-        # Si el mes ya estaba cerrado, le inyectamos la plata del producto al total congelado
         historial = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
         if historial:
             historial.monto += float(cantidad) * float(producto.precio)
-        # ---------------------------------
 
         db.session.commit()
         flash("Producto extra cargado exitosamente.", "success")
@@ -344,14 +439,10 @@ def eliminar_extra(visit_id):
     visita = Visit.query.get_or_404(visit_id)
     casa_id = visita.casa_id
     if visita.observaciones == "[EXTRA_MANUAL]":
-        
-        # --- MAGIA PARA MESES CERRADOS ---
-        # Si borramos el extra, le restamos la plata al mes congelado
         historial = AbonoHistorico.query.filter_by(casa_id=casa_id, mes=visita.fecha.month, anio=visita.fecha.year).first()
         if historial:
             for vp in visita.productos:
                 historial.monto -= float(vp.cantidad) * float(vp.precio_unitario or vp.product.precio)
-        # ---------------------------------
 
         VisitProduct.query.filter_by(visit_id=visita.id).delete()
         db.session.delete(visita)
@@ -450,16 +541,17 @@ def eliminar_casa(id):
         flash(f"Error: {str(e)}", "error")
     return redirect(url_for("casas.listar_casas"))
 
-#==============================================================================================00
-# AUMENTO PERSONALIZADO
-#==============================================================================================00
-
+#==============================================================================================
+# AUMENTO PERSONALIZADO (Individual)
+#==============================================================================================
 @casa_bp.route("/aumento-individual/<int:id>", methods=["POST"])
 @login_required
 @admin_required
 def aumento_individual(id):
     casa = Casa.query.get_or_404(id)
     tipo = request.form.get("tipo_aumento")
+    mes_desde = int(request.form.get("mes_desde", datetime.now().month))
+    anio_desde = int(request.form.get("anio_desde", datetime.now().year))
     
     try:
         valor = float(request.form.get("valor_aumento", 0).replace(',', '.'))
@@ -467,15 +559,36 @@ def aumento_individual(id):
         flash("Valor inválido", "error")
         return redirect(request.referrer or url_for('casas.listar_casas'))
     
-    if valor > 0:
-        casa.precio_anterior = float(casa.precio_base)
+    precio_actual = float(casa.precio_base) if casa.precio_base else 0.0
+
+    if valor > 0 and precio_actual > 0:
+        db.session.query(Casa).update({Casa.precio_anterior: None})
+        
+        casa.precio_anterior = precio_actual
         if tipo == "porcentaje":
-            casa.precio_base = float(casa.precio_base) * (1 + (valor / 100))
+            nuevo_bruto = precio_actual * (1 + (valor / 100))
         else:
-            casa.precio_base = float(casa.precio_base) + valor
+            nuevo_bruto = precio_actual + valor
+            
+        nuevo_precio = aplicar_redondeo(nuevo_bruto)
+        casa.precio_base = nuevo_precio
+        
+        asegurar_historial_pasado(casa, precio_actual, mes_desde, anio_desde)
+        actualizar_historial_futuro(casa, nuevo_precio, mes_desde, anio_desde)
             
         db.session.commit()
-        flash(f"Aumento aplicado correctamente a {casa.nombre_formateado()}", "success")
+        
+        # --- REGISTRO DEL AUMENTO ---
+        simbolo = "%" if tipo == "porcentaje" else "$"
+        texto_valor = f"{valor}{simbolo}" if tipo == "porcentaje" else f"{simbolo}{valor}"
+        desc = f"Aumento Indiv. ({texto_valor}) a {casa.nombre_formateado()}"
+        log = HistorialAumento(fecha=datetime.now(), descripcion=desc, casas_afectadas=1, mes_desde=mes_desde, anio_desde=anio_desde)
+        db.session.add(log)
+        db.session.commit()
+        
+        flash(f"Aumento aplicado correctamente a {casa.nombre_formateado()} a partir de {mes_desde}/{anio_desde}", "success")
+    else:
+        flash("El cliente debe tener un abono mayor a $0 para aplicarle un aumento.", "warning")
         
     return redirect(request.referrer or url_for('casas.listar_casas'))
 

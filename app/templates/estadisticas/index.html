@@ -160,19 +160,14 @@
         const data = listaCountries[currentCountryIdx];
         document.getElementById('sliderCountryNombre').innerText = data.nombre;
         
-        // Armamos la "mini-card" de las Casas
         const textoCasas = data.casas + (data.casas === 1 ? " Casa" : " Casas");
         const badgeCasas = `<span class="badge bg-white text-dark border shadow-sm px-2 py-1"><i class="bi bi-house-door-fill text-success me-1"></i>${textoCasas}</span>`;
         
-        // Verificamos si tiene barrios
         if (data.barrios > 0) {
             const textoBarrios = data.barrios + (data.barrios === 1 ? " Barrio" : " Barrios");
             const badgeBarrios = `<span class="badge bg-white text-dark border shadow-sm px-2 py-1"><i class="bi bi-signpost-split-fill text-warning me-1"></i>${textoBarrios}</span>`;
-            
-            // Mostramos ambas cards separadas
             statsContainer.innerHTML = badgeBarrios + badgeCasas;
         } else {
-            // Si tiene 0 barrios, mostramos SOLO la card de Casas
             statsContainer.innerHTML = badgeCasas;
         }
     }
@@ -185,7 +180,7 @@
         renderCountrySlider();
     }
     
-    renderCountrySlider(); // Iniciar slider
+    renderCountrySlider();
 
     // --- 2. GRÁFICOS ANUALES DE DINERO ---
     const nombresMeses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -205,48 +200,44 @@
     new Chart(document.getElementById('chartProductos'), { ...chartConfig, data: { labels: nombresMeses, datasets: [{ label: 'Productos', data: datosProductos, borderColor: '#0dcaf0', backgroundColor: 'rgba(13, 202, 240, 0.2)', fill: true, tension: 0.4 }] }});
 
 
-    // --- 3. LÓGICA DE TEMPORADA ALTA Y BAJA ---
+    // --- 3. LÓGICA DE TEMPORADA ALTA Y BAJA CON MEMORIA DE SERVIDOR ---
     const usoProductosDB = JSON.parse('{{ uso_productos_mes | safe }}');
     
     const anioActual = {{ anio_actual }};
     const anioAnterior = {{ anio_anterior }};
 
-    // Definimos el "Ciclo Operativo" estricto (De Noviembre a Noviembre)
     const availableKeys = [
-        `${anioAnterior}-11`,
-        `${anioAnterior}-12`,
-        `${anioActual}-01`,
-        `${anioActual}-02`,
-        `${anioActual}-03`,
-        `${anioActual}-04`,
-        `${anioActual}-05`,
-        `${anioActual}-06`,
-        `${anioActual}-07`,
-        `${anioActual}-08`,
-        `${anioActual}-09`,
-        `${anioActual}-10`,
+        `${anioAnterior}-11`, `${anioAnterior}-12`, `${anioActual}-01`,
+        `${anioActual}-02`, `${anioActual}-03`, `${anioActual}-04`,
+        `${anioActual}-05`, `${anioActual}-06`, `${anioActual}-07`,
+        `${anioActual}-08`, `${anioActual}-09`, `${anioActual}-10`,
         `${anioActual}-11`
     ];
     
-    // Por defecto: Dic, Ene, Feb
-    let mesesAlta = [
-        `${anioAnterior}-12`,
-        `${anioActual}-01`,
-        `${anioActual}-02`
-    ];
+    // Recibimos los datos guardados desde Python
+    const mesesGuardados = JSON.parse('{{ meses_alta_session | safe }}');
+    let mesesAlta = [];
+    
+    if (mesesGuardados && Array.isArray(mesesGuardados) && mesesGuardados.length > 0) {
+        mesesAlta = mesesGuardados; // Usa lo que el servidor recuerda
+    } else {
+        // Por defecto: Si es la primera vez que entra
+        mesesAlta = [
+            `${anioAnterior}-12`,
+            `${anioActual}-01`,
+            `${anioActual}-02`
+        ];
+    }
 
-    // Helper: Pasa de "2026-01" a "Ene 26"
     function formatearMesCorto(key) {
         const [y, m] = key.split('-');
         return nombresMeses[parseInt(m)-1] + ' ' + y.slice(2);
     }
 
-    // Helper: Resume un array de meses en "Inicio - Fin"
     function resumirRango(keysArray) {
         if (!keysArray || keysArray.length === 0) return 'Ningún mes';
         if (keysArray.length === 1) return formatearMesCorto(keysArray[0]);
-        
-        keysArray.sort(); // Aseguramos orden cronológico
+        keysArray.sort();
         return formatearMesCorto(keysArray[0]) + ' - ' + formatearMesCorto(keysArray[keysArray.length - 1]);
     }
 
@@ -256,9 +247,7 @@
         
         availableKeys.forEach(key => {
             const isChecked = mesesAlta.includes(key) ? 'checked' : '';
-            const nombreMes = formatearMesCorto(key); // Ahora dice "Nov 25", "Ene 26", etc.
-            
-            // Destacamos los meses de calor
+            const nombreMes = formatearMesCorto(key);
             const mesNum = key.split('-')[1];
             const esMesClave = ['11', '12', '01', '02', '03'].includes(mesNum);
             const labelStyle = esMesClave ? 'text-danger' : 'text-primary';
@@ -273,22 +262,33 @@
     }
 
     function toggleMes(key) {
+        // 1. Modificar el Array local
         if (mesesAlta.includes(key)) {
             mesesAlta = mesesAlta.filter(k => k !== key);
         } else {
             mesesAlta.push(key);
         }
+        
+        // 2. Refrescar las tablas
         actualizarTablas();
+        
+        // 3. AVISARLE A PYTHON SILENCIOSAMENTE PARA QUE GUARDE LA PREFERENCIA
+        fetch("{{ url_for('estadisticas.guardar_prefs') }}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token() }}" // Seguridad obligatoria
+            },
+            body: JSON.stringify({ meses_alta: mesesAlta })
+        }).catch(err => console.log("Error guardando preferencia:", err));
     }
 
     function actualizarTablas() {
         let stockAlta = {};
         let stockBaja = {};
 
-        // 1. ORDENAMOS LA TEMPORADA ALTA CRONOLÓGICAMENTE
         mesesAlta.sort();
         
-        // 2. DEFINIMOS LA TEMPORADA BAJA (Regla de negocio: solo meses POSTERIORES a la Alta)
         let mesesBaja = [];
         if (mesesAlta.length > 0) {
             let ultimoMesAlta = mesesAlta[mesesAlta.length - 1];
@@ -297,7 +297,6 @@
             mesesBaja = [...availableKeys];
         }
 
-        // 3. Acumulamos productos para Temporada Alta
         mesesAlta.forEach(key => {
             const productosDelMes = usoProductosDB[key] || {};
             for (const [producto, data] of Object.entries(productosDelMes)) {
@@ -306,7 +305,6 @@
             }
         });
 
-        // 4. Acumulamos productos para Temporada Baja
         mesesBaja.forEach(key => {
             const productosDelMes = usoProductosDB[key] || {};
             for (const [producto, data] of Object.entries(productosDelMes)) {
@@ -315,11 +313,9 @@
             }
         });
 
-        // 5. Actualizamos los textos resumidos (Ej: "Dic 25 - Feb 26")
         document.getElementById('badgeAlta').innerText = resumirRango(mesesAlta);
         document.getElementById('badgeBaja').innerText = resumirRango(mesesBaja);
 
-        // 6. Dibujamos las tablas
         pintarTabla('tablaTemporadaAlta', stockAlta);
         pintarTabla('tablaTemporadaBaja', stockBaja);
     }
@@ -328,7 +324,6 @@
         const tbody = document.getElementById(idTabla);
         tbody.innerHTML = '';
         
-        // Ordenamos de mayor cantidad a menor cantidad
         const productosOrdenados = Object.entries(datosStock).sort((a, b) => b[1].cant - a[1].cant);
 
         if (productosOrdenados.length === 0) {
@@ -349,7 +344,7 @@
         });
     }
 
-    // Inicializamos
+    // Inicializamos todo
     renderizarSelector();
     actualizarTablas();
 </script>

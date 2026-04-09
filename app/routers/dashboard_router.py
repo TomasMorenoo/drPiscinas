@@ -48,7 +48,6 @@ def obtener_marca_tiempo(mes_contexto, anio_contexto):
 # ==========================================
 
 def get_ar_time():
-    # Aseguramos la hora de Argentina UTC-3
     tz_ar = timezone(timedelta(hours=-3))
     return datetime.now(tz_ar)
 
@@ -59,7 +58,6 @@ def obtener_saludo_tiempo(nombre):
 
 def get_nombre_limpio(casa):
     nombre = casa.nombre_formateado()
-    # Elimina el S/N, S/n, s/n final
     return re.sub(r'(?i)\s+S/N$', '', nombre).strip()
 
 def obtener_detalle_productos(casa, mes, anio):
@@ -71,7 +69,6 @@ def obtener_detalle_productos(casa, mes, anio):
                 unidad = vp.product.unidad.strip() if vp.product.unidad else ""
                 clave = f"{nombre}_{unidad}"
                 
-                # Agrupa los productos si se llaman igual (extras manuales + normales)
                 if clave not in productos_dict:
                     productos_dict[clave] = {'nombre': nombre, 'unidad': unidad, 'cantidad': 0.0}
                 productos_dict[clave]['cantidad'] += float(vp.cantidad)
@@ -79,7 +76,6 @@ def obtener_detalle_productos(casa, mes, anio):
     detalles = []
     for p in productos_dict.values():
         c = p['cantidad']
-        # Si es un numero redondo (ej 5.0) le saca el decimal y muestra 5
         cant_str = str(int(c)) if c.is_integer() else str(c)
         detalles.append(f"{cant_str}{p['unidad']} de {p['nombre']}")
     return detalles
@@ -89,7 +85,6 @@ def generar_texto_deuda(hist_deuda, saldo_anterior, mes, anio):
         return ""
     meses_nombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
     
-    # FORMATO DEFINITIVO: Limpio y directo
     texto = f"\nSaldo pendiente: $ {format_money(saldo_anterior)}\n"
     
     if len(hist_deuda) == 1:
@@ -154,7 +149,6 @@ def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo, saldo_ant
         
     texto_wa += "Muchas Gracias."
     return texto_wa
-
 
 # ==========================================
 # LOGICA DE PAGOS Y CASCADA
@@ -260,7 +254,6 @@ def aplicar_pago_en_cascada(casa, monto_ingresado, username, mes_contexto, anio_
         elif txn_id not in actual:
             hist_actual.detalle_pagos = f"{actual}|{detalle_str}"
 
-
 # ==========================================
 # RUTAS DEL DASHBOARD
 # ==========================================
@@ -302,7 +295,8 @@ def index():
         saldo_ant_v = c.obtener_saldo_anterior(mes, anio)
         hist_v = historial_dict.get(c.id)
         
-        if mes_congelado and hist_v:
+        # AHORA RESPETA CUALQUIER HISTORIAL GUARDADO
+        if hist_v:
             ab_v = float(hist_v.monto)
         else:
             ab_v = float(c.precio_base or 0) if (c.activo or extras_v > 0) else 0.0
@@ -329,7 +323,8 @@ def index():
         saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
         historial = historial_dict.get(casa.id)
         
-        if mes_congelado and historial:
+        # AHORA RESPETA CUALQUIER HISTORIAL GUARDADO
+        if historial:
             abono_mes = float(historial.monto)
         else:
             abono_mes = float(casa.precio_base or 0) if (casa.activo or extras > 0) else 0.0
@@ -809,13 +804,15 @@ def planilla_impresion():
 
     casas.sort(key=natural_sort_key)
     
-    filas = []
+    reporte_sueltas = []
+    reporte_grupos = {}
+    
     for casa in casas:
         datos = casa.obtener_gastos_mensuales(mes, anio)
         producto = float(datos.get("extras", 0))
         historial = historial_dict.get(casa.id)
         
-        if mes_congelado and historial:
+        if historial:
             abono = float(historial.monto)
         else:
             abono = float(casa.precio_base or 0) if (casa.activo or producto > 0) else 0.0
@@ -825,6 +822,14 @@ def planilla_impresion():
 
         if not casa.activo and total_a_pagar <= 0.1:
             continue
+
+        # --- LÓGICA DE TACHADO (Saber si ya pagó) ---
+        monto_pagado = float(getattr(historial, 'monto_pagado', 0) or 0)
+        esta_pagado = False
+        if historial and getattr(historial, 'pagado', False) and (total_a_pagar - monto_pagado) <= 0.01:
+            esta_pagado = True
+        elif total_a_pagar <= 0.01 and historial and getattr(historial, 'pagado', False):
+            esta_pagado = True
 
         detalle_prods = []
         for v in casa.visitas:
@@ -836,20 +841,39 @@ def planilla_impresion():
         
         texto_detalle = ", ".join(detalle_prods)
             
-        filas.append({
+        item = {
             "cliente": casa.nombre_formateado(),
             "producto": producto,
             "detalle_productos": texto_detalle, 
             "abono": abono,
             "saldo_anterior": saldo_anterior,
-            "total_a_pagar": total_a_pagar
-        })
+            "total_a_pagar": total_a_pagar,
+            "pagado": esta_pagado # <-- Nuevo dato para la planilla
+        }
+
+        if casa.grupo_id:
+            if casa.grupo_id not in reporte_grupos:
+                reporte_grupos[casa.grupo_id] = {
+                    "nombre": casa.grupo.nombre,
+                    "filas": [],
+                    "total_grupo": 0.0,
+                    "grupo_pagado": True # Asumimos True y lo bajamos si alguno debe
+                }
+            reporte_grupos[casa.grupo_id]["filas"].append(item)
+            reporte_grupos[casa.grupo_id]["total_grupo"] += total_a_pagar
+            if not esta_pagado:
+                reporte_grupos[casa.grupo_id]["grupo_pagado"] = False
+        else:
+            reporte_sueltas.append(item)
         
     nombres_meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
     nombre_mes = nombres_meses[mes - 1]
 
-    return render_template("dashboard/planilla.html", filas=filas, mes_nombre=nombre_mes, anio=anio)
-
+    return render_template("dashboard/planilla.html", 
+                           reporte_sueltas=reporte_sueltas, 
+                           reporte_grupos=list(reporte_grupos.values()), 
+                           mes_nombre=nombre_mes, 
+                           anio=anio)
 @dashboard_bp.route("/api/totales")
 @login_required
 @admin_required
@@ -884,7 +908,8 @@ def api_totales():
         saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
         historial = historial_dict.get(casa.id)
         
-        if mes_congelado and historial:
+        # AHORA RESPETA CUALQUIER HISTORIAL GUARDADO
+        if historial:
             abono_mes = float(historial.monto)
         else:
             abono_mes = float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0

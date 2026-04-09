@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-8 col-lg-6">
+    <div class="col-md-8 col-lg-7">
         
         {% if hay_backup %}
         <div class="alert alert-info shadow-sm d-flex justify-content-between align-items-center mb-4">
@@ -16,7 +16,7 @@
         </div>
         {% endif %}
 
-        <div class="card shadow border-0">
+        <div class="card shadow border-0 mb-4">
             <div class="card-header bg-dark text-white py-3">
                 <h5 class="mb-0 fw-bold text-uppercase">
                     <i class="bi bi-currency-dollar me-2"></i> Actualizar Precios
@@ -25,41 +25,54 @@
             
             <div class="card-body p-4 bg-light">
                 <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center" role="alert">
-                    <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+                    <i class="bi bi-exclamation-triangle-fill fs-4 text-warning me-3"></i>
                     <div>
-                        <strong>Atención:</strong> Esta herramienta modificará el "Precio Base" de los clientes seleccionados.
+                        <strong>Atención:</strong> Esta acción modificará los precios base de todos los clientes activos. Use el botón "Deshacer" si comete un error.
                     </div>
                 </div>
 
-                <form method="POST" action="{{ url_for('casas.herramienta_aumento') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    
+                <form method="POST" action="{{ url_for('casas.herramienta_aumento') }}" id="formAumento">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
                     <div class="mb-4">
-                        <label class="form-label fw-bold small text-uppercase text-muted">¿A quién aplicar?</label>
-                        <select name="country_id" class="form-select form-select-lg">
-                            <option value="">🌍 A TODOS LOS CLIENTES (Global)</option>
-                            <option disabled>──────────────</option>
+                        <label class="form-label fw-bold text-uppercase small text-muted">A qué clientes aplicar</label>
+                        <select name="country_id" class="form-select border-primary">
+                            <option value="">A TODOS los Countries y Barrios</option>
                             {% for country in countries %}
-                                <option value="{{ country.id }}">Solo Country: {{ country.nombre }}</option>
+                                <option value="{{ country.id }}">Solo a: {{ country.nombre }}</option>
                             {% endfor %}
                         </select>
                     </div>
 
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold small text-uppercase text-muted">Tipo de Aumento</label>
-                            <select name="tipo" class="form-select" id="tipoSelect">
-                                <option value="porcentaje">Porcentaje (%)</option>
-                                <option value="fijo">Suma Fija ($)</option>
+                    <div class="row g-2 mb-4">
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-uppercase small text-muted">A partir del Mes</label>
+                            <select name="mes_desde" id="mesDesde" class="form-select border-primary" required>
+                                <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option>
+                                <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
+                                <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold small text-uppercase text-muted">Valor</label>
-                            <input type="number" step="0.01" name="valor" class="form-control fw-bold" placeholder="Ej: 15" required>
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-uppercase small text-muted">Año</label>
+                            <input type="number" name="anio_desde" id="anioDesde" class="form-control border-primary" required>
                         </div>
                     </div>
 
-                    <p class="text-muted small fst-italic mb-4" id="textoAyuda">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-uppercase small text-muted">Tipo de Aumento</label>
+                        <select name="tipo" class="form-select border-primary" id="tipoSelect" required>
+                            <option value="porcentaje">Aumento por Porcentaje (%)</option>
+                            <option value="fijo">Monto Fijo ($)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-uppercase small text-muted">Valor del Aumento <span class="text-danger">*</span></label>
+                        <input type="number" step="any" name="valor" class="form-control form-control-lg border-primary fw-bold" required placeholder="Ej: 15" min="0.01">
+                    </div>
+                    
+                    <p class="text-secondary small fst-italic mb-4" id="textoAyuda">
                         <i class="bi bi-info-circle me-1"></i>
                         Ejemplo: Si un cliente paga $10.000 y pone <strong>10</strong>, pasará a pagar <strong>$11.000</strong>.
                     </p>
@@ -75,6 +88,49 @@
                 </form>
             </div>
         </div>
+
+        <div class="card shadow border-0">
+            <div class="card-header bg-secondary text-white py-3">
+                <h5 class="mb-0 fw-bold text-uppercase fs-6">
+                    <i class="bi bi-card-checklist me-2"></i> Historial de Últimos Aumentos
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle small">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">Fecha</th>
+                                <th>Descripción</th>
+                                <th class="text-center">Desde</th>
+                                <th class="text-center pe-3">Afectados</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in ultimos_aumentos %}
+                            <tr>
+                                <td class="ps-3 text-muted">{{ log.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                                <td class="fw-bold">{{ log.descripcion }}</td>
+                                <td class="text-center">
+                                    {% if log.mes_desde and log.anio_desde %}
+                                        <span class="badge bg-primary">{{ log.mes_desde }}/{{ log.anio_desde }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center pe-3 font-monospace">{{ log.casas_afectadas }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted fst-italic">No hay registros de aumentos en el sistema.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -86,8 +142,12 @@
         if (this.value === 'porcentaje') {
             ayuda.innerHTML = '<i class="bi bi-info-circle me-1"></i> Ejemplo: Si un cliente paga $10.000 y pone <strong>10</strong>, pasará a pagar <strong>$11.000</strong>.';
         } else {
-            ayuda.innerHTML = '<i class="bi bi-info-circle me-1"></i> Ejemplo: Si un cliente paga $10.000 y pone <strong>5000</strong>, pasará a pagar <strong>$15.000</strong>.';
+            ayuda.innerHTML = '<i class="bi bi-info-circle me-1"></i> Ejemplo: Si un cliente paga $10.000 y pone <strong>15000</strong>, pasará a pagar <strong>$25.000</strong>.';
         }
     });
+
+    const d = new Date();
+    document.getElementById('mesDesde').value = d.getMonth() + 1;
+    document.getElementById('anioDesde').value = d.getFullYear();
 </script>
 {% endblock %}

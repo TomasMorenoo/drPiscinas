@@ -1,6 +1,6 @@
 from app import db
 from sqlalchemy import UniqueConstraint
-from datetime import datetime # <-- ASEGURATE DE TENER ESTO
+from datetime import datetime
 
 class Casa(db.Model):
     __tablename__ = "casas"
@@ -32,6 +32,7 @@ class Casa(db.Model):
     
     inactivado_por = db.Column(db.String(100), nullable=True)
     fecha_inactivacion = db.Column(db.DateTime, nullable=True)
+
     def __repr__(self):
         return f"<Casa {self.numero}>"
     
@@ -92,3 +93,12 @@ class Casa(db.Model):
                     saldo = 0.0
                     
         return round(saldo, 2)
+
+class HistorialAumento(db.Model):
+    __tablename__ = "historial_aumentos"
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.DateTime, default=datetime.now)
+    descripcion = db.Column(db.String(255), nullable=False)
+    casas_afectadas = db.Column(db.Integer, nullable=False)
+    mes_desde = db.Column(db.Integer, nullable=True)
+    anio_desde = db.Column(db.Integer, nullable=True)
