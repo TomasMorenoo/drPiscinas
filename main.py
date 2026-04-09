@@ -1,3 +1,14 @@
+import os
+import time
+
+# Forzar la zona horaria de Argentina antes de cualquier otra cosa
+os.environ['TZ'] = 'America/Argentina/Buenos_Aires'
+try:
+    time.tzset() # Este comando activa la zona horaria en sistemas Linux (VPS)
+except AttributeError:
+    # En Windows tzset no existe, pero en la VPS (Linux) es lo que aplica el cambio
+    pass
+
 from app import create_app, db
 import app.models 
 
