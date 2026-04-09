@@ -65,6 +65,32 @@ def create_app():
     app.register_blueprint(promo_bp)
     app.register_blueprint(grupo_bp)
     app.register_blueprint(estadisticas_bp)
+    
+    # --- MODO MANTENIMIENTO ---
+    @app.before_request
+    def check_maintenance_mode():
+        import os
+        from flask import request, render_template
+        from flask_login import current_user
+        
+        # Si existe el archivo bandera, estamos en mantenimiento
+        if os.path.exists('mantenimiento.flag'):
+            
+            # 1. Dejar cargar los archivos visuales (imágenes, CSS)
+            if request.path.startswith('/static/'):
+                return None
+            
+            # 2. Dejar pasar la ruta de login para que puedas entrar a identificarte
+            if request.path.startswith('/auth') or request.path == '/login':
+                return None
+            
+            # 3. Dejar pasar si el usuario está logueado y es 'root' 
+            # (Si tu usuario principal se llama distinto, cambialo acá)
+            if current_user.is_authenticated and current_user.username == 'root':
+                return None
+            
+            # 4. A todos los demás, bloquearlos y mostrar la pantalla de pausa
+            return render_template('errors/mantenimiento.html'), 503
 
     return app
 
