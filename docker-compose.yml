@@ -6,14 +6,16 @@ services:
     container_name: dr_piscinas_db
     restart: always
     environment:
-      # Aquí usamos las variables que coinciden con tu VPS y tu PC
       POSTGRES_USER: ${DB_USER:-drPiscinas}
       POSTGRES_PASSWORD: ${DB_PASS:-administrador}
       POSTGRES_DB: ${DB_NAME:-drPiscinas_db}
+      TZ: America/Argentina/Buenos_Aires
     ports:
-      - "5433:5432"  # En tu PC usás 5433, en la VPS no molesta.
+      - "5433:5432"
     volumes:
       - ./db_data:/var/lib/postgresql/data
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
 
   web:
     build: .
@@ -24,5 +26,10 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - SECRET_KEY=${SECRET_KEY}
+      - TZ=America/Argentina/Buenos_Aires
     ports:
       - "5000:5000"
+    volumes:
+      - .:/sistema
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
