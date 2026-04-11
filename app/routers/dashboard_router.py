@@ -582,14 +582,10 @@ def sync_abonos():
             
         hist = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
         if not hist:
-            db.session.add(AbonoHistorico(
-                casa_id=casa.id, mes=mes, anio=anio, monto=abono_a_guardar,
-                monto_pagado=0.0, pagado=False, mensaje_enviado=False
-            ))
+            db.session.add(AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=abono_a_guardar))
         else:
-            hist.monto = abono_a_guardar
-            if not hist.transaccion_id and hist.monto_pagado < hist.monto:
-                hist.pagado = False
+            if not getattr(hist, 'pagado', False) and float(hist.monto_pagado or 0) == 0:
+                hist.monto = abono_a_guardar
             
     db.session.commit()
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))

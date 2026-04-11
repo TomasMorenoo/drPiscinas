@@ -39,7 +39,10 @@ class Casa(db.Model):
     def obtener_gastos_mensuales(self, mes, anio):
         from app.models.abono_historico import AbonoHistorico
         total_extras = 0
-        mes_cerrado = AbonoHistorico.query.filter_by(mes=mes, anio=anio).first() is not None
+        
+        # Buscamos si existe la "foto" histórica de ese mes
+        hist = AbonoHistorico.query.filter_by(casa_id=self.id, mes=mes, anio=anio).first()
+        mes_cerrado = hist is not None
 
         for visita in self.visitas:
             if visita.fecha.month == mes and visita.fecha.year == anio:
@@ -51,11 +54,14 @@ class Casa(db.Model):
                 
                 if visita.promo:
                     total_extras += float(visita.promo.precio)
-                    
+        
+        # MAGIA: Si hay historial, usa el precio viejo. Si no, usa el actual.
+        abono_final = float(hist.monto) if hist else float(self.precio_base or 0)
+            
         return {
-            "abono": float(self.precio_base),
+            "abono": abono_final,
             "extras": round(total_extras, 2),
-            "total": round(float(self.precio_base) + total_extras, 2)
+            "total": round(abono_final + total_extras, 2)
         }
 
     def nombre_formateado(self):
