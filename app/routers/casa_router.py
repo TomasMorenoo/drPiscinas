@@ -13,8 +13,33 @@ import re
 import calendar
 from datetime import datetime
 from app.models.casa import HistorialAumento
+import os
 
 casa_bp = Blueprint("casas", __name__, url_prefix="/casas")
+
+# ==========================================
+# LOG EN TXT DE AUMENTOS (AUDITORÍA)
+# ==========================================
+NOMBRES_MESES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+def format_money(value):
+    """Formatea números a texto con puntos en los miles (ej: 15.000)"""
+    return f"{value:,.0f}".replace(",", ".")
+
+def log_aumento_txt(cliente, p_i, aumento, p_f, mes_num):
+    """Guarda el registro exacto del aumento en un archivo de texto"""
+    mes_nombre = NOMBRES_MESES[mes_num] if 1 <= mes_num <= 12 else str(mes_num)
+    linea = f"{cliente} | {format_money(p_i)} | {format_money(aumento)} | {format_money(p_f)} | {mes_nombre}\n"
+    
+    # Se guarda en la raíz del proyecto (junto a docker-compose.yml)
+    filepath = os.path.join(os.getcwd(), 'registro_aumentos.txt')
+    
+    escribir_encabezado = not os.path.exists(filepath) or os.path.getsize(filepath) == 0
+    
+    with open(filepath, "a", encoding="utf-8") as f:
+        if escribir_encabezado:
+            f.write("CLIENTE | P.I | AUMENTO | P.F | a partir\n")
+        f.write(linea)
 
 # ==========================================
 # LÓGICA DE ORDENAMIENTO (NATURAL)
@@ -183,6 +208,10 @@ def herramienta_aumento():
                 actualizar_historial_futuro(casa, nuevo_precio, mes_desde, anio_desde)
                 count += 1
 
+                # --- GUARDAR EN EL TXT DE AUDITORÍA ---
+                diferencia = nuevo_precio - precio_actual
+                log_aumento_txt(casa.nombre_formateado(), precio_actual, diferencia, nuevo_precio, mes_desde)
+
         db.session.commit()
         
         # --- REGISTRO DEL AUMENTO ---
@@ -209,7 +238,7 @@ def herramienta_aumento():
     countries = Country.query.filter_by(activo=True).order_by(Country.nombre).all()
     hay_backup = Casa.query.filter(Casa.precio_anterior.isnot(None), Casa.precio_anterior > 0).first() is not None
     
-    # Buscamos los últimos 15 movimientos
+    # Límite de 15 restaurado para la vista web
     ultimos_aumentos = HistorialAumento.query.order_by(HistorialAumento.fecha.desc()).limit(15).all()
     
     return render_template("casas/aumento.html", countries=countries, hay_backup=hay_backup, ultimos_aumentos=ultimos_aumentos)
@@ -578,6 +607,10 @@ def aumento_individual(id):
             
         db.session.commit()
         
+        # --- GUARDAR EN EL TXT DE AUDITORÍA ---
+        diferencia = nuevo_precio - precio_actual
+        log_aumento_txt(casa.nombre_formateado(), precio_actual, diferencia, nuevo_precio, mes_desde)
+
         # --- REGISTRO DEL AUMENTO ---
         simbolo = "%" if tipo == "porcentaje" else "$"
         texto_valor = f"{valor}{simbolo}" if tipo == "porcentaje" else f"{simbolo}{valor}"

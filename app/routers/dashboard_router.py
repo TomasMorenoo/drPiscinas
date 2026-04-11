@@ -80,52 +80,47 @@ def obtener_detalle_productos(casa, mes, anio):
         detalles.append(f"{cant_str}{p['unidad']} de {p['nombre']}")
     return detalles
 
-def generar_texto_deuda(hist_deuda, saldo_anterior, mes, anio):
-    if saldo_anterior <= 0.1:
-        return ""
-    meses_nombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-    
-    texto = f"\nSaldo pendiente: $ {format_money(saldo_anterior)}\n"
-    
-    if len(hist_deuda) == 1:
-        mes_txt = f"{meses_nombres[hist_deuda[0].mes-1]} {hist_deuda[0].anio}"
-        texto += f"* Correspondiente al mes de {mes_txt}\n"
-    elif len(hist_deuda) > 1:
-        meses_txt = ", ".join([f"{meses_nombres[h.mes-1]} {h.anio}" for h in hist_deuda])
-        texto += f"* Correspondiente a los meses de {meses_txt}\n"
-    else:
-        texto += "* Correspondiente a meses anteriores\n"
-    return texto
-
-def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior):
+def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_visual, pagos_en_este_dashboard):
     nombre_wa = casa.nombre_cliente if casa.nombre_cliente else get_nombre_limpio(casa)
     saludo = obtener_saludo_tiempo(nombre_wa)
-    total_final = abono_mes + extras + saldo_anterior
+    total_final = abono_mes + extras + saldo_anterior_visual - pagos_en_este_dashboard
     
     texto_wa = f"{saludo} como te va, te recuerdo el abono de la pile\n\n"
-    texto_wa += f"*-- TOTAL ${format_money(total_final)} --*\n\n"
-    texto_wa += "Detalle:\n\n"
-    texto_wa += f"Mes de mantenimiento ${format_money(abono_mes)}\n"
+    
+    if total_final <= 0.01:
+        texto_wa += "*-- CUENTA AL DÍA --*\n\n"
+    else:
+        texto_wa += f"*-- TOTAL A PAGAR: ${format_money(total_final)} --*\n\n"
+        
+    texto_wa += "Detalle:\n"
+    texto_wa += f"Mes de mantenimiento: ${format_money(abono_mes)}\n"
     
     if extras > 0:
-        texto_wa += f"Productos Utilizados $ {format_money(extras)}\n"
+        texto_wa += f"Productos Utilizados: ${format_money(extras)}\n"
         prods = obtener_detalle_productos(casa, mes, anio)
         for p in prods:
             texto_wa += f"* {p}\n"
             
-    if saldo_anterior > 0.1:
-        hist_deuda = [h for h in casa.historial_abonos if not getattr(h, 'pagado', False) and (h.anio < anio or (h.anio == anio and h.mes < mes))]
-        texto_wa += generar_texto_deuda(hist_deuda, saldo_anterior, mes, anio)
+    if saldo_anterior_visual > 0.1:
+        texto_wa += f"Deuda meses anteriores: ${format_money(saldo_anterior_visual)}\n"
+        
+    if pagos_en_este_dashboard > 0.1:
+        texto_wa += f"Entregado este mes: -${format_money(pagos_en_este_dashboard)}\n"
         
     texto_wa += "\nMuchas Gracias."
     return texto_wa
 
-def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo, saldo_anterior_grupo):
+def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard):
     saludo = obtener_saludo_tiempo(grupo_nombre)
     cant = len(casas_data)
     
+    total_final = total_grupo_mes + total_grupo_saldo_ant_visual - total_pagos_dashboard
+    
     texto_wa = f"{saludo} Te paso el resumen de las {cant} propiedades.\n\n"
-    texto_wa += f"*-- TOTAL ${format_money(total_grupo + saldo_anterior_grupo)} --*\n\n"
+    if total_final <= 0.01:
+        texto_wa += "*-- CUENTAS AL DÍA --*\n\n"
+    else:
+        texto_wa += f"*-- TOTAL A PAGAR: ${format_money(total_final)} --*\n\n"
     
     for c in casas_data:
         casa_obj = c['casa']
@@ -133,21 +128,17 @@ def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo, saldo_ant
         abono = c['abono']
         extras = c['extras']
         total_c = abono + extras
+        texto_wa += f"• *{nombre_casa}:* Abono ${format_money(abono)} + Prod. ${format_money(extras)} = *${format_money(total_c)}*\n"
         
-        texto_wa += f"• *{nombre_casa}:* Abono ${format_money(abono)} + Productos ${format_money(extras)} = *${format_money(total_c)}*\n"
+    texto_wa += "\n"
+    
+    if total_grupo_saldo_ant_visual > 0.1:
+        texto_wa += f"Deuda meses anteriores: *${format_money(total_grupo_saldo_ant_visual)}*\n"
         
-        if extras > 0:
-            prods = obtener_detalle_productos(casa_obj, mes, anio)
-            if prods:
-                texto_wa += f"Detalle Productos: {', '.join(prods)}\n"
-        texto_wa += "\n"
+    if total_pagos_dashboard > 0.1:
+        texto_wa += f"Entregado este mes: *-${format_money(total_pagos_dashboard)}*\n"
         
-    if saldo_anterior_grupo < -0.1:
-        texto_wa += f"Saldo a favor: *${format_money(abs(saldo_anterior_grupo))}*\n\n"
-    elif saldo_anterior_grupo > 0.1:
-        texto_wa += f"Saldo pendiente: *${format_money(saldo_anterior_grupo)}*\n\n"
-        
-    texto_wa += "Muchas Gracias."
+    texto_wa += "\nMuchas Gracias."
     return texto_wa
 
 # ==========================================
@@ -292,16 +283,24 @@ def index():
                 
         datos_v = c.obtener_gastos_mensuales(mes, anio)
         extras_v = float(datos_v.get("extras", 0))
-        saldo_ant_v = c.obtener_saldo_anterior(mes, anio)
-        hist_v = historial_dict.get(c.id)
         
-        # AHORA RESPETA CUALQUIER HISTORIAL GUARDADO
+        hist_v = historial_dict.get(c.id)
         if hist_v:
             ab_v = float(hist_v.monto)
         else:
             ab_v = float(c.precio_base or 0) if (c.activo or extras_v > 0) else 0.0
+            
+        saldo_ant_real_v = c.obtener_saldo_anterior(mes, anio)
         
-        if not c.activo and (ab_v + extras_v + saldo_ant_v) <= 0.1:
+        pago_deudas_este_mes = sum(
+            float(hx.monto_pagado or 0)
+            for hx in c.historial_abonos
+            if getattr(hx, 'fecha_pago', None) and hx.fecha_pago.month == mes and hx.fecha_pago.year == anio
+            and (hx.anio < anio or (hx.anio == anio and hx.mes < mes))
+        )
+        saldo_anterior_visual_v = saldo_ant_real_v + pago_deudas_este_mes
+        
+        if not c.activo and (ab_v + extras_v + saldo_anterior_visual_v) <= 0.1:
             continue
             
         casas.append(c)
@@ -320,10 +319,9 @@ def index():
     for casa in casas:
         datos = casa.obtener_gastos_mensuales(mes, anio)
         extras = float(datos.get("extras", 0))
-        saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
+        saldo_anterior_real = casa.obtener_saldo_anterior(mes, anio)
         historial = historial_dict.get(casa.id)
         
-        # AHORA RESPETA CUALQUIER HISTORIAL GUARDADO
         if historial:
             abono_mes = float(historial.monto)
         else:
@@ -331,19 +329,25 @@ def index():
             
         total_mes = abono_mes + extras
         
-        if saldo_anterior > 0:
-            total_deuda_anterior += saldo_anterior
-
-        monto_pagado = float(getattr(historial, 'monto_pagado', 0) or 0)
-        saldo_restante = (total_mes + saldo_anterior) - monto_pagado
+        # --- LÓGICA VISUAL DE FOTO DEL MES ---
+        pago_deudas_este_mes = sum(
+            float(h.monto_pagado or 0)
+            for h in casa.historial_abonos
+            if getattr(h, 'fecha_pago', None) and h.fecha_pago.month == mes and h.fecha_pago.year == anio
+            and (h.anio < anio or (h.anio == anio and h.mes < mes))
+        )
+        
+        saldo_anterior_visual = saldo_anterior_real + pago_deudas_este_mes
+        monto_pagado_mes_actual = float(getattr(historial, 'monto_pagado', 0) or 0)
+        pagos_en_este_dashboard = pago_deudas_este_mes + monto_pagado_mes_actual
+        
+        saldo_restante = (total_mes + saldo_anterior_visual) - pagos_en_este_dashboard
+        
         esta_pagado = getattr(historial, 'pagado', False) if historial else False
         mensaje_enviado = getattr(historial, 'mensaje_enviado', False) if historial else False
 
-        pagos_en_este_dashboard = sum(
-            float(h.monto_pagado or 0) 
-            for h in casa.historial_abonos 
-            if h.fecha_pago and h.fecha_pago.month == mes and h.fecha_pago.year == anio
-        )
+        if saldo_anterior_visual > 0:
+            total_deuda_anterior += saldo_anterior_visual
 
         if mes_congelado and historial and not casa.grupo_id:
             if saldo_restante <= 0.01 and not historial.pagado:
@@ -353,11 +357,9 @@ def index():
                 historial.mensaje_enviado = True
                 historial.cobrado_por = "SISTEMA (Auto $0)"
                 historial.fecha_pago = obtener_marca_tiempo(mes, anio)
-                
                 txn_id = f"TXN-{uuid.uuid4().hex[:8].upper()}"
                 historial.transaccion_id = txn_id
-                detalle_str = f"{txn_id}:{abono_mes + extras}"
-                historial.detalle_pagos = detalle_str
+                historial.detalle_pagos = f"{txn_id}:{abono_mes + extras}"
                 hubo_cambios = True
 
         item_casa = {
@@ -367,9 +369,9 @@ def index():
             "abono": abono_mes,
             "extras": extras,
             "total_mes": total_mes, 
-            "saldo_anterior": saldo_anterior,
+            "saldo_anterior": saldo_anterior_visual,
             "saldo_restante": saldo_restante, 
-            "monto_pagado": monto_pagado,
+            "monto_pagado": pagos_en_este_dashboard, # Se lo pasamos al HTML como si fuera un solo monto
             "pagado": esta_pagado,
             "mensaje_enviado": mensaje_enviado,
             "pagos_en_este_dashboard": pagos_en_este_dashboard,
@@ -386,13 +388,13 @@ def index():
             g = reporte_grupos[casa.grupo_id]
             g["casas"].append(item_casa)
             g["total_mes"] += total_mes
-            g["saldo_anterior"] += saldo_anterior
+            g["saldo_anterior"] += saldo_anterior_visual
             g["saldo_restante"] += saldo_restante
-            g["monto_pagado"] += monto_pagado
+            g["monto_pagado"] += pagos_en_este_dashboard
         else:
             if casa.telefono:
                 num_tel = limpiar_telefono(casa.telefono)
-                texto_wa = generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior)
+                texto_wa = generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_visual, pagos_en_este_dashboard)
                 item_casa["url_wa"] = f"whatsapp://send?phone={num_tel}&text={urllib.parse.quote(texto_wa)}"
             
             reporte_sueltas.append(item_casa)
@@ -400,14 +402,7 @@ def index():
         total_clientes += 1
         total_abono += abono_mes
         total_extras += extras
-        
-        if esta_pagado:
-            if monto_pagado == 0:
-                total_recaudado += (total_mes + saldo_anterior)
-            else:
-                total_recaudado += monto_pagado
-        else:
-            total_recaudado += monto_pagado
+        total_recaudado += pagos_en_este_dashboard
 
     total_general = total_abono + total_extras + total_deuda_anterior
 
@@ -421,7 +416,6 @@ def index():
                 if hist_obj and not hist_obj.pagado:
                     hist_obj.pagado = True
                     hist_obj.mensaje_enviado = True
-                    
                     txn_id = f"TXN-{uuid.uuid4().hex[:8].upper()}"
                     hist_obj.transaccion_id = txn_id
                     total_c = float(hist_obj.monto) + c["extras"]
@@ -433,7 +427,7 @@ def index():
 
         if g["telefono"]:
             num_tel = limpiar_telefono(g["telefono"])
-            texto_wa = generar_wa_grupo(g['nombre'], g["casas"], mes, anio, g['total_mes'], g['saldo_anterior'])
+            texto_wa = generar_wa_grupo(g['nombre'], g["casas"], mes, anio, g['total_mes'], g['saldo_anterior'], g['monto_pagado'])
             g["url_wa"] = f"whatsapp://send?phone={num_tel}&text={urllib.parse.quote(texto_wa)}"
 
     if hubo_cambios:
@@ -499,9 +493,18 @@ def toggle_pago(id):
             casa = registro.casa
             if casa.telefono:
                 datos = casa.obtener_gastos_mensuales(registro.mes, registro.anio)
-                saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
+                saldo_ant_real = casa.obtener_saldo_anterior(registro.mes, registro.anio)
                 
-                texto_wa = generar_wa_individual(casa, registro.mes, registro.anio, float(registro.monto), float(datos['extras']), saldo_ant)
+                pago_deudas_este_mes = sum(
+                    float(h.monto_pagado or 0)
+                    for h in casa.historial_abonos
+                    if getattr(h, 'fecha_pago', None) and h.fecha_pago.month == registro.mes and h.fecha_pago.year == registro.anio
+                    and (h.anio < registro.anio or (h.anio == registro.anio and h.mes < registro.mes))
+                )
+                saldo_anterior_visual = saldo_ant_real + pago_deudas_este_mes
+                pagos_en_este_dashboard = pago_deudas_este_mes + float(registro.monto_pagado or 0)
+                
+                texto_wa = generar_wa_individual(casa, registro.mes, registro.anio, float(registro.monto), float(datos['extras']), saldo_anterior_visual, pagos_en_este_dashboard)
                 url_wa = f"whatsapp://send?phone={limpiar_telefono(casa.telefono)}&text={urllib.parse.quote(texto_wa)}"
         else:
             casa = registro.casa
@@ -579,9 +582,14 @@ def sync_abonos():
             
         hist = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
         if not hist:
-            db.session.add(AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=abono_a_guardar))
+            db.session.add(AbonoHistorico(
+                casa_id=casa.id, mes=mes, anio=anio, monto=abono_a_guardar,
+                monto_pagado=0.0, pagado=False, mensaje_enviado=False
+            ))
         else:
             hist.monto = abono_a_guardar
+            if not hist.transaccion_id and hist.monto_pagado < hist.monto:
+                hist.pagado = False
             
     db.session.commit()
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
@@ -678,18 +686,34 @@ def toggle_pago_grupo(grupo_id):
             if telefono_repr:
                 casas_data = []
                 total_grupo_mes = 0
-                total_grupo_saldo_ant = 0
+                total_grupo_saldo_ant_real = 0
+                total_grupo_pago_deudas = 0
+                total_grupo_pagos_mes_actual = 0
                 
                 for h in historiales:
                     c = h.casa
                     abono = float(h.monto)
                     extras = float(c.obtener_gastos_mensuales(mes, anio)['extras'])
-                    saldo_ant = c.obtener_saldo_anterior(mes, anio)
+                    saldo_ant_real = c.obtener_saldo_anterior(mes, anio)
+                    
+                    p_deudas = sum(
+                        float(hx.monto_pagado or 0)
+                        for hx in c.historial_abonos
+                        if getattr(hx, 'fecha_pago', None) and hx.fecha_pago.month == mes and hx.fecha_pago.year == anio
+                        and (hx.anio < anio or (hx.anio == anio and hx.mes < mes))
+                    )
+                    
                     total_grupo_mes += (abono + extras)
-                    total_grupo_saldo_ant += saldo_ant
+                    total_grupo_saldo_ant_real += saldo_ant_real
+                    total_grupo_pago_deudas += p_deudas
+                    total_grupo_pagos_mes_actual += float(h.monto_pagado or 0)
+                    
                     casas_data.append({'casa': c, 'abono': abono, 'extras': extras})
                 
-                texto_wa = generar_wa_grupo(grupo.nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant)
+                total_grupo_saldo_ant_visual = total_grupo_saldo_ant_real + total_grupo_pago_deudas
+                total_pagos_dashboard = total_grupo_pago_deudas + total_grupo_pagos_mes_actual
+                
+                texto_wa = generar_wa_grupo(grupo.nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard)
                 
                 tel = re.sub(r'\D', '', telefono_repr)
                 if len(tel) == 10: tel = "549" + tel
@@ -742,7 +766,7 @@ def registrar_pago_grupo(grupo_id):
         total_mes = float(h.monto) + float(c.obtener_gastos_mensuales(mes, anio)['extras'])
         saldo_ant = c.obtener_saldo_anterior(mes, anio)
         deuda_total = total_mes + saldo_ant
-        deuda_restante = deuda_total - h.monto_pagado
+        deuda_restante = deuda_total - float(h.monto_pagado or 0)
         
         total_deuda_grupo += deuda_restante
         deudas.append({"hist": h, "restante": deuda_restante})
@@ -817,16 +841,25 @@ def planilla_impresion():
         else:
             abono = float(casa.precio_base or 0) if (casa.activo or producto > 0) else 0.0
             
-        saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
-        total_a_pagar = abono + producto + saldo_anterior
+        saldo_anterior_real = casa.obtener_saldo_anterior(mes, anio)
+        pago_deudas_este_mes = sum(
+            float(h.monto_pagado or 0)
+            for h in casa.historial_abonos
+            if getattr(h, 'fecha_pago', None) and h.fecha_pago.month == mes and h.fecha_pago.year == anio
+            and (h.anio < anio or (h.anio == anio and h.mes < mes))
+        )
+        saldo_anterior_visual = saldo_anterior_real + pago_deudas_este_mes
+        
+        total_a_pagar = abono + producto + saldo_anterior_visual
 
         if not casa.activo and total_a_pagar <= 0.1:
             continue
 
-        # --- LÓGICA DE TACHADO (Saber si ya pagó) ---
-        monto_pagado = float(getattr(historial, 'monto_pagado', 0) or 0)
+        monto_pagado_mes_actual = float(getattr(historial, 'monto_pagado', 0) or 0)
+        pagos_en_este_dashboard = pago_deudas_este_mes + monto_pagado_mes_actual
+        
         esta_pagado = False
-        if historial and getattr(historial, 'pagado', False) and (total_a_pagar - monto_pagado) <= 0.01:
+        if historial and getattr(historial, 'pagado', False) and (total_a_pagar - pagos_en_este_dashboard) <= 0.01:
             esta_pagado = True
         elif total_a_pagar <= 0.01 and historial and getattr(historial, 'pagado', False):
             esta_pagado = True
@@ -846,9 +879,9 @@ def planilla_impresion():
             "producto": producto,
             "detalle_productos": texto_detalle, 
             "abono": abono,
-            "saldo_anterior": saldo_anterior,
+            "saldo_anterior": saldo_anterior_visual,
             "total_a_pagar": total_a_pagar,
-            "pagado": esta_pagado # <-- Nuevo dato para la planilla
+            "pagado": esta_pagado 
         }
 
         if casa.grupo_id:
@@ -857,7 +890,7 @@ def planilla_impresion():
                     "nombre": casa.grupo.nombre,
                     "filas": [],
                     "total_grupo": 0.0,
-                    "grupo_pagado": True # Asumimos True y lo bajamos si alguno debe
+                    "grupo_pagado": True 
                 }
             reporte_grupos[casa.grupo_id]["filas"].append(item)
             reporte_grupos[casa.grupo_id]["total_grupo"] += total_a_pagar
@@ -874,6 +907,7 @@ def planilla_impresion():
                            reporte_grupos=list(reporte_grupos.values()), 
                            mes_nombre=nombre_mes, 
                            anio=anio)
+
 @dashboard_bp.route("/api/totales")
 @login_required
 @admin_required
@@ -881,15 +915,10 @@ def api_totales():
     mes = int(request.args.get("mes", datetime.now().month))
     anio = int(request.args.get("anio", datetime.now().year))
     
-    registro_congelado = CierreMes.query.filter_by(mes=mes, anio=anio).first()
-    mes_congelado = True if registro_congelado else False
-
     query_casas = Casa.query.options(
         selectinload(Casa.historial_abonos),
-        selectinload(Casa.visitas).selectinload(Visit.productos),
-        selectinload(Casa.visitas).joinedload(Visit.promo)
+        selectinload(Casa.visitas).selectinload(Visit.productos)
     )
-
     casas_raw = query_casas.all()
     historial_dict = {h.casa_id: h for h in AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()}
 
@@ -905,33 +934,37 @@ def api_totales():
         if not casa.activo and extras_v <= 0:
             continue
             
-        saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
+        saldo_anterior_real = casa.obtener_saldo_anterior(mes, anio)
         historial = historial_dict.get(casa.id)
         
-        # AHORA RESPETA CUALQUIER HISTORIAL GUARDADO
         if historial:
             abono_mes = float(historial.monto)
         else:
             abono_mes = float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0
+            
+        pago_deudas_este_mes = sum(
+            float(h.monto_pagado or 0)
+            for h in casa.historial_abonos
+            if getattr(h, 'fecha_pago', None) and h.fecha_pago.month == mes and h.fecha_pago.year == anio
+            and (h.anio < anio or (h.anio == anio and h.mes < mes))
+        )
         
-        if not casa.activo and (abono_mes + extras_v + saldo_anterior) <= 0.1:
+        saldo_anterior_visual = saldo_anterior_real + pago_deudas_este_mes
+        
+        if not casa.activo and (abono_mes + extras_v + saldo_anterior_visual) <= 0.1:
             continue
             
         total_mes = abono_mes + extras_v
         
-        if saldo_anterior > 0:
-            total_deuda_anterior += saldo_anterior
+        if saldo_anterior_visual > 0:
+            total_deuda_anterior += saldo_anterior_visual
 
-        esta_pagado = getattr(historial, 'pagado', False) if historial else False
-        monto_pagado = float(getattr(historial, 'monto_pagado', 0) or 0)
+        monto_pagado_mes_actual = float(getattr(historial, 'monto_pagado', 0) or 0)
+        pagos_en_este_dashboard = pago_deudas_este_mes + monto_pagado_mes_actual
 
         total_abono += abono_mes
         total_extras += extras_v
-        
-        if esta_pagado and monto_pagado == 0:
-            total_recaudado += total_mes
-        else:
-            total_recaudado += monto_pagado
+        total_recaudado += pagos_en_este_dashboard
 
     total_general = total_abono + total_extras + total_deuda_anterior
     return jsonify({
