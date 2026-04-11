@@ -20,13 +20,14 @@ def listar_grupos():
 def crear_grupo():
     if request.method == "POST":
         nombre_grupo = request.form.get("nombre")
+        nombre_id = request.form.get("nombre_identificador", "").strip() or None
         casas_seleccionadas = request.form.getlist("casas_ids[]")
-        
+
         if not nombre_grupo or not casas_seleccionadas:
             flash("Debes ingresar un nombre y seleccionar al menos una casa.", "error")
             return redirect(url_for("grupos.crear_grupo"))
-            
-        nuevo_grupo = GrupoCliente(nombre=nombre_grupo)
+
+        nuevo_grupo = GrupoCliente(nombre=nombre_grupo, nombre_identificador=nombre_id)
         db.session.add(nuevo_grupo)
         db.session.commit()
         
@@ -50,10 +51,12 @@ def editar_grupo(id):
     grupo = GrupoCliente.query.get_or_404(id)
     if request.method == "POST":
         nuevo_nombre = request.form.get("nombre")
+        nombre_id = request.form.get("nombre_identificador", "").strip() or None
         if nuevo_nombre:
             grupo.nombre = nuevo_nombre
+            grupo.nombre_identificador = nombre_id
             db.session.commit()
-            flash("Nombre del grupo actualizado.", "success")
+            flash("Nombres del grupo actualizados.", "success")
         return redirect(url_for("grupos.editar_grupo", id=grupo.id))
         
     casas_libres = Casa.query.filter_by(grupo_id=None, activo=True).order_by(Casa.country_id).all()

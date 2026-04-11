@@ -117,7 +117,7 @@
             </thead>
             <tbody>
                 {% for casa in casas %}
-                <tr class="{{ '' if casa.activo else 'opacity-50' }}">
+                <tr class="{{ '' if casa.activo else 'table-danger' }}" style="{{ '' if casa.activo else 'opacity: 0.75;' }}">
                     
                     <td class="fw-bold text-dark">
                         <a href="{{ url_for('casas.perfil', id=casa.id) }}" class="text-reset text-decoration-none d-block" title="Ver Ficha del Cliente">

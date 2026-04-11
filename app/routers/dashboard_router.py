@@ -381,7 +381,10 @@ def index():
         if casa.grupo_id:
             if casa.grupo_id not in reporte_grupos:
                 reporte_grupos[casa.grupo_id] = {
-                    "grupo_id": casa.grupo_id, "nombre": casa.grupo.nombre, "casas": [],
+                    "grupo_id": casa.grupo_id,
+                    "nombre": casa.grupo.nombre,
+                    "nombre_display": casa.grupo.nombre_display,
+                    "casas": [],
                     "total_mes": 0.0, "saldo_anterior": 0.0, "saldo_restante": 0.0,
                     "monto_pagado": 0.0, "telefono": casa.telefono
                 }
@@ -860,14 +863,24 @@ def planilla_impresion():
         elif total_a_pagar <= 0.01 and historial and getattr(historial, 'pagado', False):
             esta_pagado = True
 
-        detalle_prods = []
+        # Agrupa productos del mes (normales + extras) sin distinguir origen
+        prods_agrupados = {}
         for v in casa.visitas:
             if v.fecha.month == mes and v.fecha.year == anio:
                 for vp in v.productos:
-                    unidad = vp.product.unidad if vp.product.unidad else ""
-                    extra_tag = " (Agregado)" if v.observaciones == "[EXTRA_MANUAL]" else ""
-                    detalle_prods.append(f"{vp.cantidad}{unidad} {vp.product.nombre}{extra_tag}")
-        
+                    nombre = vp.product.nombre.strip()
+                    unidad = (vp.product.unidad or "").strip()
+                    clave = f"{nombre}_{unidad}"
+                    if clave not in prods_agrupados:
+                        prods_agrupados[clave] = {"nombre": nombre, "unidad": unidad, "cantidad": 0.0}
+                    prods_agrupados[clave]["cantidad"] += float(vp.cantidad)
+
+        detalle_prods = []
+        for p in prods_agrupados.values():
+            c = p["cantidad"]
+            cant_str = str(int(c)) if c == int(c) else str(round(c, 2))
+            detalle_prods.append(f"{cant_str}{p['unidad']} {p['nombre']}")
+
         texto_detalle = ", ".join(detalle_prods)
             
         item = {
@@ -884,9 +897,10 @@ def planilla_impresion():
             if casa.grupo_id not in reporte_grupos:
                 reporte_grupos[casa.grupo_id] = {
                     "nombre": casa.grupo.nombre,
+                    "nombre_display": casa.grupo.nombre_display,
                     "filas": [],
                     "total_grupo": 0.0,
-                    "grupo_pagado": True 
+                    "grupo_pagado": True
                 }
             reporte_grupos[casa.grupo_id]["filas"].append(item)
             reporte_grupos[casa.grupo_id]["total_grupo"] += total_a_pagar

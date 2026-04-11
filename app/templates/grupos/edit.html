@@ -3,19 +3,29 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h3 mb-0 text-gray-800 fw-bold"><i class="bi bi-gear-fill me-2 text-primary"></i>Administrar Grupo: {{ grupo.nombre }}</h1>
+    <h1 class="h3 mb-0 text-gray-800 fw-bold"><i class="bi bi-gear-fill me-2 text-primary"></i>Administrar Grupo: {{ grupo.nombre_display }}</h1>
     <a href="{{ url_for('grupos.listar_grupos') }}" class="btn btn-outline-secondary fw-bold shadow-sm">Volver</a>
 </div>
 
 <div class="row g-4">
     <div class="col-md-4">
         <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white pt-3 pb-2 border-0"><h5 class="fw-bold m-0">Editar Nombre</h5></div>
+            <div class="card-header bg-white pt-3 pb-2 border-0"><h5 class="fw-bold m-0">Editar Nombres</h5></div>
             <div class="card-body">
                 <form action="{{ url_for('grupos.editar_grupo', id=grupo.id) }}" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <input type="text" name="nombre" class="form-control fw-bold mb-3" value="{{ grupo.nombre }}" required>
-                    <button type="submit" class="btn btn-primary w-100 fw-bold">Guardar Nombre</button>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Dashboard / Planilla</label>
+                        <input type="text" name="nombre_identificador" class="form-control fw-bold border-primary"
+                               value="{{ grupo.nombre_identificador or '' }}"
+                               placeholder="Ej: Calle Falsa 123">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase text-muted">WhatsApp <span class="text-danger">*</span></label>
+                        <input type="text" name="nombre" class="form-control fw-bold" value="{{ grupo.nombre }}" required
+                               placeholder="Ej: Martín">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold">Guardar</button>
                 </form>
             </div>
         </div>

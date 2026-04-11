@@ -8,7 +8,15 @@ def admin_required(f):
         # Si no está logueado o no es admin, lo pateamos al inicio
         if not current_user.is_authenticated or not current_user.is_admin():
             flash("No tenés permisos para ver esta sección.", "error")
-            # ACÁ ESTABA EL ERROR: Cambiamos 'home.index' por 'main.home'
-            return redirect(url_for('main.home')) 
+            return redirect(url_for('main.home'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def root_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.username != 'root':
+            flash("Acceso restringido.", "error")
+            return redirect(url_for('main.home'))
         return f(*args, **kwargs)
     return decorated_function

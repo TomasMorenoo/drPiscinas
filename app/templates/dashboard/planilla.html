@@ -131,7 +131,7 @@
             
             <tr class="fila-grupo-header {% if g.grupo_pagado %}fila-pagada{% endif %}">
                 <td class="text-center"><span class="linea-fecha"></span> / <span class="linea-fecha"></span></td>
-                <td colspan="5"><strong>GRUPO: {{ g.nombre|upper }}</strong></td>
+                <td colspan="5"><strong>GRUPO: {{ g.nombre_display|upper }}</strong></td>
                 <td class="text-right col-total" style="font-size: 14px;">
                     ${{ "{:,.0f}".format(g.total_grupo).replace(',', '.') }}
                 </td>

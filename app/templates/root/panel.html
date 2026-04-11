@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+{% block title %}Panel Root - Dr. Piscinas{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0 fw-bold">
+        <i class="bi bi-shield-lock-fill text-danger me-2"></i>Panel Root
+    </h1>
+    <span class="badge bg-danger px-3 py-2 fs-6">root</span>
+</div>
+
+{# ══════════════════════════════════════════════════════════
+   FILA 1: MODO MANTENIMIENTO
+══════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm
+            {% if modo_mantenimiento %}border-start border-5 border-warning bg-warning bg-opacity-10
+            {% else %}border-start border-5 border-success{% endif %}">
+            <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 py-4">
+                <div class="d-flex align-items-center gap-3">
+                    <i class="bi {% if modo_mantenimiento %}bi-cone-striped text-warning{% else %}bi-check-circle-fill text-success{% endif %} fs-1"></i>
+                    <div>
+                        <div class="fw-bold fs-5 text-dark">Modo Mantenimiento</div>
+                        {% if modo_mantenimiento %}
+                            <div class="text-warning fw-bold">🔧 ACTIVO — Solo root puede navegar</div>
+                        {% else %}
+                            <div class="text-success fw-bold">✅ Sistema en línea y operativo</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <form method="POST" action="{{ url_for('root.toggle_mantenimiento') }}"
+                      onsubmit="return confirm('{% if modo_mantenimiento %}¿Desactivar el modo mantenimiento?{% else %}¿Activar modo mantenimiento? Los demás usuarios serán bloqueados.{% endif %}')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% if modo_mantenimiento %}
+                        <button type="submit" class="btn btn-success btn-lg fw-bold px-4">
+                            <i class="bi bi-check-lg me-2"></i>Volver a poner en línea
+                        </button>
+                    {% else %}
+                        <button type="submit" class="btn btn-warning btn-lg fw-bold px-4">
+                            <i class="bi bi-cone-striped me-2"></i>Activar Mantenimiento
+                        </button>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════
+   FILA 2: KPIs DEL SISTEMA
+══════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small text-uppercase fw-bold mb-1">Clientes Activos</div>
+            <div class="fs-2 fw-bold text-success">{{ total_clientes }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small text-uppercase fw-bold mb-1">Clientes Inactivos</div>
+            <div class="fs-2 fw-bold text-secondary">{{ total_inactivos }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small text-uppercase fw-bold mb-1">Usuarios</div>
+            <div class="fs-2 fw-bold text-info">{{ total_usuarios }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small text-uppercase fw-bold mb-1">Admins</div>
+            <div class="fs-2 fw-bold text-primary">{{ total_admins }}</div>
+        </div>
+    </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════
+   FILA 3: USUARIOS + CREAR USUARIO
+══════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+
+    {# Tabla de usuarios #}
+    <div class="col-12 col-lg-8">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-dark text-white py-3">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-people-fill me-2"></i>Usuarios del sistema</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">Usuario</th>
+                                <th class="text-center">Rol</th>
+                                <th class="text-center">Cambiar Rol</th>
+                                <th class="text-center">Reset Clave</th>
+                                <th class="text-center pe-3">Eliminar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in usuarios %}
+                            <tr>
+                                <td class="ps-3 fw-bold">
+                                    <i class="bi bi-person-circle me-1 text-muted"></i>{{ u.username }}
+                                </td>
+                                <td class="text-center">
+                                    {% if u.rol == 'admin' %}
+                                        <span class="badge bg-primary">Admin</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Empleado</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <form method="POST" action="{{ url_for('root.toggle_rol', id=u.id) }}"
+                                          onsubmit="return confirm('¿Cambiar rol de {{ u.username }}?')">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm
+                                            {% if u.rol == 'admin' %}btn-outline-secondary{% else %}btn-outline-primary{% endif %}">
+                                            {% if u.rol == 'admin' %}→ Empleado{% else %}→ Admin{% endif %}
+                                        </button>
+                                    </form>
+                                </td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-warning"
+                                            data-bs-toggle="modal" data-bs-target="#modalReset{{ u.id }}">
+                                        <i class="bi bi-key-fill"></i>
+                                    </button>
+                                </td>
+                                <td class="text-center pe-3">
+                                    <form method="POST" action="{{ url_for('root.eliminar_usuario', id=u.id) }}"
+                                          onsubmit="return confirm('¿Eliminar definitivamente a {{ u.username }}?')">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash3-fill"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" class="text-center text-muted py-4 fst-italic">No hay usuarios creados.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Crear usuario #}
+    <div class="col-12 col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-dark text-white py-3">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-person-plus-fill me-2"></i>Nuevo Usuario</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('root.crear_usuario') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Usuario</label>
+                        <input type="text" name="username" class="form-control" required placeholder="nombre_usuario">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Contraseña</label>
+                        <input type="password" name="password" class="form-control" required placeholder="••••••••">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Rol</label>
+                        <select name="rol" class="form-select">
+                            <option value="empleado">Empleado</option>
+                            <option value="admin">Administrador</option>
+                        </select>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-dark fw-bold">
+                            <i class="bi bi-plus-circle me-1"></i>Crear usuario
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{# ══════════════════════════════════════════════════════════
+   FILA 4: HISTORIAL DE AUMENTOS + LOG TXT
+══════════════════════════════════════════════════════════ #}
+<div class="row g-3">
+
+    {# Historial de aumentos (DB) #}
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-dark text-white py-3">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-graph-up-arrow me-2"></i>Historial de Aumentos</h5>
+            </div>
+            <div class="card-body p-0" style="max-height: 380px; overflow-y: auto;">
+                <table class="table table-hover align-middle small mb-0">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th class="ps-3">Fecha</th>
+                            <th>Descripción</th>
+                            <th class="text-center">Desde</th>
+                            <th class="text-center pe-3">Casas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in ultimos_aumentos %}
+                        <tr>
+                            <td class="ps-3 text-muted font-monospace" style="white-space:nowrap;">
+                                {{ a.fecha.strftime('%d/%m %H:%M') }}
+                            </td>
+                            <td class="fw-bold">{{ a.descripcion }}</td>
+                            <td class="text-center">
+                                {% if a.mes_desde and a.anio_desde %}
+                                    <span class="badge bg-primary">{{ a.mes_desde }}/{{ a.anio_desde }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center pe-3 font-monospace">{{ a.casas_afectadas }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-center text-muted py-4 fst-italic">Sin registros.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# Log de aumentos (txt) #}
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-dark text-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-file-text me-2"></i>Log de Auditoría (txt)</h5>
+                {% if lineas_log %}
+                <form method="POST" action="{{ url_for('root.limpiar_log') }}"
+                      onsubmit="return confirm('¿Limpiar el log de auditoría? Esta acción no se puede deshacer.')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-outline-light">
+                        <i class="bi bi-trash3 me-1"></i>Limpiar
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+            <div class="card-body p-0" style="max-height: 380px; overflow-y: auto;">
+                {% if lineas_log %}
+                <table class="table table-hover align-middle small mb-0 font-monospace">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th class="ps-3">Cliente</th>
+                            <th class="text-end">Precio Ant.</th>
+                            <th class="text-end">Aumento</th>
+                            <th class="text-end">Precio Nuevo</th>
+                            <th class="text-end pe-3">Desde</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for linea in lineas_log %}
+                        {% set partes = linea.split(' | ') %}
+                        {% if partes | length == 5 %}
+                        <tr>
+                            <td class="ps-3 fw-bold text-dark">{{ partes[0] }}</td>
+                            <td class="text-end text-muted">${{ partes[1] }}</td>
+                            <td class="text-end text-success fw-bold">+${{ partes[2] }}</td>
+                            <td class="text-end text-dark">${{ partes[3] }}</td>
+                            <td class="text-end pe-3 text-primary">{{ partes[4] }}</td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="text-center text-muted fst-italic py-5">
+                    <i class="bi bi-file-earmark-x fs-2 d-block mb-2 opacity-50"></i>
+                    Sin registros en el log.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{# ── Modales de reset de contraseña ──────────────────────────────────────── #}
+{% for u in usuarios %}
+<div class="modal fade" id="modalReset{{ u.id }}" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-dark text-white border-0">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-key-fill me-2"></i>Reset: {{ u.username }}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('root.reset_password', id=u.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <label class="form-label small fw-bold text-uppercase text-muted">Nueva contraseña</label>
+                    <input type="password" name="nueva_password" class="form-control" required
+                           placeholder="Nueva clave" autofocus>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning btn-sm fw-bold">
+                        <i class="bi bi-check-lg me-1"></i>Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% endblock %}

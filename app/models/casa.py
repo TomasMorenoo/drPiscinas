@@ -55,7 +55,7 @@ class Casa(db.Model):
                 if visita.promo:
                     total_extras += float(visita.promo.precio)
         
-        # MAGIA: Si hay historial, usa el precio viejo. Si no, usa el actual.
+        # MAGIA: Si hay historial, usa el precio congelado. Si no, usa el actual (precio_base).
         abono_final = float(hist.monto) if hist else float(self.precio_base or 0)
             
         return {
@@ -95,10 +95,12 @@ class Casa(db.Model):
                 saldo += total_hist
                 saldo -= pagado_hist
                 
+                # Reseteamos el saldo a 0 si la cuota figura pagada completamente por otro medio
                 if getattr(hist, 'pagado', False) and pagado_hist == 0 and saldo > 0.01:
                     saldo = 0.0
                     
         return round(saldo, 2)
+
 
 class HistorialAumento(db.Model):
     __tablename__ = "historial_aumentos"

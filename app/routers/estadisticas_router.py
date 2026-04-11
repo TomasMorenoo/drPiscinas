@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, session, jsonify # <--- AGREGAMOS session y jsonify
+from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required
 from app.decorators import admin_required
 from app.models.casa import Casa
@@ -6,6 +6,7 @@ from app.models.abono_historico import AbonoHistorico
 from app.models.visit import Visit
 from app.models.country import Country
 from app.models.visit_product import VisitProduct
+from app.models.configuracion import Configuracion
 from app import db
 from sqlalchemy import extract, func
 from sqlalchemy.orm import selectinload, joinedload
@@ -15,7 +16,7 @@ import json
 estadisticas_bp = Blueprint("estadisticas", __name__, url_prefix="/estadisticas")
 
 # =======================================================
-# NUEVA RUTA INVISIBLE: Guarda tu preferencia en la sesión
+# RUTA: Guarda la preferencia de meses en la base de datos
 # =======================================================
 @estadisticas_bp.route("/guardar-prefs", methods=["POST"])
 @login_required
@@ -23,7 +24,8 @@ estadisticas_bp = Blueprint("estadisticas", __name__, url_prefix="/estadisticas"
 def guardar_prefs():
     data = request.get_json(silent=True) or {}
     if 'meses_alta' in data:
-        session['meses_alta'] = data['meses_alta']
+        Configuracion.set('meses_alta', data['meses_alta'])
+        db.session.commit()
     return jsonify({"success": True})
 
 
@@ -99,8 +101,8 @@ def index():
             
     total_anual_productos = sum(meses_productos)
 
-    # --- LEEMOS LA MEMORIA DEL SERVIDOR ---
-    meses_alta_session = session.get('meses_alta', None)
+    # --- LEEMOS LA PREFERENCIA GUARDADA EN LA BASE DE DATOS ---
+    meses_alta_guardados = Configuracion.get('meses_alta', None)
 
     return render_template(
         "estadisticas/index.html",
@@ -114,5 +116,5 @@ def index():
         total_anual_abonos=total_anual_abonos,
         total_anual_productos=total_anual_productos,
         uso_productos_mes=json.dumps(uso_productos_mes),
-        meses_alta_session=json.dumps(meses_alta_session) if meses_alta_session else "null" # <--- PASAMOS LA MEMORIA
+        meses_alta_session=json.dumps(meses_alta_guardados) if meses_alta_guardados is not None else "null"
     )

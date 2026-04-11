@@ -14,7 +14,8 @@
         <table class="table table-hover align-middle mb-0">
             <thead class="table-dark">
                 <tr>
-                    <th class="ps-4">Nombre del Grupo</th>
+                    <th class="ps-4">Nombre en Dashboard</th>
+                    <th>Nombre WhatsApp</th>
                     <th class="text-center">Integrantes (Casas)</th>
                     <th class="text-end pe-4">Acciones</th>
                 </tr>
@@ -22,7 +23,14 @@
             <tbody>
                 {% for grupo in grupos %}
                 <tr>
-                    <td class="ps-4 fw-bold text-dark fs-5">{{ grupo.nombre }}</td>
+                    <td class="ps-4 fw-bold text-dark fs-5">{{ grupo.nombre_display }}</td>
+                    <td class="text-muted small">
+                        {% if grupo.nombre_identificador %}
+                            {{ grupo.nombre }}
+                        {% else %}
+                            <span class="fst-italic text-secondary">(igual al anterior)</span>
+                        {% endif %}
+                    </td>
                     <td class="text-center">
                         <span class="badge bg-secondary fs-6">{{ grupo.casas|length }} Casas</span>
                     </td>

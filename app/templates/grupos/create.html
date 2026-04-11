@@ -43,9 +43,19 @@
                 <form method="POST" action="{{ url_for('grupos.crear_grupo') }}" id="formGrupo">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     
-                    <div class="mb-4">
-                        <label class="form-label fw-bold text-dark fs-5">Nombre del Grupo Definitivo</label>
-                        <input type="text" name="nombre" class="form-control form-control-lg shadow-sm border-secondary fw-bold" placeholder="Ej: Familia Pérez (3 Casas)" required>
+                    <div class="row g-3 mb-4">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-bold text-dark">Nombre en Dashboard / Planilla <span class="text-danger">*</span></label>
+                            <input type="text" name="nombre_identificador" class="form-control form-control-lg shadow-sm border-primary fw-bold"
+                                   placeholder="Ej: Calle Falsa 123 (Lotes A-C)">
+                            <div class="form-text">Se muestra en el dashboard y en la hoja de ruta.</div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-bold text-dark">Nombre para WhatsApp <span class="text-danger">*</span></label>
+                            <input type="text" name="nombre" class="form-control form-control-lg shadow-sm border-secondary fw-bold"
+                                   placeholder="Ej: Martín" required>
+                            <div class="form-text">Se usa en el saludo del mensaje. Ej: <em>"Hola Martín, te paso el resumen..."</em></div>
+                        </div>
                     </div>
 
                     <h6 class="fw-bold mb-3 text-muted border-bottom pb-2">Propiedades que formarán el grupo</h6>

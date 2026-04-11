@@ -117,6 +117,14 @@
                             <i class="bi bi-person-circle me-1"></i> {{ current_user.username }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                            {% if current_user.username == 'root' %}
+                            <li>
+                                <a class="dropdown-item fw-bold text-danger" href="{{ url_for('root.panel') }}">
+                                    <i class="bi bi-shield-lock-fill me-2"></i>Panel Root
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            {% endif %}
                             <li>
                                 <a class="dropdown-item text-danger fw-bold" href="{{ url_for('auth.logout') }}">
                                     <i class="bi bi-box-arrow-right me-2"></i> Cerrar Sesión
@@ -172,6 +180,16 @@
             return new bootstrap.Tooltip(tooltipTriggerEl);
         });
     });
+
+    // Recordar posición de scroll por página
+    (function() {
+        var scrollKey = 'scroll_' + window.location.pathname + window.location.search;
+        var saved = sessionStorage.getItem(scrollKey);
+        if (saved !== null) window.scrollTo(0, parseInt(saved));
+        window.addEventListener('beforeunload', function() {
+            sessionStorage.setItem(scrollKey, window.scrollY);
+        });
+    })();
 </script>
 </body>
 </html>

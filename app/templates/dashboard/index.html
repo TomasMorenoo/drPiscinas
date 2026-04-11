@@ -764,7 +764,7 @@
 
                     {# Nombre + badge + colapsar #}
                     <div class="d-flex align-items-center gap-2 mb-2 mb-lg-0">
-                        <h6 class="mb-0 fw-bold text-dark">{{ g.nombre }}</h6>
+                        <h6 class="mb-0 fw-bold text-dark">{{ g.nombre_display }}</h6>
                         <span class="badge bg-light text-primary border border-primary">{{ g.casas|length }} Lotes</span>
                         <button class="btn btn-sm btn-light border text-secondary p-1 d-print-none ms-auto ms-lg-0"
                                 type="button" data-bs-toggle="collapse" data-bs-target="#collapseGrupo{{ g.grupo_id }}"
@@ -821,7 +821,7 @@
                                 {% endif %}
 
                                 {% if not g.pagado %}
-                                <button onclick="abrirModalPago('grupo', {{ g.grupo_id }}, 'GRUPO: {{ g.nombre }}', {{ g.total_mes + g.saldo_anterior - g.monto_pagado }})"
+                                <button onclick="abrirModalPago('grupo', {{ g.grupo_id }}, 'GRUPO: {{ g.nombre_display }}', {{ g.total_mes + g.saldo_anterior - g.monto_pagado }})"
                                         class="btn btn-outline-secondary btn-sm rounded-circle d-flex align-items-center justify-content-center shadow-sm"
                                         style="width: 38px; height: 38px;" title="Pago parcial">
                                     <i class="bi bi-cash-stack"></i>

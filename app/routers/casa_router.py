@@ -66,12 +66,9 @@ def aplicar_redondeo(valor):
 def asegurar_historial_pasado(casa, precio_viejo, mes_desde, anio_desde):
     from datetime import datetime
     limite_inferior = datetime(2026, 1, 1)
-    
-    if not casa.fecha_creacion:
-        fecha_inicio = limite_inferior
-    else:
-        fecha_inicio = max(casa.fecha_creacion, limite_inferior)
-        
+
+    fecha_inicio = max(casa.fecha_creacion or limite_inferior, limite_inferior)
+
     m_curr = fecha_inicio.month
     y_curr = fecha_inicio.year
     m_end = mes_desde - 1
@@ -79,13 +76,18 @@ def asegurar_historial_pasado(casa, precio_viejo, mes_desde, anio_desde):
     if m_end == 0:
         m_end = 12
         y_end -= 1
-        
+
     while (y_curr < y_end) or (y_curr == y_end and m_curr <= m_end):
         hist = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=m_curr, anio=y_curr).first()
         if not hist:
             nuevo_hist = AbonoHistorico(
-                casa_id=casa.id, mes=m_curr, anio=y_curr, monto=precio_viejo,
-                pagado=True, monto_pagado=precio_viejo, cobrado_por="SISTEMA (Historial Congelado)"
+                casa_id=casa.id,
+                mes=m_curr,
+                anio=y_curr,
+                monto=precio_viejo,
+                pagado=True,
+                monto_pagado=precio_viejo,
+                cobrado_por="SISTEMA (Historial Congelado)"
             )
             db.session.add(nuevo_hist)
         m_curr += 1
@@ -100,7 +102,8 @@ def actualizar_historial_futuro(casa, nuevo_precio, mes_desde, anio_desde):
             AbonoHistorico.anio > anio_desde,
             and_(AbonoHistorico.anio == anio_desde, AbonoHistorico.mes >= mes_desde)
         ),
-        AbonoHistorico.pagado == False
+        AbonoHistorico.pagado == False,
+        AbonoHistorico.monto_pagado == 0  # No tocar meses con pagos ya registrados
     ).all()
     for f in futuros:
         f.monto = nuevo_precio
@@ -328,9 +331,22 @@ def editar_casa(id):
 
         precio_actual_db = float(casa.precio_base) if casa.precio_base else 0.0
         
+        # --- EL BLINDAJE PARA LA EDICIÓN MANUAL ---
         if abs(precio_actual_db - nuevo_precio) > 0.01:
             casa.precio_anterior = precio_actual_db
+            
+            ahora = datetime.now()
+            # Congelamos el historial usando la función suelta, pasándole el objeto 'casa'
+            asegurar_historial_pasado(casa, precio_actual_db, ahora.month, ahora.year)
+            
             casa.precio_base = nuevo_precio
+            
+            # Actualizamos el mes actual si no está pagado
+            hist_actual = AbonoHistorico.query.filter_by(
+                casa_id=casa.id, mes=ahora.month, anio=ahora.year, pagado=False
+            ).first()
+            if hist_actual:
+                hist_actual.monto = nuevo_precio
 
         casa.numero = numero
         casa.country_id = country_id
