@@ -55,7 +55,7 @@
                             <label class="form-label fw-bold small text-uppercase text-muted">Abono Mensual <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text bg-white text-secondary">$</span>
-                                <input type="text" name="precio_base" id="inputPrecio" class="form-control fw-bold text-end" value="{{ '{:,.0f}'.format(casa.precio_base).replace(',', '.') }}" required oninput="formatearMoneda(this)">
+                                <input type="text" name="precio_base" id="inputPrecio" class="form-control fw-bold text-end" value="{{ '{:,.0f}'.format(casa.precio_base) }}" required oninput="formatearMoneda(this)">
                             </div>
                         </div>
                     </div>
@@ -164,7 +164,7 @@
         if (input) {
             let valor = input.value;
             valor = valor.replace(/\./g, ""); // Borra los puntos
-            valor = valor.replace(",", ".");  // Cambia coma por punto para la DB
+            valor = valor;  // Cambia coma por punto para la DB
             input.value = valor;
         }
     });

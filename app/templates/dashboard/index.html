@@ -370,11 +370,13 @@
 
                 {# Botones de acción #}
                 <div class="acciones-header">
-                    <a href="{{ url_for('dashboard.planilla_impresion', mes=mes, anio=anio) }}" target="_blank"
-                       class="btn btn-sm btn-outline-secondary fw-bold" title="Hoja de Ruta">
+                    <button type="button" class="btn btn-sm btn-outline-secondary fw-bold"
+                            title="Hoja de Ruta"
+                            data-bs-toggle="modal" data-bs-target="#modalFiltroHoja"
+                            data-mes="{{ mes }}" data-anio="{{ anio }}">
                         <i class="bi bi-file-earmark-pdf-fill"></i>
                         <span class="d-none d-sm-inline ms-1">HOJA</span>
-                    </a>
+                    </button>
 
                     <a href="{{ url_for('grupos.listar_grupos') }}" class="btn btn-sm btn-outline-dark fw-bold" title="Gestionar Grupos">
                         <i class="bi bi-collection-fill"></i>
@@ -437,22 +439,22 @@
 
         <div class="kpi-card border-start border-4 border-secondary bg-white">
             <div class="kpi-label">Abonos</div>
-            <div class="kpi-value text-secondary">${{ "{:,.0f}".format(kpi_abono) }}</div>
+            <div class="kpi-value text-secondary">${{ kpi_abono | pesos }}</div>
         </div>
 
         <div class="kpi-card border-start border-4 border-info bg-white">
             <div class="kpi-label">Productos</div>
-            <div class="kpi-value text-info">${{ "{:,.0f}".format(kpi_extras) }}</div>
+            <div class="kpi-value text-info">${{ kpi_extras | pesos }}</div>
         </div>
 
         <div class="kpi-card border-start border-4 border-danger bg-white">
             <div class="kpi-label">Deben</div>
-            <div class="kpi-value text-danger" id="kpi-deuda">${{ "{:,.0f}".format(kpi_deuda) }}</div>
+            <div class="kpi-value text-danger" id="kpi-deuda">${{ kpi_deuda | pesos }}</div>
         </div>
 
         <div class="kpi-card kpi-total-card border-start border-4 border-success bg-success bg-opacity-10">
             <div class="kpi-label text-success">Total a Cobrar</div>
-            <div class="kpi-value text-success" id="kpi-total">${{ "{:,.0f}".format(kpi_total) }}</div>
+            <div class="kpi-value text-success" id="kpi-total">${{ kpi_total | pesos }}</div>
         </div>
 
     </div>
@@ -514,10 +516,13 @@
                         {% for item in reporte_sueltas %}
                         
                         {# CALCULAMOS ESTADO Y ATRASO #}
+                        {# "atrasado" = pagado con más de 1 mes de diferencia respecto al período (1 mes de diferencia es el ciclo normal) #}
                         {% set estado_clase = 'pagado' if item.pagado else ('notificado' if item.mensaje_enviado else 'pendiente') %}
                         {% set pagado_atrasado = false %}
                         {% if item.pagado and item.historial_obj and item.historial_obj.fecha_pago %}
-                            {% if item.historial_obj.fecha_pago.year > anio or (item.historial_obj.fecha_pago.year == anio and item.historial_obj.fecha_pago.month > mes) %}
+                            {% set fp = item.historial_obj.fecha_pago %}
+                            {% set meses_diff = (fp.year - anio) * 12 + (fp.month - mes) %}
+                            {% if meses_diff > 1 %}
                                 {% set pagado_atrasado = true %}
                             {% endif %}
                         {% endif %}
@@ -538,20 +543,20 @@
 
                             {# 2. ABONO #}
                             <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">
-                                ${{ "{:,.0f}".format(item.abono) }}
+                                ${{ item.abono | pesos }}
                             </td>
                             
                             {# 3. PRODUCTOS #}
                             <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">
-                                ${{ "{:,.0f}".format(item.extras) }}
+                                ${{ item.extras | pesos }}
                             </td>
                             
                             {# 4. DEBE #}
                             <td class="text-end pe-3 text-nowrap d-none d-md-table-cell d-print-table-cell">
                                 {% if item.saldo_anterior < -0.1 %}
-                                    <span class="text-success fw-bold font-monospace">+${{ "{:,.0f}".format(item.saldo_anterior | abs) }}</span>
+                                    <span class="text-success fw-bold font-monospace">+${{ item.saldo_anterior | abs | pesos }}</span>
                                 {% elif item.saldo_anterior > 0.1 %}
-                                    <span class="text-danger fw-bold font-monospace">-${{ "{:,.0f}".format(item.saldo_anterior) }}</span>
+                                    <span class="text-danger fw-bold font-monospace">-${{ item.saldo_anterior | pesos }}</span>
                                 {% else %}
                                     <span class="fw-bold text-muted">$0</span>
                                 {% endif %}
@@ -562,18 +567,18 @@
                                 <div class="td-montos-grid">
                                     <div class="monto-item">
                                         <span class="monto-label">Abono</span>
-                                        <span class="monto-valor">${{ "{:,.0f}".format(item.abono) }}</span>
+                                        <span class="monto-valor">${{ item.abono | pesos }}</span>
                                     </div>
                                     <div class="monto-item">
                                         <span class="monto-label">Productos</span>
-                                        <span class="monto-valor">${{ "{:,.0f}".format(item.extras) }}</span>
+                                        <span class="monto-valor">${{ item.extras | pesos }}</span>
                                     </div>
                                     <div class="monto-item">
                                         <span class="monto-label">Debe</span>
                                         {% if item.saldo_anterior < -0.1 %}
-                                            <span class="monto-valor text-success">+${{ "{:,.0f}".format(item.saldo_anterior | abs) }}</span>
+                                            <span class="monto-valor text-success">+${{ item.saldo_anterior | abs | pesos }}</span>
                                         {% elif item.saldo_anterior > 0.1 %}
-                                            <span class="monto-valor text-danger">-${{ "{:,.0f}".format(item.saldo_anterior) }}</span>
+                                            <span class="monto-valor text-danger">-${{ item.saldo_anterior | pesos }}</span>
                                         {% else %}
                                             <span class="monto-valor text-muted">$0</span>
                                         {% endif %}
@@ -588,12 +593,12 @@
                                 {% if item.pagos_en_este_dashboard > 0 and not item.pagado %}
                                     <div class="d-flex flex-column align-items-end align-items-md-center">
                                         <span class="badge bg-warning text-dark mb-1 shadow-sm" style="font-size: 0.75rem;">
-                                            <i class="bi bi-coin me-1"></i>Entregó: ${{ "{:,.0f}".format(item.pagos_en_este_dashboard) }}
+                                            <i class="bi bi-coin me-1"></i>Entregó: ${{ item.pagos_en_este_dashboard | pesos }}
                                         </span>
-                                        <span class="total-valor text-danger" style="font-size: 0.9rem;">Restan: ${{ "{:,.0f}".format(deuda_actual) }}</span>
+                                        <span class="total-valor text-danger" style="font-size: 0.9rem;">Restan: ${{ deuda_actual | pesos }}</span>
                                     </div>
                                 {% else %}
-                                    <span class="total-valor">${{ "{:,.0f}".format(item.total_mes + item.saldo_anterior) }}</span>
+                                    <span class="total-valor">${{ (item.total_mes + item.saldo_anterior) | pesos }}</span>
                                 {% endif %}
 
                                 {# Acciones inline en mobile #}
@@ -780,9 +785,9 @@
                             <div class="grupo-monto-item">
                                 <span class="grupo-monto-label">Debe</span>
                                 {% if g.saldo_anterior < -0.1 %}
-                                    <span class="fw-bold text-success font-monospace">+${{ "{:,.0f}".format(g.saldo_anterior | abs) }}</span>
+                                    <span class="fw-bold text-success font-monospace">+${{ g.saldo_anterior | abs | pesos }}</span>
                                 {% elif g.saldo_anterior > 0.1 %}
-                                    <span class="fw-bold text-danger font-monospace">-${{ "{:,.0f}".format(g.saldo_anterior) }}</span>
+                                    <span class="fw-bold text-danger font-monospace">-${{ g.saldo_anterior | pesos }}</span>
                                 {% else %}
                                     <span class="fw-bold text-muted">$0</span>
                                 {% endif %}
@@ -790,7 +795,7 @@
 
                             <div class="grupo-monto-item">
                                 <span class="grupo-monto-label">Total a Pagar</span>
-                                <span class="fw-bold text-dark font-monospace">${{ "{:,.0f}".format(g.total_mes + g.saldo_anterior) }}</span>
+                                <span class="fw-bold text-dark font-monospace">${{ (g.total_mes + g.saldo_anterior) | pesos }}</span>
                             </div>
 
                             <div class="grupo-monto-item">
@@ -801,7 +806,7 @@
                                 {% elif g.pagado or g.monto_pagado >= (total_deuda - 0.1) %}
                                     <span class="fw-bold text-success small"><i class="bi bi-check-circle-fill"></i> Pagado</span>
                                 {% elif g.monto_pagado > 0 %}
-                                    <span class="fw-bold text-warning small"><i class="bi bi-coin me-1"></i>Faltan: ${{ "{:,.0f}".format(total_deuda - g.monto_pagado) }}</span>
+                                    <span class="fw-bold text-warning small"><i class="bi bi-coin me-1"></i>Faltan: ${{ (total_deuda - g.monto_pagado) | pesos }}</span>
                                 {% else %}
                                     <span class="fw-bold text-danger small"><i class="bi bi-clock-fill"></i> Pendiente</span>
                                 {% endif %}
@@ -870,7 +875,9 @@
                             {% for item in g.casas %}
                                 {% set pagado_atrasado = false %}
                                 {% if item.pagado and item.historial_obj and item.historial_obj.fecha_pago %}
-                                    {% if item.historial_obj.fecha_pago.year > anio or (item.historial_obj.fecha_pago.year == anio and item.historial_obj.fecha_pago.month > mes) %}
+                                    {% set fp = item.historial_obj.fecha_pago %}
+                                    {% set meses_diff = (fp.year - anio) * 12 + (fp.month - mes) %}
+                                    {% if meses_diff > 1 %}
                                         {% set pagado_atrasado = true %}
                                     {% endif %}
                                 {% endif %}
@@ -888,16 +895,16 @@
 
                                 {# Montos desktop #}
                                 <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">
-                                    ${{ "{:,.0f}".format(item.abono) }}
+                                    ${{ item.abono | pesos }}
                                 </td>
                                 <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">
-                                    ${{ "{:,.0f}".format(item.extras) }}
+                                    ${{ item.extras | pesos }}
                                 </td>
                                 <td class="text-end font-monospace d-none d-md-table-cell d-print-table-cell">
                                     {% if item.saldo_anterior < -0.1 %}
-                                        <span class="text-success fw-bold">+${{ "{:,.0f}".format(item.saldo_anterior | abs) }}</span>
+                                        <span class="text-success fw-bold">+${{ item.saldo_anterior | abs | pesos }}</span>
                                     {% elif item.saldo_anterior > 0.1 %}
-                                        <span class="text-danger fw-bold">-${{ "{:,.0f}".format(item.saldo_anterior) }}</span>
+                                        <span class="text-danger fw-bold">-${{ item.saldo_anterior | pesos }}</span>
                                     {% else %}
                                         <span class="text-muted">$0</span>
                                     {% endif %}
@@ -908,18 +915,18 @@
                                     <div class="td-montos-grid">
                                         <div class="monto-item">
                                             <span class="monto-label">Abono</span>
-                                            <span class="monto-valor">${{ "{:,.0f}".format(item.abono) }}</span>
+                                            <span class="monto-valor">${{ item.abono | pesos }}</span>
                                         </div>
                                         <div class="monto-item">
                                             <span class="monto-label">Productos</span>
-                                            <span class="monto-valor">${{ "{:,.0f}".format(item.extras) }}</span>
+                                            <span class="monto-valor">${{ item.extras | pesos }}</span>
                                         </div>
                                         <div class="monto-item">
                                             <span class="monto-label">Debe</span>
                                             {% if item.saldo_anterior < -0.1 %}
-                                                <span class="monto-valor text-success">+${{ "{:,.0f}".format(item.saldo_anterior | abs) }}</span>
+                                                <span class="monto-valor text-success">+${{ item.saldo_anterior | abs | pesos }}</span>
                                             {% elif item.saldo_anterior > 0.1 %}
-                                                <span class="monto-valor text-danger">-${{ "{:,.0f}".format(item.saldo_anterior) }}</span>
+                                                <span class="monto-valor text-danger">-${{ item.saldo_anterior | pesos }}</span>
                                             {% else %}
                                                 <span class="monto-valor text-muted">$0</span>
                                             {% endif %}
@@ -934,12 +941,12 @@
                                     {% if item.pagos_en_este_dashboard > 0 and not item.pagado %}
                                         <div class="d-flex flex-column align-items-end align-items-md-center">
                                             <span class="badge bg-warning text-dark mb-1 shadow-sm" style="font-size: 0.75rem;">
-                                                <i class="bi bi-coin me-1"></i>Entregó: ${{ "{:,.0f}".format(item.pagos_en_este_dashboard) }}
+                                                <i class="bi bi-coin me-1"></i>Entregó: ${{ item.pagos_en_este_dashboard | pesos }}
                                             </span>
-                                            <span class="total-valor text-danger" style="font-size: 0.9rem;">Restan: ${{ "{:,.0f}".format(deuda_actual) }}</span>
+                                            <span class="total-valor text-danger" style="font-size: 0.9rem;">Restan: ${{ deuda_actual | pesos }}</span>
                                         </div>
                                     {% else %}
-                                        <span class="total-valor">${{ "{:,.0f}".format(item.total_mes + item.saldo_anterior) }}</span>
+                                        <span class="total-valor">${{ (item.total_mes + item.saldo_anterior) | pesos }}</span>
                                     {% endif %}
 
                                     <div class="acciones-mobile-inline d-md-none d-print-none mt-1 justify-content-end">
@@ -1062,19 +1069,49 @@
                 </div>
                 <div class="modal-body p-4 text-center bg-light">
                     <h5 class="text-primary fw-bold mb-1" id="modal-nombre-cliente">Cliente</h5>
-                    <p class="text-muted small mb-4">
+                    <p class="text-muted small mb-3">
                         Deuda Actual: <strong class="text-danger" id="modal-deuda-cliente">$0</strong>
                     </p>
-                    <label class="form-label fw-bold text-uppercase small text-secondary">¿Cuánto dinero entregó?</label>
-                    <div class="input-group input-group-lg mx-auto shadow-sm mb-2" style="max-width: 280px;">
-                        <span class="input-group-text bg-white border-success fw-bold text-success">$</span>
+
+                    {# Selector de moneda #}
+                    <div class="btn-group mb-3" role="group">
+                        <input type="radio" class="btn-check" name="modal_moneda" id="moneda_ars" value="ars" checked autocomplete="off">
+                        <label class="btn btn-outline-success fw-bold px-4" for="moneda_ars">$ ARS</label>
+
+                        <input type="radio" class="btn-check" name="modal_moneda" id="moneda_usd" value="usd" autocomplete="off">
+                        <label class="btn btn-outline-primary fw-bold px-4" for="moneda_usd">USD</label>
+                    </div>
+
+                    <label class="form-label fw-bold text-uppercase small text-secondary d-block">¿Cuánto dinero entregó?</label>
+                    <div class="input-group input-group-lg mx-auto shadow-sm mb-2" style="max-width: 300px;">
+                        <span class="input-group-text bg-white border-success fw-bold text-success" id="modal-simbolo-moneda">$</span>
                         <input type="text" id="monto_entregado"
                                class="form-control border-success text-center fw-bold text-dark fs-4"
                                placeholder="Ej: 15.000" inputmode="numeric">
                     </div>
-                    <div class="form-text"><i class="bi bi-info-circle"></i> El saldo restante se calculará automáticamente.</div>
+
+                    {# Panel de conversión USD (oculto por defecto) #}
+                    <div id="panel-conversion-usd" class="d-none mt-3 p-3 rounded-3 border border-primary bg-white mx-auto" style="max-width: 340px;">
+                        <div id="cot-loading" class="text-muted small">
+                            <span class="spinner-border spinner-border-sm me-1"></span> Obteniendo cotización...
+                        </div>
+                        <div id="cot-datos" class="d-none">
+                            <div class="text-muted small mb-2" id="cot-label">Dólar Blue — venta: <strong id="cot-valor">–</strong></div>
+                            <div class="fs-5 fw-bold text-primary">
+                                = <span id="cot-resultado">$0</span> ARS
+                            </div>
+                            <div class="text-muted" style="font-size:10px;" id="cot-actualizado"></div>
+                        </div>
+                        <div id="cot-error" class="d-none text-danger small">
+                            <i class="bi bi-exclamation-triangle me-1"></i>No se pudo obtener la cotización.
+                            <br>Ingresá el monto en ARS directamente.
+                        </div>
+                    </div>
+
+                    <div class="form-text mt-2"><i class="bi bi-info-circle"></i> El saldo restante se calculará automáticamente.</div>
                     <input type="hidden" id="modal_tipo_pago">
                     <input type="hidden" id="modal_id_referencia">
+                    <input type="hidden" id="modal_cotizacion_usd" value="0">
                 </div>
                 <div class="modal-footer bg-light border-0 d-flex justify-content-center pb-4 pt-0">
                     <button type="button" class="btn btn-outline-secondary px-4 fw-bold" data-bs-dismiss="modal">Cancelar</button>
@@ -1231,18 +1268,92 @@ const filtroEstado = document.getElementById('filtroEstado');
 if(buscador) buscador.addEventListener('keyup', filtrarDashboard);
 if(filtroEstado) filtroEstado.addEventListener('change', filtrarDashboard);
 
+/* ── Formato del input de monto (ARS: puntos / USD: dígitos limpios) ── */
 const montoInput = document.getElementById('monto_entregado');
 if (montoInput) {
-    montoInput.addEventListener('input', function() {
-        const value = this.value.replace(/\D/g, '');
-        this.value = value ? new Intl.NumberFormat('es-AR').format(parseInt(value, 10)) : '';
+    montoInput.addEventListener('input', function () {
+        const esUSD = document.getElementById('moneda_usd').checked;
+        if (esUSD) {
+            // Para USD permitir decimales simples (ej: 200.50)
+            let v = this.value.replace(/[^\d.]/g, '');
+            const partes = v.split('.');
+            if (partes.length > 2) v = partes[0] + '.' + partes.slice(1).join('');
+            this.value = v;
+        } else {
+            const value = this.value.replace(/\D/g, '');
+            this.value = value ? new Intl.NumberFormat('es-AR').format(parseInt(value, 10)) : '';
+        }
+        actualizarConversion();
     });
+}
+
+/* ── Selector de moneda ── */
+document.querySelectorAll('input[name="modal_moneda"]').forEach(function (radio) {
+    radio.addEventListener('change', function () {
+        const esUSD = this.value === 'usd';
+        document.getElementById('panel-conversion-usd').classList.toggle('d-none', !esUSD);
+        document.getElementById('modal-simbolo-moneda').textContent = esUSD ? 'USD' : '$';
+        document.getElementById('monto_entregado').value = '';
+        document.getElementById('monto_entregado').placeholder = esUSD ? 'Ej: 200' : 'Ej: 15.000';
+        if (esUSD) cargarCotizacion();
+    });
+});
+
+/* ── Carga cotización desde el backend ── */
+let _cotizacion = 0;
+function cargarCotizacion() {
+    document.getElementById('cot-loading').classList.remove('d-none');
+    document.getElementById('cot-datos').classList.add('d-none');
+    document.getElementById('cot-error').classList.add('d-none');
+    document.getElementById('modal_cotizacion_usd').value = 0;
+    _cotizacion = 0;
+
+    fetch('/dashboard/api/cotizacion-dolar')
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            document.getElementById('cot-loading').classList.add('d-none');
+            if (!d.ok) throw new Error(d.error || 'Error');
+            _cotizacion = d.venta;
+            document.getElementById('modal_cotizacion_usd').value = _cotizacion;
+            document.getElementById('cot-label').innerHTML =
+                d.label + ' &mdash; venta: <strong>$' +
+                new Intl.NumberFormat('es-AR').format(_cotizacion) + '</strong>';
+            document.getElementById('cot-datos').classList.remove('d-none');
+            actualizarConversion();
+        })
+        .catch(function () {
+            document.getElementById('cot-loading').classList.add('d-none');
+            document.getElementById('cot-error').classList.remove('d-none');
+        });
+}
+
+/* ── Recalcula ARS en tiempo real ── */
+function actualizarConversion() {
+    if (!document.getElementById('moneda_usd').checked) return;
+    const usd = parseFloat(document.getElementById('monto_entregado').value) || 0;
+    const ars = Math.round(usd * _cotizacion);
+    document.getElementById('cot-resultado').textContent =
+        '$' + new Intl.NumberFormat('es-AR').format(ars);
 }
 
 function enviarPagoParcial() {
     const tipo = document.getElementById('modal_tipo_pago').value;
     const id_referencia = document.getElementById('modal_id_referencia').value;
-    const monto = parseFloat(document.getElementById('monto_entregado').value.replace(/\./g, ''));
+    const esUSD = document.getElementById('moneda_usd').checked;
+
+    let monto;
+    if (esUSD) {
+        const usd = parseFloat(document.getElementById('monto_entregado').value) || 0;
+        const cotizacion = parseFloat(document.getElementById('modal_cotizacion_usd').value) || 0;
+        if (cotizacion <= 0) {
+            alert('No se pudo obtener la cotización. Ingresá el monto en ARS.');
+            return;
+        }
+        monto = Math.round(usd * cotizacion);
+    } else {
+        monto = parseFloat(document.getElementById('monto_entregado').value.replace(/\./g, '').replace(',', '.'));
+    }
+
     if (isNaN(monto) || monto <= 0) return;
 
     const btn = document.getElementById('btn-guardar-pago');
@@ -1250,25 +1361,27 @@ function enviarPagoParcial() {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Guardando...';
 
-    const url = tipo === 'grupo' ? `/dashboard/registrar-pago-grupo/${id_referencia}` : `/dashboard/registrar-pago-especial/${id_referencia}`;
+    const url = tipo === 'grupo'
+        ? `/dashboard/registrar-pago-grupo/${id_referencia}`
+        : `/dashboard/registrar-pago-especial/${id_referencia}`;
     const bodyData = { monto };
     if (tipo === 'grupo') { bodyData.mes = {{ mes }}; bodyData.anio = {{ anio }}; }
 
     fetch(url, {
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' }, 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
         body: JSON.stringify(bodyData)
     })
-    .then(res => res.json())
-    .then(data => {
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
         if (data.success) {
             bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
-            setTimeout(() => location.reload(), 150);
+            setTimeout(function () { location.reload(); }, 150);
         }
     })
-    .catch(() => { 
-        btn.innerHTML = contenidoOriginal; 
-        btn.disabled = false; 
+    .catch(function () {
+        btn.innerHTML = contenidoOriginal;
+        btn.disabled = false;
     });
 }
 
@@ -1276,10 +1389,17 @@ function abrirModalPago(tipo, id_referencia, nombre, deuda) {
     document.getElementById('modal_tipo_pago').value = tipo;
     document.getElementById('modal_id_referencia').value = id_referencia;
     document.getElementById('modal-nombre-cliente').innerText = nombre;
-    document.getElementById('modal-deuda-cliente').innerText = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(deuda);
+    document.getElementById('modal-deuda-cliente').innerText =
+        new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(deuda);
     document.getElementById('monto_entregado').value = '';
+    // Resetear a ARS
+    document.getElementById('moneda_ars').checked = true;
+    document.getElementById('panel-conversion-usd').classList.add('d-none');
+    document.getElementById('modal-simbolo-moneda').textContent = '$';
+    document.getElementById('monto_entregado').placeholder = 'Ej: 15.000';
+    _cotizacion = 0;
     new bootstrap.Modal(document.getElementById('modalPago')).show();
-    setTimeout(() => document.getElementById('monto_entregado').focus(), 500);
+    setTimeout(function () { document.getElementById('monto_entregado').focus(); }, 500);
 }
 
 window.addEventListener('beforeunload', () => sessionStorage.setItem('scrollPosition', window.scrollY));
@@ -1288,4 +1408,39 @@ window.addEventListener('load', () => {
     if (pos) { window.scrollTo(0, parseInt(pos)); sessionStorage.removeItem('scrollPosition'); }
 });
 </script>
-{% endblock %}
+
+{# ── Modal selección de filtro para Hoja de Ruta ── #}
+<div class="modal fade" id="modalFiltroHoja" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-dark text-white border-0 py-3">
+                <h6 class="modal-title fw-bold mb-0">
+                    <i class="bi bi-file-earmark-pdf-fill me-2"></i>¿Qué querés ver?
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3 d-grid gap-2" id="cuerpoFiltroHoja">
+                <a id="hoja-todos"       class="btn btn-dark fw-bold"            target="_blank">Todos</a>
+                <a id="hoja-pendiente"   class="btn btn-outline-secondary fw-bold" target="_blank">Pendientes</a>
+                <a id="hoja-pagado"      class="btn btn-outline-success fw-bold"   target="_blank">Pagados</a>
+                <a id="hoja-notificado"  class="btn btn-outline-info fw-bold"      target="_blank">Notificados</a>
+                <a id="hoja-saldar"      class="btn btn-outline-warning fw-bold"   target="_blank">Saldar</a>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('modalFiltroHoja').addEventListener('show.bs.modal', function (e) {
+    const btn  = e.relatedTarget;
+    const mes  = btn.dataset.mes;
+    const anio = btn.dataset.anio;
+    const base = "{{ url_for('dashboard.planilla_impresion') }}";
+    const params = `mes=${mes}&anio=${anio}`;
+    document.getElementById('hoja-todos').href       = `${base}?${params}&filtro=todos`;
+    document.getElementById('hoja-pendiente').href   = `${base}?${params}&filtro=pendiente`;
+    document.getElementById('hoja-pagado').href      = `${base}?${params}&filtro=pagado`;
+    document.getElementById('hoja-notificado').href  = `${base}?${params}&filtro=notificado`;
+    document.getElementById('hoja-saldar').href      = `${base}?${params}&filtro=saldar`;
+});
+</script>
+{% endblock %}         

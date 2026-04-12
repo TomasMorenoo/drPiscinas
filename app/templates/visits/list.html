@@ -55,7 +55,7 @@
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm bg-primary text-white p-3 h-100 d-flex flex-column justify-content-center">
             <h6 class="fw-bold small text-uppercase opacity-75">Facturación Extras del Mes</h6>
-            <h2 class="mb-0 fw-bold">$ {{ "{:,.2f}".format(total_mes) }}</h2>
+            <h2 class="mb-0 fw-bold">$ {{ total_mes | pesos }}</h2>
         </div>
     </div>
     {% endif %}
@@ -131,7 +131,7 @@
 
                         {% if current_user.is_admin() %}
                         <td class="text-center fw-bold text-success">
-                            $ {{ "{:,.2f}".format(visit.calcular_total()) }}
+                            $ {{ visit.calcular_total() | pesos }}
                         </td>
                         {% endif %}
 

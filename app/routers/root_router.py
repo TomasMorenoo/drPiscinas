@@ -1,11 +1,13 @@
 import os
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
+import subprocess
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, Response
 from flask_login import login_required, current_user
 from app.decorators import root_required
 from app.models.user import User
 from app.models.casa import Casa, HistorialAumento
 from app.models.abono_historico import AbonoHistorico
 from app.models.configuracion import Configuracion
+from app.models.auditoria import AuditoriaLog
 from app import db
 from datetime import datetime
 
@@ -47,6 +49,27 @@ def panel():
         lineas_log = [l.strip() for l in lineas if l.strip() and 'CLIENTE' not in l][-50:]
         lineas_log.reverse()
 
+    tipo_dolar = Configuracion.get('tipo_dolar', 'blue')
+
+    # ── Log de auditoría DB ──────────────────────────────────────────────────
+    filtro_accion = request.args.get("filtro_accion", "")
+    filtro_usuario = request.args.get("filtro_usuario", "")
+    pagina = request.args.get("pagina", 1, type=int)
+    por_pagina = 50
+
+    audit_query = AuditoriaLog.query
+    if filtro_accion:
+        audit_query = audit_query.filter(AuditoriaLog.accion == filtro_accion)
+    if filtro_usuario:
+        audit_query = audit_query.filter(AuditoriaLog.usuario.ilike(f"%{filtro_usuario}%"))
+
+    total_audit = audit_query.count()
+    audit_logs = audit_query.order_by(AuditoriaLog.fecha.desc()).offset((pagina - 1) * por_pagina).limit(por_pagina).all()
+    total_paginas = (total_audit + por_pagina - 1) // por_pagina
+
+    acciones_disponibles = [r[0] for r in db.session.query(AuditoriaLog.accion).distinct().order_by(AuditoriaLog.accion).all()]
+    usuarios_disponibles = [r[0] for r in db.session.query(AuditoriaLog.usuario).distinct().order_by(AuditoriaLog.usuario).all()]
+
     return render_template(
         "root/panel.html",
         modo_mantenimiento=modo_mantenimiento,
@@ -57,7 +80,34 @@ def panel():
         usuarios=usuarios,
         ultimos_aumentos=ultimos_aumentos,
         lineas_log=lineas_log,
+        tipo_dolar=tipo_dolar,
+        audit_logs=audit_logs,
+        total_audit=total_audit,
+        total_paginas=total_paginas,
+        pagina_actual=pagina,
+        filtro_accion=filtro_accion,
+        filtro_usuario=filtro_usuario,
+        acciones_disponibles=acciones_disponibles,
+        usuarios_disponibles=usuarios_disponibles,
     )
+
+
+# ================================================
+# CONFIGURACIÓN TIPO DE DÓLAR
+# ================================================
+@root_bp.route("/tipo-dolar", methods=["POST"])
+@login_required
+@root_required
+def set_tipo_dolar():
+    tipo = request.form.get("tipo_dolar", "blue")
+    if tipo not in ("blue", "mep"):
+        flash("Tipo de dólar inválido.", "error")
+    else:
+        Configuracion.set("tipo_dolar", tipo)
+        db.session.commit()
+        labels = {"blue": "Dólar Blue", "mep": "Dólar MEP"}
+        flash(f"Cotización cambiada a {labels[tipo]}.", "success")
+    return redirect(url_for("root.panel"))
 
 
 # ================================================
@@ -176,3 +226,88 @@ def limpiar_log():
         os.remove(LOG_AUMENTOS)
         flash("Log de aumentos limpiado.", "info")
     return redirect(url_for('root.panel'))
+
+
+# ================================================
+# BACKUP DE LA BASE DE DATOS
+# ================================================
+@root_bp.route("/backup-db")
+@login_required
+@root_required
+def backup_db():
+    """
+    Genera un pg_dump de la base de datos y lo devuelve como descarga directa.
+    Requiere postgresql-client instalado en el container (dockerfile ya lo incluye).
+    """
+    import urllib.parse as _urlparse
+
+    # Leer credenciales desde la DATABASE_URL o las variables individuales
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        parsed = _urlparse.urlparse(database_url)
+        db_user = parsed.username
+        db_pass = parsed.password
+        db_host = parsed.hostname
+        db_port = str(parsed.port or 5432)
+        db_name = parsed.path.lstrip("/")
+    else:
+        db_user = os.getenv("DB_USER", "drPiscinas")
+        db_pass = os.getenv("DB_PASS", "administrador")
+        db_host = os.getenv("DB_HOST", "db")
+        db_port = "5432"
+        db_name = os.getenv("DB_NAME", "drPiscinas_db")
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    filename = f"backup_{timestamp}.sql"
+
+    env = os.environ.copy()
+    env["PGPASSWORD"] = db_pass or ""
+
+    try:
+        resultado = subprocess.run(
+            [
+                "pg_dump",
+                "-h", db_host,
+                "-p", db_port,
+                "-U", db_user,
+                "-d", db_name,
+                "--no-password",
+                "--format=plain",
+                "--encoding=UTF8",
+            ],
+            capture_output=True,
+            env=env,
+            timeout=60,
+        )
+
+        if resultado.returncode != 0:
+            error_msg = resultado.stderr.decode("utf-8", errors="replace")
+            flash(f"❌ Error al generar el backup: {error_msg[:200]}", "error")
+            return redirect(url_for("root.panel"))
+
+        sql_content = resultado.stdout
+
+        # Guardar también una copia local en sueltos/
+        backup_dir = os.path.join(os.getcwd(), "sueltos")
+        os.makedirs(backup_dir, exist_ok=True)
+        with open(os.path.join(backup_dir, filename), "wb") as f:
+            f.write(sql_content)
+
+        return Response(
+            sql_content,
+            mimetype="application/octet-stream",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": len(sql_content),
+            }
+        )
+
+    except FileNotFoundError:
+        flash("❌ pg_dump no está disponible. Reconstruí el container con 'docker compose build'.", "error")
+        return redirect(url_for("root.panel"))
+    except subprocess.TimeoutExpired:
+        flash("❌ El backup tardó demasiado y fue cancelado.", "error")
+        return redirect(url_for("root.panel"))
+    except Exception as e:
+        flash(f"❌ Error inesperado: {str(e)}", "error")
+        return redirect(url_for("root.panel"))

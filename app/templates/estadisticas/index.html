@@ -62,7 +62,7 @@
                     <h5 class="fw-bold text-dark mb-0"><i class="bi bi-currency-dollar text-success me-1"></i>Abonos Anual</h5>
                     <div class="text-end">
                         <span class="d-block small text-muted text-uppercase fw-bold">Total Acumulado</span>
-                        <span class="badge bg-success fs-5 shadow-sm">${{ "{:,.0f}".format(total_anual_abonos).replace(',', '.') }}</span>
+                        <span class="badge bg-success fs-5 shadow-sm">${{ total_anual_abonos | pesos }}</span>
                     </div>
                 </div>
                 <div class="card-body">
@@ -76,7 +76,7 @@
                     <h5 class="fw-bold text-dark mb-0"><i class="bi bi-box-seam text-info me-1"></i>Productos Anual</h5>
                     <div class="text-end">
                         <span class="d-block small text-muted text-uppercase fw-bold">Total Acumulado</span>
-                        <span class="badge bg-info text-dark fs-5 shadow-sm">${{ "{:,.0f}".format(total_anual_productos).replace(',', '.') }}</span>
+                        <span class="badge bg-info text-dark fs-5 shadow-sm">${{ total_anual_productos | pesos }}</span>
                     </div>
                 </div>
                 <div class="card-body">

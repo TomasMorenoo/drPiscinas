@@ -67,7 +67,7 @@
 
                     <div class="mb-3">
                         <small class="text-muted d-block text-uppercase fw-bold">Abono Base Actual</small>
-                        <span class="fs-5 text-success fw-bold">${{ "{:,.2f}".format(casa.precio_base) }}</span>
+                        <span class="fs-5 text-success fw-bold">${{ casa.precio_base | pesos }}</span>
                     </div>
 
                     <div class="mt-4">
@@ -107,7 +107,7 @@
                                             <td class="ps-4 fw-bold text-muted">{{ v.fecha.strftime('%m/%Y') }}</td>
                                             <td class="fw-bold text-dark">{{ vp.product.nombre }}</td>
                                             <td class="font-monospace">{{ vp.cantidad }} {{ vp.product.unidad }}</td>
-                                            <td class="font-monospace text-success fw-bold">${{ "{:,.0f}".format(vp.cantidad * (vp.precio_unitario or vp.product.precio)) }}</td>
+                                            <td class="font-monospace text-success fw-bold">${{ (vp.cantidad * (vp.precio_unitario or vp.product.precio)) | pesos }}</td>
                                             <td class="text-end pe-4">
                                                 <form action="{{ url_for('casas.eliminar_extra', visit_id=v.id) }}" method="POST" onsubmit="return confirm('¿Eliminar este cargo manual?');">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -154,7 +154,7 @@
                                                     {% for vp in visit.productos %}{{ vp.product.nombre }} ({{ vp.cantidad }}) {% endfor %}
                                                 </small>
                                             </div>
-                                            <span class="badge bg-primary rounded-pill fs-6">${{ "{:,.0f}".format(visit.calcular_total()) }}</span>
+                                            <span class="badge bg-primary rounded-pill fs-6">${{ visit.calcular_total() | pesos }}</span>
                                         </li>
                                     {% endif %}
                                 {% endfor %}
@@ -183,20 +183,30 @@
                                             <td class="ps-4 fw-bold text-dark text-uppercase">{{ d.periodo }}</td>
                                             <td class="text-end font-monospace">
                                                 {% if d.saldo_anterior < -0.1 %}
-                                                    <span class="text-success fw-bold">A favor: ${{ "{:,.0f}".format(d.saldo_anterior | abs) }}</span>
+                                                    <span class="text-success fw-bold">A favor: ${{ d.saldo_anterior | abs | pesos }}</span>
                                                 {% elif d.saldo_anterior > 0.1 %}
-                                                    <span class="text-danger fw-bold">Deuda: ${{ "{:,.0f}".format(d.saldo_anterior) }}</span>
+                                                    <span class="text-danger fw-bold">Deuda: ${{ d.saldo_anterior | pesos }}</span>
                                                 {% else %}
                                                     <span class="text-muted">$0</span>
                                                 {% endif %}
                                             </td>
-                                            <td class="text-end font-monospace fw-bold text-dark">${{ "{:,.0f}".format(d.costo_mes) }}</td>
-                                            <td class="text-end font-monospace text-success fw-bold">${{ "{:,.0f}".format(d.pagado) }}</td>
+                                            <td class="text-end font-monospace fw-bold text-dark">${{ d.costo_mes | pesos }}</td>
+                                            <td class="text-end font-monospace text-success fw-bold">${{ d.pagado | pesos }}</td>
                                             <td class="text-end pe-4">
                                                 {% if d.saldo > 0.1 %}
-                                                    <span class="badge bg-danger fs-6 w-100 py-2 shadow-sm">Debe: ${{ "{:,.0f}".format(d.saldo) }}</span>
+                                                    <span class="badge bg-danger fs-6 w-100 py-2 shadow-sm">Debe: ${{ d.saldo | pesos }}</span>
                                                 {% elif d.saldo < -0.1 %}
-                                                    <span class="badge bg-info fs-6 w-100 py-2 shadow-sm">A favor: ${{ "{:,.0f}".format(d.saldo | abs) }}</span>
+                                                    <span class="badge bg-info fs-6 w-100 py-2 shadow-sm"
+                                                        style="cursor: help;"
+                                                        data-bs-toggle="tooltip"
+                                                        data-bs-placement="top"
+                                                        {% if d.historial and d.historial.cobrado_por %}
+                                                        title="Cobrado por {{ d.historial.cobrado_por }} el {{ d.historial.fecha_pago.strftime('%d/%m/%Y a las %H:%M') }}"
+                                                        {% else %}
+                                                        title="Pago registrado antes de la implementación del auditor"
+                                                        {% endif %}>
+                                                        A favor: ${{ d.saldo | abs | pesos }}
+                                                    </span>
                                                 {% else %}
                                                     <span class="badge bg-success fs-6 w-100 py-2 text-uppercase shadow-sm"
                                                         style="cursor: help;"
@@ -236,7 +246,7 @@
                 </div>
                 <div class="modal-body p-4 bg-light">
                     <p class="text-muted text-center mb-4">
-                        Abono Actual: <span class="badge bg-secondary fs-6">${{ "{:,.0f}".format(casa.precio_base).replace(',', '.') }}</span>
+                        Abono Actual: <span class="badge bg-secondary fs-6">${{ casa.precio_base | pesos }}</span>
                     </p>
                     <div class="row g-3">
                         <div class="col-md-6">
@@ -248,7 +258,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-uppercase small text-muted">Valor a Incrementar</label>
-                            <input type="number" name="valor_aumento" class="form-control border-info" required step="any" min="0" placeholder="Ej: 15">
+                            <input type="text" inputmode="numeric" name="valor_aumento" class="form-control border-info formato-miles" required placeholder="Ej: 15">
                         </div>
                     </div>
 
@@ -299,7 +309,7 @@
                         <select name="product_id" class="form-select border-secondary fw-bold" required>
                             <option value="">Seleccionar...</option>
                             {% for p in productos %}
-                            <option value="{{ p.id }}">{{ p.nombre }} (${{ "{:,.0f}".format(p.precio) }})</option>
+                            <option value="{{ p.id }}">{{ p.nombre }} (${{ p.precio | pesos }})</option>
                             {% endfor %}
                         </select>
                     </div>

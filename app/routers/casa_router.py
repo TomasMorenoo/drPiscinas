@@ -18,6 +18,19 @@ import os
 casa_bp = Blueprint("casas", __name__, url_prefix="/casas")
 
 # ==========================================
+# AUDITORÍA DB
+# ==========================================
+
+def registrar_auditoria(usuario, accion, detalle):
+    """Guarda una entrada en el log de auditoría."""
+    from app.models.auditoria import AuditoriaLog
+    from datetime import timedelta, timezone
+    tz_ar = timezone(timedelta(hours=-3))
+    ahora_ar = datetime.now(tz_ar).replace(tzinfo=None)
+    log = AuditoriaLog(fecha=ahora_ar, usuario=usuario, accion=accion, detalle=detalle)
+    db.session.add(log)
+
+# ==========================================
 # LOG EN TXT DE AUMENTOS (AUDITORÍA)
 # ==========================================
 NOMBRES_MESES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -216,22 +229,36 @@ def herramienta_aumento():
                 log_aumento_txt(casa.nombre_formateado(), precio_actual, diferencia, nuevo_precio, mes_desde)
 
         db.session.commit()
-        
+
         # --- REGISTRO DEL AUMENTO ---
         if count > 0:
             target = "TODOS LOS CLIENTES"
             if country_id:
                 c_obj = Country.query.get(country_id)
                 if c_obj: target = f"COUNTRY {c_obj.nombre.upper()}"
-            
-            simbolo = "%" if tipo == "porcentaje" else "$"
-            texto_valor = f"{valor}{simbolo}" if tipo == "porcentaje" else f"{simbolo}{valor}"
+
+            if tipo == "porcentaje":
+                texto_valor = f"{valor}%"
+            else:
+                texto_valor = f"${format_money(valor)}"
             desc = f"Aumento Global ({texto_valor}) a {target}"
-            
+
             log = HistorialAumento(fecha=datetime.now(), descripcion=desc, casas_afectadas=count, mes_desde=mes_desde, anio_desde=anio_desde)
             db.session.add(log)
+
+            # --- AUDITORÍA: aumento individual por cada casa ---
+            for casa in casas_afectadas:
+                precio_viejo = float(casa.precio_anterior) if casa.precio_anterior else 0.0
+                precio_nuevo = float(casa.precio_base)
+                diferencia_aud = precio_nuevo - precio_viejo
+                registrar_auditoria(
+                    current_user.username,
+                    'AUMENTO',
+                    f"{casa.nombre_formateado()} — Antes: ${format_money(precio_viejo)} → +${format_money(diferencia_aud)} → Nuevo: ${format_money(precio_nuevo)} (desde {mes_desde}/{anio_desde})"
+                )
+
             db.session.commit()
-            
+
             flash(f"✅ Precios actualizados en {count} propiedades a partir de {mes_desde}/{anio_desde}.", "success")
         else:
             flash("⚠️ No se encontraron propiedades con abono mayor a $0 para aumentar.", "warning")
@@ -280,8 +307,16 @@ def deshacer_aumento():
         desc = "Reversión (Deshacer) del último aumento"
         log = HistorialAumento(fecha=datetime.now(), descripcion=desc, casas_afectadas=count)
         db.session.add(log)
+
+        # --- AUDITORÍA ---
+        registrar_auditoria(
+            current_user.username,
+            'DESHACER_AUMENTO',
+            f"Se revirtió el último aumento en {count} propiedades"
+        )
+
         db.session.commit()
-        
+
     flash(f"⏪ Se restauraron los abonos originales en {count} propiedades.", "info")
     return redirect(url_for("casas.listar_casas"))
 
@@ -419,7 +454,19 @@ def crear_casa():
             creados += 1
 
         db.session.commit()
-        
+
+        # --- AUDITORÍA ---
+        if creados > 0:
+            country_obj = Country.query.get(country_id)
+            country_nombre = country_obj.nombre if country_obj else str(country_id)
+            nombres_creados = ", ".join(numeros_lista[:creados]) if len(numeros_lista) <= 5 else f"{creados} clientes"
+            registrar_auditoria(
+                current_user.username,
+                'CREAR_CLIENTE',
+                f"{nombres_creados} — {country_nombre}" + (f" — {nombre_cliente}" if nombre_cliente else "")
+            )
+            db.session.commit()
+
         if creados > 0 and omitidos == 0:
             flash(f"✅ Se crearon {creados} clientes correctamente.", "success")
         elif creados > 0 and omitidos > 0:
@@ -559,11 +606,21 @@ def toggle_casa(id):
         casa.activo = False
         casa.inactivado_por = current_user.username
         casa.fecha_inactivacion = datetime.now()
+        registrar_auditoria(
+            current_user.username,
+            'INACTIVAR_CLIENTE',
+            casa.nombre_formateado()
+        )
     else:
         casa.activo = True
         casa.inactivado_por = None
         casa.fecha_inactivacion = None
-        
+        registrar_auditoria(
+            current_user.username,
+            'ACTIVAR_CLIENTE',
+            casa.nombre_formateado()
+        )
+
     db.session.commit()
     return redirect(url_for("casas.listar_casas"))
 
@@ -572,7 +629,15 @@ def toggle_casa(id):
 @admin_required
 def eliminar_casa(id):
     casa = Casa.query.get_or_404(id)
+    nombre_casa = casa.nombre_formateado()
     try:
+        # --- AUDITORÍA (antes de borrar) ---
+        registrar_auditoria(
+            current_user.username,
+            'ELIMINAR_CLIENTE',
+            f"{nombre_casa} — Precio base: ${format_money(float(casa.precio_base or 0))}"
+        )
+
         AbonoHistorico.query.filter_by(casa_id=id).delete()
         visitas = Visit.query.filter_by(casa_id=id).all()
         for visita in visitas:
@@ -628,11 +693,22 @@ def aumento_individual(id):
         log_aumento_txt(casa.nombre_formateado(), precio_actual, diferencia, nuevo_precio, mes_desde)
 
         # --- REGISTRO DEL AUMENTO ---
-        simbolo = "%" if tipo == "porcentaje" else "$"
-        texto_valor = f"{valor}{simbolo}" if tipo == "porcentaje" else f"{simbolo}{valor}"
+        if tipo == "porcentaje":
+            texto_valor = f"{valor}%"
+        else:
+            texto_valor = f"${format_money(valor)}"
         desc = f"Aumento Indiv. ({texto_valor}) a {casa.nombre_formateado()}"
         log = HistorialAumento(fecha=datetime.now(), descripcion=desc, casas_afectadas=1, mes_desde=mes_desde, anio_desde=anio_desde)
         db.session.add(log)
+
+        # --- AUDITORÍA ---
+        diferencia_indiv = nuevo_precio - precio_actual
+        registrar_auditoria(
+            current_user.username,
+            'AUMENTO',
+            f"{casa.nombre_formateado()} — Antes: ${format_money(precio_actual)} → +${format_money(diferencia_indiv)} → Nuevo: ${format_money(nuevo_precio)} (desde {mes_desde}/{anio_desde})"
+        )
+
         db.session.commit()
         
         flash(f"Aumento aplicado correctamente a {casa.nombre_formateado()} a partir de {mes_desde}/{anio_desde}", "success")

@@ -180,16 +180,27 @@
             return new bootstrap.Tooltip(tooltipTriggerEl);
         });
     });
-
-    // Recordar posición de scroll por página
-    (function() {
-        var scrollKey = 'scroll_' + window.location.pathname + window.location.search;
-        var saved = sessionStorage.getItem(scrollKey);
-        if (saved !== null) window.scrollTo(0, parseInt(saved));
-        window.addEventListener('beforeunload', function() {
-            sessionStorage.setItem(scrollKey, window.scrollY);
-        });
-    })();
 </script>
-</body>
-</html>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Seleccionamos todos los inputs que tengan la clase 'formato-miles'
+    const inputsNumericos = document.querySelectorAll('.formato-miles');
+
+    inputsNumericos.forEach(input => {
+        // 2. Función para darle formato mientras el usuario escribe
+        input.addEventListener('input', function(e) {
+            // Quitamos todo lo que no sea número
+            let valor = this.value.replace(/\D/g, "");
+            
+            if (valor === "") {
+                this.value = "";
+                return;
+            }
+            
+            // Lo convertimos a número y le damos formato argentino (puntos en los miles)
+            this.value = new Intl.NumberFormat('es-AR').format(parseInt(valor, 10));
+        });
+
+        // 3. Si la página carga y ya tiene un valor (ej: al Editar cliente), lo formateamos
+        if (input.v

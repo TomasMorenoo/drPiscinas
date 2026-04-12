@@ -67,7 +67,15 @@ def create_app():
     app.register_blueprint(grupo_bp)
     app.register_blueprint(estadisticas_bp)
     app.register_blueprint(root_bp)
-    
+
+    # --- FILTRO JINJA2: formato pesos argentinos (punto como separador de miles) ---
+    @app.template_filter('pesos')
+    def format_pesos(value):
+        try:
+            return "{:,.0f}".format(float(value)).replace(',', '.')
+        except (ValueError, TypeError):
+            return value
+
     # --- MODO MANTENIMIENTO ---
     @app.before_request
     def check_maintenance_mode():

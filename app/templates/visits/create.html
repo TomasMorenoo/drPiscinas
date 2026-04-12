@@ -45,7 +45,7 @@
                                 {% for promo in promos %}
                                     <option value="{{ promo.id }}" {% if visit and visit.promo_id == promo.id %}selected{% endif %}>
                                         {% if current_user.is_admin() %}
-                                            {{ promo.nombre }} (${{ promo.precio }})
+                                            {{ promo.nombre }} (${{ promo.precio | pesos }})
                                         {% else %}
                                             {{ promo.nombre }}
                                         {% endif %}

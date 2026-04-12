@@ -126,7 +126,7 @@
                     </td>
 
                     <td class="text-end font-monospace text-secondary">
-                        $ {{ "{:,.2f}".format(casa.precio_base) }}
+                        $ {{ casa.precio_base | pesos }}
                     </td>
 
                     <td class="text-center">

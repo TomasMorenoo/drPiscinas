@@ -6,18 +6,18 @@
     <style>
         @page { size: A4 portrait; margin: 1cm; }
         body { font-family: Arial, sans-serif; font-size: 11px; color: #000; background: #fff; margin: 0; padding: 0; }
-        
+
         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
         .header h1 { margin: 0; font-size: 18px; text-transform: uppercase; }
         .header p { margin: 5px 0 0 0; font-size: 13px; color: #555; }
-        
+
         table { width: 100%; border-collapse: collapse; }
         th, td { border: 1px solid #000; padding: 6px 4px; text-align: left; vertical-align: middle; }
         th { background-color: #f2f2f2; text-transform: uppercase; font-size: 10px; }
-        
+
         .text-right { text-align: right; }
         .text-center { text-align: center; }
-        
+
         .box-lapicera {
             display: inline-block;
             width: 16px;
@@ -26,22 +26,22 @@
             border-radius: 3px;
             margin-top: 2px;
         }
-        
+
         .linea-fecha {
             display: inline-block;
             width: 30px;
             border-bottom: 1px solid #000;
         }
-        
+
         .col-total { font-weight: bold; font-size: 12px; }
         .a-favor { color: #555; font-style: italic; font-size: 10px;}
         .deuda { font-weight: bold; }
-        
+
         .detalle-prod { font-size: 9px; color: #333; line-height: 1.2; }
 
         .fila-grupo-header {
-            background-color: #e6ecf2; 
-            border-top: 2px solid #000; 
+            background-color: #e6ecf2;
+            border-top: 2px solid #000;
             border-bottom: 2px solid #000;
         }
         .fila-grupo-hijo {
@@ -49,7 +49,6 @@
             color: #444;
         }
 
-        /* ESTILOS PARA LOS CLIENTES YA PAGADOS */
         .fila-pagada {
             text-decoration: line-through;
             color: #999 !important;
@@ -61,16 +60,39 @@
             font-weight: bold;
             font-size: 11px;
             color: #777;
-            text-decoration: none !important; /* Para que la palabra PAGÓ no esté tachada */
+            text-decoration: none !important;
             display: inline-block;
         }
+
+        /* Encabezado de filtro (solo en pantalla, no imprime) */
+        .filtro-header {
+            text-align: center;
+            padding: 8px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            color: #555;
+            border-bottom: 1px dashed #aaa;
+        }
+        .filtro-header strong { color: #000; }
+        @media print { .filtro-header { display: none; } }
     </style>
 </head>
-<body onload="window.print();">
+<body>
 
     <div class="header">
         <h1>DR. PISCINAS - HOJA DE RUTA Y COBROS</h1>
         <p>Período de Facturación: <strong>{{ mes_nombre }} {{ anio }}</strong></p>
+    </div>
+
+    {% set etiquetas = {
+        'todos':      'Todos los clientes',
+        'pendiente':  'Pendientes de pago',
+        'pagado':     'Pagados',
+        'notificado': 'Notificados',
+        'saldar':     'Con saldo a saldar'
+    } %}
+    <div class="filtro-header">
+        Filtro aplicado: <strong>{{ etiquetas.get(filtro, 'Todos') }}</strong>
     </div>
 
     <table>
@@ -88,35 +110,35 @@
         </thead>
         <tbody>
             {% for f in reporte_sueltas %}
-            <tr class="{% if f.pagado %}fila-pagada{% endif %}">
+            <tr class="fila-planilla {% if f.pagado %}fila-pagada{% endif %}" data-estado="{{ f.estado }}">
                 <td class="text-center"><span class="linea-fecha"></span> / <span class="linea-fecha"></span></td>
-                
+
                 <td><strong>{{ f.cliente }}</strong></td>
-                
+
                 <td class="detalle-prod">
                     {% if f.detalle_productos %} {{ f.detalle_productos }} {% else %} - {% endif %}
                 </td>
 
                 <td class="text-right">
                     {% if f.producto > 0 %}
-                        ${{ "{:,.0f}".format(f.producto).replace(',', '.') }}
+                        ${{ f.producto | pesos }}
                     {% else %} - {% endif %}
                 </td>
-                
-                <td class="text-right">${{ "{:,.0f}".format(f.abono).replace(',', '.') }}</td>
-                
+
+                <td class="text-right">${{ f.abono | pesos }}</td>
+
                 <td class="text-right">
                     {% if f.saldo_anterior < -0.1 %}
-                        <span class="a-favor">${{ "{:,.0f}".format(f.saldo_anterior | abs).replace(',', '.') }} (A favor)</span>
+                        <span class="a-favor">${{ f.saldo_anterior | abs | pesos }} (A favor)</span>
                     {% elif f.saldo_anterior > 0.1 %}
-                        <span class="deuda">Debe ${{ "{:,.0f}".format(f.saldo_anterior).replace(',', '.') }}</span>
+                        <span class="deuda">Debe ${{ f.saldo_anterior | pesos }}</span>
                     {% else %} $0 {% endif %}
                 </td>
-                
+
                 <td class="text-right col-total">
-                    ${{ "{:,.0f}".format(f.total_a_pagar).replace(',', '.') }}
+                    ${{ f.total_a_pagar | pesos }}
                 </td>
-                
+
                 <td class="text-center">
                     {% if f.pagado %}
                         <span class="texto-pago">PAGÓ</span>
@@ -128,12 +150,14 @@
             {% endfor %}
 
             {% for g in reporte_grupos %}
-            
-            <tr class="fila-grupo-header {% if g.grupo_pagado %}fila-pagada{% endif %}">
+            {% set grupo_idx = loop.index %}
+
+            <tr class="fila-grupo-header fila-planilla {% if g.grupo_pagado %}fila-pagada{% endif %}"
+                data-estado="{{ g.estado }}" data-grupo="{{ grupo_idx }}">
                 <td class="text-center"><span class="linea-fecha"></span> / <span class="linea-fecha"></span></td>
                 <td colspan="5"><strong>GRUPO: {{ g.nombre_display|upper }}</strong></td>
                 <td class="text-right col-total" style="font-size: 14px;">
-                    ${{ "{:,.0f}".format(g.total_grupo).replace(',', '.') }}
+                    ${{ g.total_grupo | pesos }}
                 </td>
                 <td class="text-center">
                     {% if g.grupo_pagado %}
@@ -145,34 +169,35 @@
             </tr>
 
             {% for f in g.filas %}
-            <tr class="fila-grupo-hijo {% if f.pagado %}fila-pagada{% endif %}">
+            <tr class="fila-grupo-hijo fila-planilla {% if f.pagado %}fila-pagada{% endif %}"
+                data-estado="{{ f.estado }}" data-grupo-padre="{{ grupo_idx }}">
                 <td class="text-center" style="border-top: none; border-bottom: none; color:#aaa;">-</td>
                 <td style="padding-left: 15px;">↳ {{ f.cliente }}</td>
-                
+
                 <td class="detalle-prod">
                     {% if f.detalle_productos %} {{ f.detalle_productos }} {% else %} - {% endif %}
                 </td>
 
                 <td class="text-right">
                     {% if f.producto > 0 %}
-                        ${{ "{:,.0f}".format(f.producto).replace(',', '.') }}
+                        ${{ f.producto | pesos }}
                     {% else %} - {% endif %}
                 </td>
-                
-                <td class="text-right">${{ "{:,.0f}".format(f.abono).replace(',', '.') }}</td>
-                
+
+                <td class="text-right">${{ f.abono | pesos }}</td>
+
                 <td class="text-right">
                     {% if f.saldo_anterior < -0.1 %}
-                        <span class="a-favor">${{ "{:,.0f}".format(f.saldo_anterior | abs).replace(',', '.') }} (A favor)</span>
+                        <span class="a-favor">${{ f.saldo_anterior | abs | pesos }} (A favor)</span>
                     {% elif f.saldo_anterior > 0.1 %}
-                        <span class="deuda">Debe ${{ "{:,.0f}".format(f.saldo_anterior).replace(',', '.') }}</span>
+                        <span class="deuda">Debe ${{ f.saldo_anterior | pesos }}</span>
                     {% else %} $0 {% endif %}
                 </td>
-                
+
                 <td class="text-right text-muted" style="font-size: 10px;">
-                    ${{ "{:,.0f}".format(f.total_a_pagar).replace(',', '.') }}
+                    ${{ f.total_a_pagar | pesos }}
                 </td>
-                
+
                 <td class="text-center" style="border-top: none; border-bottom: none; background-color: {% if g.grupo_pagado %}#f9f9f9{% else %}#e6ecf2{% endif %};"></td>
             </tr>
             {% endfor %}
@@ -182,4 +207,40 @@
     </table>
 
 </body>
+<script>
+(function () {
+    var FILTRO = "{{ filtro }}";
+    var PENDIENTE = ['pendiente', 'notificado', 'saldar'];
+
+    if (FILTRO === 'todos') {
+        window.print();
+        return;
+    }
+
+    // Ocultar filas que no corresponden al filtro
+    var filas = document.querySelectorAll('.fila-planilla');
+    filas.forEach(function (fila) {
+        var estado = fila.dataset.estado;
+        var visible = (FILTRO === 'pendiente')
+            ? PENDIENTE.indexOf(estado) !== -1
+            : estado === FILTRO;
+
+        if (!visible) {
+            fila.style.display = 'none';
+        }
+    });
+
+    // Si un grupo queda oculto, también ocultar sus hijos
+    document.querySelectorAll('.fila-grupo-header').forEach(function (header) {
+        if (header.style.display === 'none') {
+            var idx = header.dataset.grupo;
+            document.querySelectorAll('[data-grupo-padre="' + idx + '"]').forEach(function (hijo) {
+                hijo.style.display = 'none';
+            });
+        }
+    });
+
+    window.print();
+})();
+</script>
 </html>

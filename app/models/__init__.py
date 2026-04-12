@@ -8,3 +8,4 @@ from app.models.promo_product import PromoProduct
 from app.models.grupo import GrupoCliente
 from app.models.cierre_mes import CierreMes
 from app.models.configuracion import Configuracion
+from app.models.auditoria import AuditoriaLog

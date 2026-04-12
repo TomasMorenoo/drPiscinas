@@ -17,6 +17,19 @@ import uuid
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
 # ==========================================
+# AUDITORÍA
+# ==========================================
+
+def registrar_auditoria(usuario, accion, detalle):
+    """Guarda una entrada en el log de auditoría."""
+    from app.models.auditoria import AuditoriaLog
+    from datetime import datetime, timedelta, timezone
+    tz_ar = timezone(timedelta(hours=-3))
+    ahora_ar = datetime.now(tz_ar).replace(tzinfo=None)
+    log = AuditoriaLog(fecha=ahora_ar, usuario=usuario, accion=accion, detalle=detalle)
+    db.session.add(log)
+
+# ==========================================
 # UTILIDADES Y FORMATOS
 # ==========================================
 
@@ -35,13 +48,12 @@ def limpiar_telefono(tel):
     if len(num) == 10: num = "549" + num
     return num
 
-def obtener_marca_tiempo(mes_contexto, anio_contexto):
-    ahora = datetime.now()
-    if anio_contexto == ahora.year and mes_contexto == ahora.month:
-        return ahora
-    else:
-        ultimo_dia = calendar.monthrange(anio_contexto, mes_contexto)[1]
-        return datetime(anio_contexto, mes_contexto, ultimo_dia, ahora.hour, ahora.minute, ahora.second, ahora.microsecond)
+def obtener_marca_tiempo(mes_contexto=None, anio_contexto=None):
+    """Siempre devuelve la fecha/hora real actual en zona horaria Argentina (UTC-3)."""
+    tz_ar = timezone(timedelta(hours=-3))
+    ahora_ar = datetime.now(tz_ar)
+    # Devolvemos sin tzinfo para compatibilidad con el resto del ORM (naive datetime)
+    return ahora_ar.replace(tzinfo=None)
 
 # ==========================================
 # LOGICA DE MENSAJES (WHATSAPP)
@@ -290,16 +302,9 @@ def index():
         else:
             ab_v = float(c.precio_base or 0) if (c.activo or extras_v > 0) else 0.0
             
-        saldo_ant_real_v = c.obtener_saldo_anterior(mes, anio)
-        
-        pago_deudas_este_mes = sum(
-            float(hx.monto_pagado or 0)
-            for hx in c.historial_abonos
-            if getattr(hx, 'fecha_pago', None) and hx.fecha_pago.month == mes and hx.fecha_pago.year == anio
-            and (hx.anio < anio or (hx.anio == anio and hx.mes < mes))
-        )
-        saldo_anterior_visual_v = saldo_ant_real_v + pago_deudas_este_mes
-        
+        # obtener_saldo_anterior ya refleja correctamente todos los pagos en cascada
+        saldo_anterior_visual_v = c.obtener_saldo_anterior(mes, anio)
+
         if not c.activo and (ab_v + extras_v + saldo_anterior_visual_v) <= 0.1:
             continue
             
@@ -328,19 +333,15 @@ def index():
             abono_mes = float(casa.precio_base or 0) if (casa.activo or extras > 0) else 0.0
             
         total_mes = abono_mes + extras
-        
+
         # --- LÓGICA VISUAL DE FOTO DEL MES ---
-        pago_deudas_este_mes = sum(
-            float(h.monto_pagado or 0)
-            for h in casa.historial_abonos
-            if getattr(h, 'fecha_pago', None) and h.fecha_pago.month == mes and h.fecha_pago.year == anio
-            and (h.anio < anio or (h.anio == anio and h.mes < mes))
-        )
-        
-        saldo_anterior_visual = saldo_anterior_real + pago_deudas_este_mes
+        # Con pagos en cascada, obtener_saldo_anterior() ya refleja correctamente
+        # todos los abonos parciales aplicados a meses anteriores.
+        # NO sumamos pago_deudas_este_mes porque eso duplicaría deudas ya saldadas.
+        saldo_anterior_visual = saldo_anterior_real
         monto_pagado_mes_actual = float(getattr(historial, 'monto_pagado', 0) or 0)
-        pagos_en_este_dashboard = pago_deudas_este_mes + monto_pagado_mes_actual
-        
+        pagos_en_este_dashboard = monto_pagado_mes_actual
+
         saldo_restante = (total_mes + saldo_anterior_visual) - pagos_en_este_dashboard
         
         esta_pagado = getattr(historial, 'pagado', False) if historial else False
@@ -469,6 +470,15 @@ def toggle_pago(id):
     url_wa = None 
 
     if action == 'undo' or (pagado and action != 'advance'):
+        # --- AUDITORÍA: deshacer pago ---
+        casa_undo = registro.casa
+        mes_nombre_undo = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][registro.mes - 1]
+        registrar_auditoria(
+            current_user.username,
+            'DESHACER_PAGO',
+            f"{casa_undo.nombre_formateado()} — {mes_nombre_undo} {registro.anio}"
+        )
+
         txns_to_revert = []
         if getattr(registro, 'detalle_pagos', None):
             for p in registro.detalle_pagos.split('|'):
@@ -476,7 +486,7 @@ def toggle_pago(id):
                     txns_to_revert.append(p.split(':')[0])
         elif getattr(registro, 'transaccion_id', None):
             txns_to_revert.append(registro.transaccion_id)
-            
+
         if txns_to_revert:
             for t_id in txns_to_revert:
                 hermanos = AbonoHistorico.query.filter(
@@ -489,24 +499,17 @@ def toggle_pago(id):
                     revertir_transaccion(h, t_id)
         else:
             revertir_transaccion(registro, "VIEJO")
-            
+
     elif action == 'advance' or not pagado:
         if not pagado and not enviado:
             registro.mensaje_enviado = True
             casa = registro.casa
             if casa.telefono:
                 datos = casa.obtener_gastos_mensuales(registro.mes, registro.anio)
-                saldo_ant_real = casa.obtener_saldo_anterior(registro.mes, registro.anio)
-                
-                pago_deudas_este_mes = sum(
-                    float(h.monto_pagado or 0)
-                    for h in casa.historial_abonos
-                    if getattr(h, 'fecha_pago', None) and h.fecha_pago.month == registro.mes and h.fecha_pago.year == registro.anio
-                    and (h.anio < registro.anio or (h.anio == registro.anio and h.mes < registro.mes))
-                )
-                saldo_anterior_visual = saldo_ant_real + pago_deudas_este_mes
-                pagos_en_este_dashboard = pago_deudas_este_mes + float(registro.monto_pagado or 0)
-                
+                # obtener_saldo_anterior ya refleja correctamente todos los pagos en cascada
+                saldo_anterior_visual = casa.obtener_saldo_anterior(registro.mes, registro.anio)
+                pagos_en_este_dashboard = float(registro.monto_pagado or 0)
+
                 texto_wa = generar_wa_individual(casa, registro.mes, registro.anio, float(registro.monto), float(datos['extras']), saldo_anterior_visual, pagos_en_este_dashboard)
                 url_wa = f"whatsapp://send?phone={limpiar_telefono(casa.telefono)}&text={urllib.parse.quote(texto_wa)}"
         else:
@@ -514,7 +517,15 @@ def toggle_pago(id):
             datos = casa.obtener_gastos_mensuales(registro.mes, registro.anio)
             saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
             total_a_pagar = float(registro.monto) + float(datos['extras']) + saldo_ant - float(registro.monto_pagado or 0)
-            
+
+            # --- AUDITORÍA: marcar pagado ---
+            mes_nombre_pago = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][registro.mes - 1]
+            registrar_auditoria(
+                current_user.username,
+                'PAGO',
+                f"{casa.nombre_formateado()} — {mes_nombre_pago} {registro.anio} — ${format_money(total_a_pagar)}"
+            )
+
             if total_a_pagar > 0.01:
                 aplicar_pago_en_cascada(casa, total_a_pagar, current_user.username, registro.mes, registro.anio)
             else:
@@ -522,14 +533,14 @@ def toggle_pago(id):
                 registro.mensaje_enviado = True
                 registro.cobrado_por = current_user.username
                 registro.fecha_pago = obtener_marca_tiempo(registro.mes, registro.anio)
-                
+
                 if hasattr(registro, 'transaccion_id'):
                     txn_id = f"TXN-{uuid.uuid4().hex[:8].upper()}"
                     registro.transaccion_id = txn_id
                     detalle_str = f"{txn_id}:{total_a_pagar}"
                     actual = getattr(registro, 'detalle_pagos', None)
                     registro.detalle_pagos = f"{actual}|{detalle_str}" if actual else detalle_str
-                
+
     db.session.commit()
     return jsonify({"success": True, "url_wa": url_wa})
 
@@ -541,9 +552,17 @@ def marcar_pagado_directo(id):
     casa = registro.casa
     datos = casa.obtener_gastos_mensuales(registro.mes, registro.anio)
     saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
-    
+
     total_a_pagar = float(registro.monto) + float(datos['extras']) + saldo_ant - float(registro.monto_pagado or 0)
-    
+
+    # --- AUDITORÍA ---
+    mes_nombre_d = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][registro.mes - 1]
+    registrar_auditoria(
+        current_user.username,
+        'PAGO',
+        f"{casa.nombre_formateado()} — {mes_nombre_d} {registro.anio} — ${format_money(total_a_pagar)}"
+    )
+
     if total_a_pagar > 0.01:
         aplicar_pago_en_cascada(casa, total_a_pagar, current_user.username, registro.mes, registro.anio)
     else:
@@ -650,6 +669,16 @@ def toggle_pago_grupo(grupo_id):
     url_wa = None
 
     if action == 'undo' or (all_pagado and action != 'advance'):
+        # --- AUDITORÍA: deshacer pago grupo ---
+        if casas_grupo:
+            grupo_obj_aud = casas_grupo[0].grupo
+            mes_nombre_gu = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mes - 1]
+            registrar_auditoria(
+                current_user.username,
+                'DESHACER_PAGO',
+                f"Grupo {grupo_obj_aud.nombre if grupo_obj_aud else grupo_id} — {mes_nombre_gu} {anio}"
+            )
+
         txns_to_revert = set()
         for h in historiales:
             if getattr(h, 'detalle_pagos', None):
@@ -658,7 +687,7 @@ def toggle_pago_grupo(grupo_id):
                         txns_to_revert.add(p.split(':')[0])
             elif getattr(h, 'transaccion_id', None):
                 txns_to_revert.add(h.transaccion_id)
-                
+
         if txns_to_revert:
             for t_id in txns_to_revert:
                 hermanos = AbonoHistorico.query.filter(
@@ -685,33 +714,22 @@ def toggle_pago_grupo(grupo_id):
             if telefono_repr:
                 casas_data = []
                 total_grupo_mes = 0
-                total_grupo_saldo_ant_real = 0
-                total_grupo_pago_deudas = 0
-                total_grupo_pagos_mes_actual = 0
-                
+                total_grupo_saldo_ant_visual = 0
+                total_pagos_dashboard = 0
+
                 for h in historiales:
                     c = h.casa
                     abono = float(h.monto)
                     extras = float(c.obtener_gastos_mensuales(mes, anio)['extras'])
-                    saldo_ant_real = c.obtener_saldo_anterior(mes, anio)
-                    
-                    p_deudas = sum(
-                        float(hx.monto_pagado or 0)
-                        for hx in c.historial_abonos
-                        if getattr(hx, 'fecha_pago', None) and hx.fecha_pago.month == mes and hx.fecha_pago.year == anio
-                        and (hx.anio < anio or (hx.anio == anio and hx.mes < mes))
-                    )
-                    
+                    # obtener_saldo_anterior ya refleja correctamente todos los pagos en cascada
+                    saldo_ant = c.obtener_saldo_anterior(mes, anio)
+
                     total_grupo_mes += (abono + extras)
-                    total_grupo_saldo_ant_real += saldo_ant_real
-                    total_grupo_pago_deudas += p_deudas
-                    total_grupo_pagos_mes_actual += float(h.monto_pagado or 0)
-                    
+                    total_grupo_saldo_ant_visual += saldo_ant
+                    total_pagos_dashboard += float(h.monto_pagado or 0)
+
                     casas_data.append({'casa': c, 'abono': abono, 'extras': extras})
-                
-                total_grupo_saldo_ant_visual = total_grupo_saldo_ant_real + total_grupo_pago_deudas
-                total_pagos_dashboard = total_grupo_pago_deudas + total_grupo_pagos_mes_actual
-                
+
                 texto_wa = generar_wa_grupo(grupo.nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard)
                 
                 tel = re.sub(r'\D', '', telefono_repr)
@@ -719,13 +737,23 @@ def toggle_pago_grupo(grupo_id):
                 url_wa = f"whatsapp://send?phone={tel}&text={urllib.parse.quote(texto_wa)}"
 
         else:
+            # --- AUDITORÍA: marcar pagado grupo ---
+            if casas_grupo:
+                grupo_obj_p = casas_grupo[0].grupo
+                mes_nombre_gp = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mes - 1]
+                registrar_auditoria(
+                    current_user.username,
+                    'PAGO',
+                    f"Grupo {grupo_obj_p.nombre if grupo_obj_p else grupo_id} — {mes_nombre_gp} {anio}"
+                )
+
             txn_id = f"TXN-{uuid.uuid4().hex[:8].upper()}"
             for h in historiales:
                 c = h.casa
                 datos = c.obtener_gastos_mensuales(mes, anio)
                 saldo_ant = c.obtener_saldo_anterior(mes, anio)
                 total_a_pagar = float(h.monto) + float(datos['extras']) + saldo_ant - float(h.monto_pagado or 0)
-                
+
                 if total_a_pagar > 0.01:
                     aplicar_pago_en_cascada(c, total_a_pagar, current_user.username, mes, anio)
                 else:
@@ -756,6 +784,16 @@ def registrar_pago_grupo(grupo_id):
         AbonoHistorico.mes == mes,
         AbonoHistorico.anio == anio
     ).all()
+
+    # --- AUDITORÍA ---
+    if casas_grupo and monto_ingresado > 0:
+        grupo_obj_rg = casas_grupo[0].grupo
+        mes_nombre_rg = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mes - 1]
+        registrar_auditoria(
+            current_user.username,
+            'PAGO_PARCIAL',
+            f"Grupo {grupo_obj_rg.nombre if grupo_obj_rg else grupo_id} — {mes_nombre_rg} {anio} — ${format_money(monto_ingresado)}"
+        )
 
     deudas = []
     total_deuda_grupo = 0
@@ -797,10 +835,17 @@ def registrar_pago_grupo(grupo_id):
 def registrar_pago_especial(id_historial):
     registro = AbonoHistorico.query.get_or_404(id_historial)
     monto_ingresado = float(request.json.get("monto", 0))
-    
+
     if monto_ingresado > 0:
+        # --- AUDITORÍA ---
+        mes_nombre_e = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][registro.mes - 1]
+        registrar_auditoria(
+            current_user.username,
+            'PAGO_PARCIAL',
+            f"{registro.casa.nombre_formateado()} — {mes_nombre_e} {registro.anio} — ${format_money(monto_ingresado)}"
+        )
         aplicar_pago_en_cascada(registro.casa, monto_ingresado, current_user.username, registro.mes, registro.anio)
-        
+
     db.session.commit()
     return jsonify({"success": True})
 
@@ -809,8 +854,9 @@ def registrar_pago_especial(id_historial):
 @login_required
 @admin_required
 def planilla_impresion():
-    mes = int(request.args.get("mes", datetime.now().month))
-    anio = int(request.args.get("anio", datetime.now().year))
+    mes    = int(request.args.get("mes",    datetime.now().month))
+    anio   = int(request.args.get("anio",   datetime.now().year))
+    filtro = request.args.get("filtro", "todos")
     
     registro_congelado = CierreMes.query.filter_by(mes=mes, anio=anio).first()
     mes_congelado = True if registro_congelado else False
@@ -840,28 +886,35 @@ def planilla_impresion():
         else:
             abono = float(casa.precio_base or 0) if (casa.activo or producto > 0) else 0.0
             
-        saldo_anterior_real = casa.obtener_saldo_anterior(mes, anio)
-        pago_deudas_este_mes = sum(
-            float(h.monto_pagado or 0)
-            for h in casa.historial_abonos
-            if getattr(h, 'fecha_pago', None) and h.fecha_pago.month == mes and h.fecha_pago.year == anio
-            and (h.anio < anio or (h.anio == anio and h.mes < mes))
-        )
-        saldo_anterior_visual = saldo_anterior_real + pago_deudas_este_mes
-        
+        # obtener_saldo_anterior ya refleja correctamente todos los pagos en cascada
+        saldo_anterior_visual = casa.obtener_saldo_anterior(mes, anio)
+
         total_a_pagar = abono + producto + saldo_anterior_visual
 
         if not casa.activo and total_a_pagar <= 0.1:
             continue
 
         monto_pagado_mes_actual = float(getattr(historial, 'monto_pagado', 0) or 0)
-        pagos_en_este_dashboard = pago_deudas_este_mes + monto_pagado_mes_actual
-        
+        pagos_en_este_dashboard = monto_pagado_mes_actual
+
         esta_pagado = False
         if historial and getattr(historial, 'pagado', False) and (total_a_pagar - pagos_en_este_dashboard) <= 0.01:
             esta_pagado = True
         elif total_a_pagar <= 0.01 and historial and getattr(historial, 'pagado', False):
             esta_pagado = True
+
+        notificado = bool(getattr(historial, 'mensaje_enviado', False)) if historial else False
+        tiene_saldo = saldo_anterior_visual > 0.1
+
+        # Estado para filtros: pagado > notificado > saldar > pendiente
+        if esta_pagado:
+            estado = "pagado"
+        elif notificado:
+            estado = "notificado"
+        elif tiene_saldo:
+            estado = "saldar"
+        else:
+            estado = "pendiente"
 
         # Agrupa productos del mes (normales + extras) sin distinguir origen
         prods_agrupados = {}
@@ -882,15 +935,18 @@ def planilla_impresion():
             detalle_prods.append(f"{cant_str}{p['unidad']} {p['nombre']}")
 
         texto_detalle = ", ".join(detalle_prods)
-            
+
         item = {
             "cliente": casa.nombre_formateado(),
             "producto": producto,
-            "detalle_productos": texto_detalle, 
+            "detalle_productos": texto_detalle,
             "abono": abono,
             "saldo_anterior": saldo_anterior_visual,
             "total_a_pagar": total_a_pagar,
-            "pagado": esta_pagado 
+            "pagado": esta_pagado,
+            "notificado": notificado,
+            "tiene_saldo": tiene_saldo,
+            "estado": estado,
         }
 
         if casa.grupo_id:
@@ -900,23 +956,41 @@ def planilla_impresion():
                     "nombre_display": casa.grupo.nombre_display,
                     "filas": [],
                     "total_grupo": 0.0,
-                    "grupo_pagado": True
+                    "grupo_pagado": True,
+                    "grupo_notificado": False,
+                    "grupo_tiene_saldo": False,
                 }
             reporte_grupos[casa.grupo_id]["filas"].append(item)
             reporte_grupos[casa.grupo_id]["total_grupo"] += total_a_pagar
             if not esta_pagado:
                 reporte_grupos[casa.grupo_id]["grupo_pagado"] = False
+            if notificado:
+                reporte_grupos[casa.grupo_id]["grupo_notificado"] = True
+            if tiene_saldo:
+                reporte_grupos[casa.grupo_id]["grupo_tiene_saldo"] = True
         else:
             reporte_sueltas.append(item)
         
+    # Calcular estado de cada grupo para filtros
+    for g in reporte_grupos.values():
+        if g["grupo_pagado"]:
+            g["estado"] = "pagado"
+        elif g["grupo_notificado"]:
+            g["estado"] = "notificado"
+        elif g["grupo_tiene_saldo"]:
+            g["estado"] = "saldar"
+        else:
+            g["estado"] = "pendiente"
+
     nombres_meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
     nombre_mes = nombres_meses[mes - 1]
 
-    return render_template("dashboard/planilla.html", 
-                           reporte_sueltas=reporte_sueltas, 
-                           reporte_grupos=list(reporte_grupos.values()), 
-                           mes_nombre=nombre_mes, 
-                           anio=anio)
+    return render_template("dashboard/planilla.html",
+                           reporte_sueltas=reporte_sueltas,
+                           reporte_grupos=list(reporte_grupos.values()),
+                           mes_nombre=nombre_mes,
+                           anio=anio,
+                           filtro=filtro)
 
 @dashboard_bp.route("/api/totales")
 @login_required
@@ -952,25 +1026,19 @@ def api_totales():
         else:
             abono_mes = float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0
             
-        pago_deudas_este_mes = sum(
-            float(h.monto_pagado or 0)
-            for h in casa.historial_abonos
-            if getattr(h, 'fecha_pago', None) and h.fecha_pago.month == mes and h.fecha_pago.year == anio
-            and (h.anio < anio or (h.anio == anio and h.mes < mes))
-        )
-        
-        saldo_anterior_visual = saldo_anterior_real + pago_deudas_este_mes
-        
+        # obtener_saldo_anterior ya refleja correctamente todos los pagos en cascada
+        saldo_anterior_visual = saldo_anterior_real
+
         if not casa.activo and (abono_mes + extras_v + saldo_anterior_visual) <= 0.1:
             continue
-            
+
         total_mes = abono_mes + extras_v
-        
+
         if saldo_anterior_visual > 0:
             total_deuda_anterior += saldo_anterior_visual
 
         monto_pagado_mes_actual = float(getattr(historial, 'monto_pagado', 0) or 0)
-        pagos_en_este_dashboard = pago_deudas_este_mes + monto_pagado_mes_actual
+        pagos_en_este_dashboard = monto_pagado_mes_actual
 
         total_abono += abono_mes
         total_extras += extras_v
@@ -983,3 +1051,37 @@ def api_totales():
         "kpi_pendiente": f"${format_money(total_general - total_recaudado)}",
         "kpi_total": f"${format_money(total_general)}"
     })
+
+# ================================================
+# API: COTIZACIÓN DÓLAR
+# ================================================
+@dashboard_bp.route("/api/cotizacion-dolar")
+@login_required
+@admin_required
+def api_cotizacion_dolar():
+    """Devuelve la cotización actualizada según el tipo configurado en root."""
+    import urllib.request
+    import json as _json
+    from app.models.configuracion import Configuracion
+
+    tipo = Configuracion.get('tipo_dolar', 'blue')  # 'blue' o 'mep'
+    endpoint_map = {
+        'blue': 'blue',
+        'mep':  'bolsa',  # MEP = Bolsa en dolarapi.com
+    }
+    casa = endpoint_map.get(tipo, 'blue')
+
+    try:
+        url = f"https://dolarapi.com/v1/dolares/{casa}"
+        req = urllib.request.Request(url, headers={"User-Agent": "DrPiscinas/1.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = _json.loads(resp.read().decode())
+        return jsonify({
+            "ok":    True,
+            "tipo":  tipo,
+            "label": "Dólar Blue" if tipo == 'blue' else "Dólar MEP",
+            "compra": data.get("compra"),
+            "venta":  data.get("venta"),
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 502

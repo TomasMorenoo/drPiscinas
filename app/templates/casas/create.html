@@ -168,7 +168,7 @@ document.getElementById('formCrear').addEventListener('submit', function(e) {
     if (input) {
         let valor = input.value;
         valor = valor.replace(/\./g, ""); // Borra todos los puntos
-        valor = valor.replace(",", ".");  // Cambia la coma por punto decimal para Python
+        valor = valor;  // Cambia la coma por punto decimal para Python
         input.value = valor;
     }
 });

@@ -48,6 +48,76 @@
 </div>
 
 {# ══════════════════════════════════════════════════════════
+   FILA 1b: BACKUP DE BASE DE DATOS
+══════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm border-start border-5 border-dark">
+            <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 py-4">
+                <div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-database-down fs-1 text-dark"></i>
+                    <div>
+                        <div class="fw-bold fs-5 text-dark">Backup de Base de Datos</div>
+                        <div class="text-muted small">
+                            Genera y descarga un <code>.sql</code> con toda la base de datos.
+                            Los backups también se guardan automáticamente en <code>sueltos/</code>.
+                        </div>
+                    </div>
+                </div>
+                <a href="{{ url_for('root.backup_db') }}"
+                   class="btn btn-dark btn-lg fw-bold px-4"
+                   onclick="this.innerHTML='<span class=\'spinner-border spinner-border-sm me-2\'></span>Generando...'; this.classList.add('disabled');">
+                    <i class="bi bi-download me-2"></i>Descargar Backup
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════
+   FILA 1c: COTIZACIÓN DÓLAR
+══════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm border-start border-5 border-info">
+            <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 py-4">
+                <div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-currency-dollar text-info fs-1"></i>
+                    <div>
+                        <div class="fw-bold fs-5 text-dark">Tipo de Dólar para Pagos</div>
+                        <div class="text-muted small">
+                            Cotización usada en los pagos parciales en USD.
+                            Actualmente: <strong class="text-info">
+                                {% if tipo_dolar == 'blue' %}Dólar Blue{% else %}Dólar MEP{% endif %}
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+                <form method="POST" action="{{ url_for('root.set_tipo_dolar') }}" class="d-flex align-items-center gap-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" name="tipo_dolar" id="opt_blue" value="blue"
+                               {% if tipo_dolar == 'blue' %}checked{% endif %} autocomplete="off">
+                        <label class="btn btn-outline-info fw-bold px-4" for="opt_blue">
+                            <i class="bi bi-droplet-fill me-1"></i>Blue
+                        </label>
+
+                        <input type="radio" class="btn-check" name="tipo_dolar" id="opt_mep" value="mep"
+                               {% if tipo_dolar == 'mep' %}checked{% endif %} autocomplete="off">
+                        <label class="btn btn-outline-info fw-bold px-4" for="opt_mep">
+                            <i class="bi bi-graph-up me-1"></i>MEP
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-info fw-bold text-white px-4">
+                        <i class="bi bi-save me-1"></i>Guardar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════
    FILA 2: KPIs DEL SISTEMA
 ══════════════════════════════════════════════════════════ #}
 <div class="row g-3 mb-4">
@@ -186,7 +256,146 @@
 </div>
 
 {# ══════════════════════════════════════════════════════════
-   FILA 4: HISTORIAL DE AUMENTOS + LOG TXT
+   FILA 4: LOG DE AUDITORÍA DB
+══════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-dark text-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h5 class="mb-0 fw-bold">
+                    <i class="bi bi-journal-check me-2"></i>Auditoría del Sistema
+                    {% if total_audit > 0 %}
+                    <span class="badge bg-secondary ms-2">{{ total_audit }} registros</span>
+                    {% endif %}
+                </h5>
+
+                {# Filtros #}
+                <form method="GET" action="{{ url_for('root.panel') }}" class="d-flex flex-wrap gap-2 align-items-center">
+                    <select name="filtro_accion" class="form-select form-select-sm" style="width:auto;">
+                        <option value="">Todas las acciones</option>
+                        {% for a in acciones_disponibles %}
+                        <option value="{{ a }}" {% if filtro_accion == a %}selected{% endif %}>{{ a }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="filtro_usuario" class="form-select form-select-sm" style="width:auto;">
+                        <option value="">Todos los usuarios</option>
+                        {% for u_opt in usuarios_disponibles %}
+                        <option value="{{ u_opt }}" {% if filtro_usuario == u_opt %}selected{% endif %}>{{ u_opt }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-outline-light">
+                        <i class="bi bi-funnel me-1"></i>Filtrar
+                    </button>
+                    {% if filtro_accion or filtro_usuario %}
+                    <a href="{{ url_for('root.panel') }}#audit" class="btn btn-sm btn-outline-warning">
+                        <i class="bi bi-x-circle me-1"></i>Limpiar
+                    </a>
+                    {% endif %}
+                </form>
+            </div>
+
+            <div class="card-body p-0" id="audit">
+                {% if audit_logs %}
+                <div style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-hover align-middle small mb-0">
+                        <thead class="table-dark sticky-top" style="top:0;">
+                            <tr>
+                                <th class="ps-3" style="white-space:nowrap;">Fecha</th>
+                                <th style="white-space:nowrap;">Hora</th>
+                                <th>Usuario</th>
+                                <th>Acción</th>
+                                <th>Detalle</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in audit_logs %}
+                            <tr>
+                                <td class="ps-3 font-monospace text-muted" style="white-space:nowrap;">
+                                    {{ log.fecha.strftime('%d/%m/%Y') }}
+                                </td>
+                                <td class="font-monospace text-muted" style="white-space:nowrap;">
+                                    {{ log.fecha.strftime('%H:%M:%S') }}
+                                </td>
+                                <td>
+                                    <span class="fw-bold {% if log.usuario == 'root' %}text-danger{% else %}text-primary{% endif %}">
+                                        <i class="bi bi-person-fill me-1"></i>{{ log.usuario }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if log.accion == 'PAGO' %}
+                                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>PAGO</span>
+                                    {% elif log.accion == 'PAGO_PARCIAL' %}
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-cash me-1"></i>PAGO PARCIAL</span>
+                                    {% elif log.accion == 'DESHACER_PAGO' %}
+                                        <span class="badge bg-danger"><i class="bi bi-arrow-counterclockwise me-1"></i>DESHIZO PAGO</span>
+                                    {% elif log.accion == 'AUMENTO' %}
+                                        <span class="badge bg-primary"><i class="bi bi-graph-up-arrow me-1"></i>AUMENTO</span>
+                                    {% elif log.accion == 'DESHACER_AUMENTO' %}
+                                        <span class="badge bg-secondary"><i class="bi bi-arrow-counterclockwise me-1"></i>DESHIZO AUMENTO</span>
+                                    {% elif log.accion == 'CREAR_CLIENTE' %}
+                                        <span class="badge bg-info text-dark"><i class="bi bi-person-plus me-1"></i>NUEVO CLIENTE</span>
+                                    {% elif log.accion == 'ELIMINAR_CLIENTE' %}
+                                        <span class="badge bg-dark"><i class="bi bi-trash3 me-1"></i>ELIMINÓ CLIENTE</span>
+                                    {% elif log.accion == 'INACTIVAR_CLIENTE' %}
+                                        <span class="badge bg-secondary"><i class="bi bi-pause-circle me-1"></i>INACTIVÓ</span>
+                                    {% elif log.accion == 'ACTIVAR_CLIENTE' %}
+                                        <span class="badge bg-success"><i class="bi bi-play-circle me-1"></i>ACTIVÓ</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark">{{ log.accion }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted">{{ log.detalle }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {# Paginación #}
+                {% if total_paginas > 1 %}
+                <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
+                    <small class="text-muted">
+                        Página {{ pagina_actual }} de {{ total_paginas }} &nbsp;·&nbsp; {{ total_audit }} registros en total
+                    </small>
+                    <div class="d-flex gap-1">
+                        {% if pagina_actual > 1 %}
+                        <a href="{{ url_for('root.panel', pagina=pagina_actual-1, filtro_accion=filtro_accion, filtro_usuario=filtro_usuario) }}#audit"
+                           class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                        {% endif %}
+                        {% for p in range([1, pagina_actual-2]|max, [total_paginas+1, pagina_actual+3]|min) %}
+                        <a href="{{ url_for('root.panel', pagina=p, filtro_accion=filtro_accion, filtro_usuario=filtro_usuario) }}#audit"
+                           class="btn btn-sm {% if p == pagina_actual %}btn-dark{% else %}btn-outline-secondary{% endif %}">
+                            {{ p }}
+                        </a>
+                        {% endfor %}
+                        {% if pagina_actual < total_paginas %}
+                        <a href="{{ url_for('root.panel', pagina=pagina_actual+1, filtro_accion=filtro_accion, filtro_usuario=filtro_usuario) }}#audit"
+                           class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% else %}
+                <div class="text-center text-muted fst-italic py-5">
+                    <i class="bi bi-journal-x fs-2 d-block mb-2 opacity-50"></i>
+                    Sin registros de auditoría todavía.
+                    {% if filtro_accion or filtro_usuario %}
+                    <br><small>Probá limpiar los filtros.</small>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════
+   FILA 5: HISTORIAL DE AUMENTOS + LOG TXT
 ══════════════════════════════════════════════════════════ #}
 <div class="row g-3">
 
