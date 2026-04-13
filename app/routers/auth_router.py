@@ -42,6 +42,32 @@ def login():
     return render_template('auth/login.html')
 
 # ==========================================
+# ACCESO OCULTO PARA ROOT (durante mantenimiento)
+# ==========================================
+@auth_bp.route('/acceso', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
+def acceso_root():
+    """Ruta de login que no es bloqueada por el modo mantenimiento."""
+    if current_user.is_authenticated:
+        return redirect(url_for('main.home'))
+
+    if request.method == 'POST':
+        username = request.form.get('username').strip()
+        password = request.form.get('password')
+        user = User.query.filter(User.username.ilike(username)).first()
+        if user and user.check_password(password):
+            login_user(user, remember=False)
+            session.permanent = False
+            flash('¡Bienvenido de nuevo!', 'success')
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('main.home'))
+        else:
+            flash('Usuario o contraseña incorrectos.', 'danger')
+
+    return render_template('auth/login.html')
+
+
+# ==========================================
 # LOGOUT (SALIDA)
 # ==========================================
 @auth_bp.route('/logout')

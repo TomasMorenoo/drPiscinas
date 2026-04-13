@@ -2,23 +2,394 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>En Mantenimiento - Dr. Piscinas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mantenimiento | {{ cfg.app_name }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
-        body { background-color: #f8f9fa; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .maint-card { max-width: 500px; text-align: center; padding: 40px; border-radius: 15px; background: white; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-top: 5px solid #0dcaf0; }
-        .icon-gear { font-size: 4rem; color: #0dcaf0; animation: spin 4s linear infinite; }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1d20;
+            padding: 2rem 1rem;
+        }
+
+        /* ── Tarjeta central ─────────────────────────────────────────── */
+        .maint-card {
+            width: 100%;
+            max-width: 480px;
+            text-align: center;
+        }
+
+        /* ── Nombre de la app ────────────────────────────────────────── */
+        .app-brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-bottom: 2.5rem;
+        }
+        .app-brand-photo {
+            width: 44px; height: 44px;
+            object-fit: cover; border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+        }
+        .app-brand-logo {
+            width: 40px; height: 40px;
+            object-fit: contain; border-radius: 8px;
+        }
+        .app-brand-icon {
+            font-size: 1.8rem;
+            color: #6c757d;
+        }
+        .app-brand-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #adb5bd;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* ── Texto ───────────────────────────────────────────────────── */
+        .maint-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #f8f9fa;
+            margin-bottom: 0.5rem;
+        }
+        .maint-subtitle {
+            font-size: 0.9rem;
+            color: #6c757d;
+            line-height: 1.7;
+            margin-bottom: 2rem;
+        }
+
+        /* ── Link admin ──────────────────────────────────────────────── */
+        .admin-link {
+            margin-top: 2.5rem;
+            font-size: 0.75rem;
+        }
+        .admin-link a {
+            color: #495057;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .admin-link a:hover { color: #adb5bd; }
+
+        /* ════════════════════════════════════════════════════════════
+           ANIMACIÓN DE PILETA
+        ════════════════════════════════════════════════════════════ */
+        .pool-scene {
+            margin: 0 auto 2rem;
+            width: 260px;
+            position: relative;
+        }
+
+        /* Borde superior (mosaico) */
+        .pool-coping {
+            height: 13px;
+            background: linear-gradient(to bottom, #495057, #343a40);
+            border-radius: 6px 6px 0 0;
+            border: 2px solid #495057;
+            border-bottom: 3px solid #868e96;
+            position: relative;
+        }
+        /* Pequeñas marcas de azulejos en el borde */
+        .pool-coping::before {
+            content: '';
+            position: absolute;
+            inset: 3px 8px;
+            background: repeating-linear-gradient(
+                90deg,
+                transparent 0, transparent 18px,
+                rgba(255,255,255,0.07) 18px, rgba(255,255,255,0.07) 19px
+            );
+        }
+
+        /* Cuerpo */
+        .pool-body {
+            height: 170px;
+            border: 3px solid #495057;
+            border-top: none;
+            border-radius: 0 0 16px 16px;
+            overflow: hidden;
+            position: relative;
+            background: #2b3035;
+        }
+
+        /* Rejilla de azulejos en las paredes */
+        .pool-body::before {
+            content: '';
+            position: absolute;
+            inset: 0; z-index: 0;
+            background:
+                repeating-linear-gradient(90deg,
+                    rgba(255,255,255,0.04) 0, rgba(255,255,255,0.04) 1px,
+                    transparent 1px, transparent 52px),
+                repeating-linear-gradient(0deg,
+                    rgba(255,255,255,0.04) 0, rgba(255,255,255,0.04) 1px,
+                    transparent 1px, transparent 34px);
+        }
+
+        /* Líneas de calle */
+        .pool-lanes {
+            position: absolute;
+            inset: 0; z-index: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-evenly;
+            padding: 0 18px;
+        }
+        .pool-lane {
+            height: 2px;
+            background: repeating-linear-gradient(
+                90deg,
+                #495057 0, #495057 14px,
+                transparent 14px, transparent 22px
+            );
+        }
+
+        /* Agua */
+        .water {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            z-index: 2;
+            overflow: hidden;
+            height: 0%;
+            animation: fill-pool 5.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+        @keyframes fill-pool {
+            0%   { height: 0%; }
+            10%  { height: 5%; }
+            100% { height: 73%; }
+        }
+
+        .water-body {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top,
+                #0c4a6e 0%,
+                #0369a1 40%,
+                #0ea5e9 75%,
+                #38bdf8 100%
+            );
+        }
+        /* Reflejo de luz */
+        .water-body::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 35%;
+            background: linear-gradient(to bottom,
+                rgba(255,255,255,0.12) 0%,
+                transparent 100%
+            );
+        }
+
+        /* Olas */
+        .wave-wrap {
+            position: absolute;
+            top: -10px; left: 0; right: 0;
+            height: 22px; overflow: hidden;
+        }
+        .wave-a {
+            position: absolute; top: 0; left: -60%; width: 220%; height: 22px;
+            animation: wm 3.2s ease-in-out infinite;
+        }
+        .wave-b {
+            position: absolute; top: 5px; left: -40%; width: 220%; height: 14px;
+            animation: wm 3.2s ease-in-out infinite reverse;
+            opacity: 0.45;
+        }
+        @keyframes wm {
+            0%   { transform: translateX(0); }
+            50%  { transform: translateX(7%); }
+            100% { transform: translateX(0); }
+        }
+
+        /* Reflejos en el agua */
+        .glint {
+            position: absolute; z-index: 3;
+            background: rgba(255,255,255,0.18);
+            border-radius: 50%;
+            animation: glint 4s ease-in-out infinite;
+        }
+        .g1 { width: 60px; height: 12px; top: 18%; left: 12%; animation-delay: 0s; }
+        .g2 { width: 38px; height: 9px;  top: 46%; left: 58%; animation-delay: 1.3s; }
+        .g3 { width: 26px; height: 7px;  top: 67%; left: 30%; animation-delay: 2.3s; }
+        @keyframes glint {
+            0%,100% { opacity: 0.25; transform: scaleX(1); }
+            50%      { opacity: 0.65; transform: scaleX(1.18); }
+        }
+
+        /* Ripple */
+        .ripple {
+            position: absolute;
+            bottom: 0; left: 50%;
+            transform: translateX(-50%);
+            width: 0; height: 0;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.45);
+            animation: ripple 1.8s ease-out infinite;
+        }
+        @keyframes ripple {
+            0%   { width: 0;    height: 0;    opacity: 0.8; }
+            100% { width: 64px; height: 20px; opacity: 0; bottom: -4px; }
+        }
+
+        /* Gota */
+        .drop-wrap {
+            position: absolute;
+            top: -32px; left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+        }
+        .drop {
+            width: 9px; height: 14px;
+            background: #38bdf8;
+            border-radius: 50% 50% 50% 50% / 55% 55% 45% 45%;
+            margin: 0 auto;
+            animation: drop-fall 1.8s ease-in infinite;
+        }
+        @keyframes drop-fall {
+            0%   { transform: translateY(0)     scaleY(1);   opacity: 1; }
+            78%  { transform: translateY(192px)  scaleY(0.85); opacity: 1; }
+            88%  { transform: translateY(200px)  scaleY(0.25); opacity: 0.5; }
+            100% { transform: translateY(200px)  scaleY(0);   opacity: 0; }
+        }
+
+        /* Barra de nivel */
+        .pool-level {
+            display: flex;
+            align-items: center;
+            margin-top: 8px;
+            gap: 10px;
+        }
+        .level-bar {
+            flex: 1;
+            height: 4px;
+            background: #343a40;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .level-fill {
+            height: 100%;
+            background: linear-gradient(to right, #0369a1, #38bdf8);
+            border-radius: 2px;
+            width: 0%;
+            animation: bar-fill 5.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+        @keyframes bar-fill {
+            0%   { width: 0%; }
+            10%  { width: 5%; }
+            100% { width: 73%; }
+        }
+        .level-pct {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #38bdf8;
+            min-width: 36px;
+            text-align: right;
+        }
+
+        /* ── Responsive ──────────────────────────────────────────────── */
+        @media (max-width: 480px) {
+            .pool-scene { width: 220px; }
+            .pool-body  { height: 140px; }
+            .maint-title { font-size: 1.3rem; }
+        }
     </style>
 </head>
 <body>
-    <div class="maint-card">
-        <i class="bi bi-gear-fill icon-gear mb-3 d-inline-block"></i>
-        <h2 class="fw-bold text-dark">Estamos mejorando el sistema</h2>
-        <p class="text-muted mt-3">Dr. Piscinas se encuentra temporalmente en mantenimiento para traerte nuevas funcionalidades. Volveremos a estar en línea a la brevedad.</p>
-        
-        <p class="small text-secondary mt-4 mb-0">¿Sos administrador? <a href="{{ url_for('auth.login') }}" class="text-decoration-none">Ingresar</a></p>
+
+<div class="maint-card">
+
+    {# ── Nombre de la app ── #}
+    <div class="app-brand">
+        {% if cfg.login_image %}
+            <img src="{{ url_for('root.serve_login_image') }}" alt="logo" class="app-brand-photo">
+        {% elif cfg.app_icon_192 %}
+            <img src="{{ url_for('root.icon_192') }}" alt="logo" class="app-brand-logo">
+        {% else %}
+            <i class="bi bi-grid-3x3-gap-fill app-brand-icon"></i>
+        {% endif %}
+        <span class="app-brand-name">{{ cfg.app_name }}</span>
     </div>
+
+    {# ── Animación de pileta ── #}
+    <div class="pool-scene">
+        <div class="pool-coping"></div>
+        <div class="pool-body">
+            <div class="pool-lanes">
+                <div class="pool-lane"></div>
+                <div class="pool-lane"></div>
+                <div class="pool-lane"></div>
+            </div>
+            <div class="water">
+                <div class="water-body"></div>
+                <div class="glint g1"></div>
+                <div class="glint g2"></div>
+                <div class="glint g3"></div>
+                <div class="wave-wrap">
+                    <svg class="wave-a" xmlns="http://www.w3.org/2000/svg"
+                         viewBox="0 0 900 22" preserveAspectRatio="none">
+                        <path d="M0,11 C150,22 300,0 450,11 C600,22 750,0 900,11 L900,22 L0,22 Z"
+                              fill="rgba(255,255,255,0.15)"/>
+                    </svg>
+                    <svg class="wave-b" xmlns="http://www.w3.org/2000/svg"
+                         viewBox="0 0 900 14" preserveAspectRatio="none">
+                        <path d="M0,7 C150,14 300,0 450,7 C600,14 750,0 900,7 L900,14 L0,14 Z"
+                              fill="rgba(255,255,255,0.1)"/>
+                    </svg>
+                </div>
+                <div class="ripple"></div>
+            </div>
+            <div class="drop-wrap"><div class="drop"></div></div>
+        </div>
+
+        <div class="pool-level">
+            <div class="level-bar"><div class="level-fill"></div></div>
+            <div class="level-pct"><span id="pct">0</span>%</div>
+        </div>
+    </div>
+
+    {# ── Mensaje ── #}
+    <p class="maint-title">Estamos llenando la pileta</p>
+    <p class="maint-subtitle">
+        {{ cfg.app_name }} se encuentra temporalmente fuera de línea
+        mientras incorporamos mejoras. Volvemos a la brevedad.
+    </p>
+
+    {# ── Link admin (discreto) ── #}
+    <div class="admin-link">
+        <a href="{{ url_for('auth.acceso_root') }}">
+            <i class="bi bi-lock me-1"></i>Acceso administrador
+        </a>
+    </div>
+
+</div>
+
+<script>
+    (function () {
+        const el = document.getElementById('pct');
+        const target = 73, duration = 5500;
+        const start = performance.now();
+        function ease(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+        function tick(now) {
+            const p = ease(Math.min(now - start, duration) / duration);
+            el.textContent = Math.round(p * target);
+            if (now - start < duration) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+    })();
+</script>
+
 </body>
 </html>

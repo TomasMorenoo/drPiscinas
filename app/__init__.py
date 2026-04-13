@@ -132,8 +132,9 @@ def create_app():
             if request.path.startswith('/static/'):
                 return None
             
-            # 2. Dejar pasar la ruta de login para que puedas entrar a identificarte
-            if request.path.startswith('/auth') or request.path == '/login':
+            # 2. Rutas que siempre deben pasar (acceso oculto + recursos visuales)
+            PASS_PATHS = ('/acceso', '/root/icon/192', '/root/login-image')
+            if request.path in PASS_PATHS:
                 return None
             
             # 3. Dejar pasar si el usuario está logueado y es 'root' 
