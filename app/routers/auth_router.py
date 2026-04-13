@@ -49,7 +49,8 @@ def login():
 def acceso_root():
     """Ruta de login que no es bloqueada por el modo mantenimiento."""
     if current_user.is_authenticated:
-        return redirect(url_for('main.home'))
+        logout_user()
+        session.clear()
 
     if request.method == 'POST':
         username = request.form.get('username').strip()
