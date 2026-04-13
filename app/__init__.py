@@ -76,6 +76,48 @@ def create_app():
         except (ValueError, TypeError):
             return value
 
+    # --- CONTEXT PROCESSOR: cfg global (disponible en todos los templates) ---
+    @app.context_processor
+    def inject_cfg():
+        from types import SimpleNamespace
+        from app.models.configuracion import Configuracion
+
+        try:
+            # Icono de la app (estático)
+            icon_path = os.path.join(app.static_folder, 'drpiscina-192.png')
+            app_icon_192 = os.path.exists(icon_path)
+
+            # Imagen de fondo del login (subida por root)
+            login_filename = Configuracion.get('login_image_filename', None)
+            if login_filename:
+                img_path = os.path.join(app.static_folder, 'uploads', login_filename)
+                login_image = os.path.exists(img_path)
+            else:
+                login_image = False
+
+            app_name        = Configuracion.get('app_name', 'Dr. Piscinas')
+            app_description = Configuracion.get('app_description', 'Sistema de gestión de piletas')
+            footer_texto    = Configuracion.get('footer_texto', '')
+            footer_contacto = Configuracion.get('footer_contacto', '')
+        except Exception:
+            app_icon_192    = False
+            login_image     = False
+            app_name        = 'Dr. Piscinas'
+            app_description = 'Sistema de gestión de piletas'
+            footer_texto    = ''
+            footer_contacto = ''
+
+        cfg = SimpleNamespace(
+            app_name=app_name,
+            app_description=app_description,
+            app_icon_192=app_icon_192,
+            login_image=login_image,
+            footer_texto=footer_texto,
+            footer_contacto=footer_contacto,
+        )
+        from datetime import datetime
+        return dict(cfg=cfg, now=datetime.now())
+
     # --- MODO MANTENIMIENTO ---
     @app.before_request
     def check_maintenance_mode():

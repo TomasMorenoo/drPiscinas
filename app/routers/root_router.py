@@ -1,7 +1,8 @@
 import os
 import subprocess
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, Response
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, Response, send_file, abort, current_app
 from flask_login import login_required, current_user
+from werkzeug.utils import secure_filename
 from app.decorators import root_required
 from app.models.user import User
 from app.models.casa import Casa, HistorialAumento
@@ -10,6 +11,8 @@ from app.models.configuracion import Configuracion
 from app.models.auditoria import AuditoriaLog
 from app import db
 from datetime import datetime
+
+ALLOWED_IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.webp'}
 
 root_bp = Blueprint("root", __name__, url_prefix="/root")
 
@@ -31,6 +34,13 @@ def panel():
     total_inactivos = Casa.query.filter_by(activo=False).count()
     total_usuarios = User.query.filter(User.username != 'root').count()
     total_admins = User.query.filter(User.username != 'root', User.rol == 'admin').count()
+
+    # ── Imagen de login ──────────────────────────────────────────────────────
+    login_filename = Configuracion.get('login_image_filename', None)
+    login_image_exists = False
+    if login_filename:
+        img_path = os.path.join(current_app.static_folder, 'uploads', login_filename)
+        login_image_exists = os.path.exists(img_path)
 
     # ── Usuarios (sin root) ──────────────────────────────────────────────────
     usuarios = User.query.filter(User.username != 'root').order_by(User.rol, User.username).all()
@@ -73,6 +83,7 @@ def panel():
     return render_template(
         "root/panel.html",
         modo_mantenimiento=modo_mantenimiento,
+        login_image_exists=login_image_exists,
         total_clientes=total_clientes,
         total_inactivos=total_inactivos,
         total_usuarios=total_usuarios,
@@ -311,3 +322,107 @@ def backup_db():
     except Exception as e:
         flash(f"❌ Error inesperado: {str(e)}", "error")
         return redirect(url_for("root.panel"))
+
+
+# ================================================
+# GUARDAR CONFIGURACIÓN DEL FOOTER
+# ================================================
+@root_bp.route("/footer", methods=["POST"])
+@login_required
+@root_required
+def set_footer():
+    texto    = request.form.get("footer_texto", "").strip()
+    contacto = request.form.get("footer_contacto", "").strip()
+    Configuracion.set("footer_texto", texto)
+    Configuracion.set("footer_contacto", contacto)
+    db.session.commit()
+    flash("✅ Footer actualizado.", "success")
+    return redirect(url_for("root.panel"))
+
+
+# ================================================
+# SERVIR ICONO 192px
+# ================================================
+@root_bp.route("/icon/192")
+def icon_192():
+    """Sirve el ícono de 192px de la app."""
+    path = os.path.join(current_app.static_folder, 'drpiscina-192.png')
+    if os.path.exists(path):
+        return send_file(path, mimetype='image/png')
+    abort(404)
+
+
+# ================================================
+# SERVIR IMAGEN DE LOGIN
+# ================================================
+@root_bp.route("/login-image")
+def serve_login_image():
+    """Sirve la imagen de fondo del login."""
+    login_filename = Configuracion.get('login_image_filename', None)
+    if not login_filename:
+        abort(404)
+    path = os.path.join(current_app.static_folder, 'uploads', login_filename)
+    if not os.path.exists(path):
+        abort(404)
+    ext = os.path.splitext(login_filename)[1].lower()
+    mimetypes = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'}
+    return send_file(path, mimetype=mimetypes.get(ext, 'image/jpeg'))
+
+
+# ================================================
+# SUBIR IMAGEN DE LOGIN
+# ================================================
+@root_bp.route("/login-image/upload", methods=["POST"])
+@login_required
+@root_required
+def upload_login_image():
+    """Recibe y guarda la imagen de fondo del login."""
+    archivo = request.files.get('login_image')
+    if not archivo or archivo.filename == '':
+        flash("No se seleccionó ningún archivo.", "error")
+        return redirect(url_for('root.panel'))
+
+    ext = os.path.splitext(secure_filename(archivo.filename))[1].lower()
+    if ext not in ALLOWED_IMAGE_EXTS:
+        flash("Formato no soportado. Usá JPG, PNG o WebP.", "error")
+        return redirect(url_for('root.panel'))
+
+    uploads_dir = os.path.join(current_app.static_folder, 'uploads')
+    os.makedirs(uploads_dir, exist_ok=True)
+
+    # Eliminar imagen anterior si existe
+    old_filename = Configuracion.get('login_image_filename', None)
+    if old_filename:
+        old_path = os.path.join(uploads_dir, old_filename)
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
+    filename = f"login_bg{ext}"
+    archivo.save(os.path.join(uploads_dir, filename))
+
+    Configuracion.set('login_image_filename', filename)
+    db.session.commit()
+
+    flash("✅ Imagen del login actualizada correctamente.", "success")
+    return redirect(url_for('root.panel'))
+
+
+# ================================================
+# ELIMINAR IMAGEN DE LOGIN
+# ================================================
+@root_bp.route("/login-image/remove", methods=["POST"])
+@login_required
+@root_required
+def remove_login_image():
+    """Elimina la imagen de fondo del login."""
+    login_filename = Configuracion.get('login_image_filename', None)
+    if login_filename:
+        path = os.path.join(current_app.static_folder, 'uploads', login_filename)
+        if os.path.exists(path):
+            os.remove(path)
+        Configuracion.set('login_image_filename', None)
+        db.session.commit()
+        flash("Imagen del login eliminada.", "info")
+    else:
+        flash("No había imagen para eliminar.", "warning")
+    return redirect(url_for('root.panel'))

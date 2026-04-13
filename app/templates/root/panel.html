@@ -75,7 +75,70 @@
 </div>
 
 {# ══════════════════════════════════════════════════════════
-   FILA 1c: COTIZACIÓN DÓLAR
+   FILA 1c: IMAGEN DEL LOGIN
+══════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm border-start border-5 border-primary">
+            <div class="card-body d-flex flex-column flex-md-row align-items-md-start justify-content-between gap-3 py-4">
+                <div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-image text-primary fs-1"></i>
+                    <div>
+                        <div class="fw-bold fs-5 text-dark">Foto del Login</div>
+                        <div class="text-muted small">
+                            Reemplaza el ícono de grilla por una foto cuadrada en el panel izquierdo.
+                            {% if login_image_exists %}
+                                <span class="badge bg-success ms-1">✅ Foto activa</span>
+                            {% else %}
+                                <span class="badge bg-secondary ms-1">Mostrando ícono por defecto</span>
+                            {% endif %}
+                        </div>
+                        {% if login_image_exists %}
+                        <div class="mt-2">
+                            <img src="{{ url_for('root.serve_login_image') }}"
+                                 alt="Preview login"
+                                 style="height: 110px; width: 200px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="d-flex flex-column gap-2" style="min-width: 240px;">
+                    <form method="POST"
+                          action="{{ url_for('root.upload_login_image') }}"
+                          enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <label class="form-label small fw-bold text-uppercase text-muted mb-1">
+                            {% if login_image_exists %}Reemplazar imagen{% else %}Subir imagen{% endif %}
+                        </label>
+                        <div class="input-group">
+                            <input type="file" name="login_image"
+                                   accept=".jpg,.jpeg,.png,.webp"
+                                   class="form-control form-control-sm" required>
+                            <button type="submit" class="btn btn-primary btn-sm fw-bold">
+                                <i class="bi bi-upload me-1"></i>Subir
+                            </button>
+                        </div>
+                        <div class="form-text">JPG, PNG o WebP. Se muestra como cuadrado con esquinas redondeadas.</div>
+                    </form>
+
+                    {% if login_image_exists %}
+                    <form method="POST"
+                          action="{{ url_for('root.remove_login_image') }}"
+                          onsubmit="return confirm('¿Eliminar la imagen del login?')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-danger btn-sm fw-bold w-100">
+                            <i class="bi bi-trash3 me-1"></i>Eliminar imagen
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════
+   FILA 1d: COTIZACIÓN DÓLAR
 ══════════════════════════════════════════════════════════ #}
 <div class="row g-3 mb-4">
     <div class="col-12">
@@ -112,6 +175,75 @@
                         <i class="bi bi-save me-1"></i>Guardar
                     </button>
                 </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════
+   FILA 1e: FOOTER DEL SITIO
+══════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm border-start border-5 border-secondary">
+            <div class="card-body py-4">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <i class="bi bi-layout-text-window-reverse text-secondary fs-1"></i>
+                    <div>
+                        <div class="fw-bold fs-5 text-dark">Footer del sitio</div>
+                        <div class="text-muted small">
+                            Se muestra en la barra inferior de todas las páginas y en el login.
+                            El año y el nombre de la app se agregan automáticamente.
+                        </div>
+                    </div>
+                </div>
+                <form method="POST" action="{{ url_for('root.set_footer') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-bold text-uppercase text-muted">
+                                Texto principal
+                            </label>
+                            <input type="text" name="footer_texto"
+                                   class="form-control"
+                                   placeholder="Ej: Todos los derechos reservados"
+                                   value="{{ cfg.footer_texto or '' }}">
+                            <div class="form-text">
+                                Aparece junto al año y nombre: <em>&copy; 2025 Dr. Piscinas — [texto]</em>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-bold text-uppercase text-muted">
+                                Contacto / texto secundario
+                            </label>
+                            <input type="text" name="footer_contacto"
+                                   class="form-control"
+                                   placeholder="Ej: Tel: 011-1234-5678 | info@drpiscinas.com"
+                                   value="{{ cfg.footer_contacto or '' }}">
+                            <div class="form-text">
+                                Se muestra alineado a la derecha del footer.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-secondary fw-bold">
+                            <i class="bi bi-save me-1"></i>Guardar footer
+                        </button>
+                    </div>
+                </form>
+
+                {# Preview #}
+                <div class="mt-3 rounded p-2 px-3 d-flex justify-content-between align-items-center flex-wrap gap-1"
+                     style="background:#212529; font-size:0.78rem; color:#6c757d;">
+                    <span>
+                        &copy; <span id="prev-year">{{ now.year }}</span>
+                        <strong style="color:#adb5bd;">{{ cfg.app_name }}</strong>
+                        {% if cfg.footer_texto %}&mdash; {{ cfg.footer_texto }}{% endif %}
+                    </span>
+                    {% if cfg.footer_contacto %}
+                    <span>{{ cfg.footer_contacto }}</span>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>

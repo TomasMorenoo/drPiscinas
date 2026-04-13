@@ -18,9 +18,32 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     
     <style>
+        html, body {
+            height: 100%;
+        }
         body {
             background-color: #e9ecef; /* Gris industrial */
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .main-content {
+            flex: 1;
+        }
+        .site-footer {
+            background-color: #212529;
+            color: #adb5bd;
+            font-size: 0.8rem;
+            padding: 0.85rem 0;
+            border-top: 1px solid #343a40;
+        }
+        .site-footer a {
+            color: #adb5bd;
+            text-decoration: none;
+        }
+        .site-footer a:hover {
+            color: #fff;
         }
         
         .navbar {
@@ -143,14 +166,15 @@
     </div>
 </nav>
 
-<div class="container pb-5">
+<div class="main-content">
+<div class="container py-4">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
           {% set bootstrap_class = 'success' if category == 'success' else 'danger' if category == 'error' else 'warning' if category == 'warning' else 'info' %}
-          
+
           <div class="alert alert-{{ bootstrap_class }} alert-dismissible fade show shadow-sm" role="alert">
-            <i class="bi {{ 'bi-check-circle-fill' if category == 'success' else 'bi-exclamation-triangle-fill' }}"></i> 
+            <i class="bi {{ 'bi-check-circle-fill' if category == 'success' else 'bi-exclamation-triangle-fill' }}"></i>
             {{ message }}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
           </div>
@@ -160,6 +184,22 @@
 
     {% block content %}{% endblock %}
 </div>
+</div>
+
+{# ── Footer ── #}
+<footer class="site-footer">
+    <div class="container d-flex flex-column flex-sm-row justify-content-between align-items-center gap-1">
+        <span>
+            &copy; {{ now.year }} <strong class="text-white">{{ cfg.app_name }}</strong>
+            {% if cfg.footer_texto %}
+                &mdash; {{ cfg.footer_texto }}
+            {% endif %}
+        </span>
+        {% if cfg.footer_contacto %}
+        <span class="text-end">{{ cfg.footer_contacto }}</span>
+        {% endif %}
+    </div>
+</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
