@@ -78,11 +78,23 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-uppercase text-muted">Email del Cliente (Opcional)</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-white"><i class="bi bi-envelope text-primary"></i></span>
-                            <input type="email" name="email" class="form-control fw-bold" value="{{ casa.email if casa.email else '' }}" placeholder="Ej: cliente@correo.com">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold small text-uppercase text-muted">Email del Cliente (Opcional)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="bi bi-envelope text-primary"></i></span>
+                                <input type="email" name="email" class="form-control fw-bold" value="{{ casa.email if casa.email else '' }}" placeholder="Ej: cliente@correo.com">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold small text-uppercase text-muted">Cliente Desde <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="bi bi-calendar-event text-primary"></i></span>
+                                <input type="date" name="fecha_creacion" id="fecha_creacion" class="form-control fw-bold"
+                                       value="{{ casa.fecha_creacion.strftime('%Y-%m-%d') if casa.fecha_creacion else '' }}" required>
+                            </div>
+                            <div class="form-text small text-muted">Mes desde el que se factura al cliente.</div>
                         </div>
                     </div>
 

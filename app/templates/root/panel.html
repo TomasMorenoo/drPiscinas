@@ -472,6 +472,12 @@
                                         <span class="badge bg-secondary"><i class="bi bi-pause-circle me-1"></i>INACTIVÓ</span>
                                     {% elif log.accion == 'ACTIVAR_CLIENTE' %}
                                         <span class="badge bg-success"><i class="bi bi-play-circle me-1"></i>ACTIVÓ</span>
+                                    {% elif log.accion == 'CREAR_VISITA' %}
+                                        <span class="badge bg-primary"><i class="bi bi-calendar-plus me-1"></i>NUEVA VISITA</span>
+                                    {% elif log.accion == 'EDITAR_VISITA' %}
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-calendar-check me-1"></i>EDITÓ VISITA</span>
+                                    {% elif log.accion == 'ELIMINAR_VISITA' %}
+                                        <span class="badge bg-danger"><i class="bi bi-calendar-x me-1"></i>ELIMINÓ VISITA</span>
                                     {% else %}
                                         <span class="badge bg-light text-dark">{{ log.accion }}</span>
                                     {% endif %}

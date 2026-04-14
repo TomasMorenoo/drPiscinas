@@ -475,6 +475,7 @@
                         <option value="todos">Todos los estados</option>
                         <option value="pendiente">🕒 Pendientes</option>
                         <option value="notificado">✉️ Notificados</option>
+                        <option value="saldar">⚠️ Falta Saldar</option>
                         <option value="pagado">✅ Pagados</option>
                     </select>
                 </div>
@@ -517,7 +518,7 @@
                         
                         {# CALCULAMOS ESTADO Y ATRASO #}
                         {# "atrasado" = pagado con más de 1 mes de diferencia respecto al período (1 mes de diferencia es el ciclo normal) #}
-                        {% set estado_clase = 'pagado' if item.pagado else ('notificado' if item.mensaje_enviado else 'pendiente') %}
+                        {% set estado_clase = item.estado %}
                         {% set pagado_atrasado = false %}
                         {% if item.pagado and item.historial_obj and item.historial_obj.fecha_pago %}
                             {% set fp = item.historial_obj.fecha_pago %}
@@ -527,7 +528,7 @@
                             {% endif %}
                         {% endif %}
                         
-                        <tr class="fila-busqueda" data-estado="{{ estado_clase }}">
+                        <tr class="fila-busqueda" data-estado="{{ estado_clase }}" data-pago-parcial="{{ 'true' if item.pagos_en_este_dashboard > 0 and not item.pagado else 'false' }}">
 
                             {# 1. NOMBRE #}
                             <td class="ps-3 td-nombre" style="max-width: 200px;">
@@ -759,9 +760,9 @@
         {% for g in reporte_grupos %}
         
         {# CALCULAMOS EL ESTADO PARA EL FILTRO #}
-        {% set estado_clase_g = 'pagado' if g.pagado else ('notificado' if g.mensaje_enviado else 'pendiente') %}
+        {% set estado_clase_g = g.estado %}
         
-        <div class="card border-0 shadow-sm border-start border-4 border-primary mb-3 fila-busqueda" data-estado="{{ estado_clase_g }}">
+        <div class="card border-0 shadow-sm border-start border-4 border-primary mb-3 fila-busqueda" data-estado="{{ estado_clase_g }}" data-pago-parcial="{{ 'true' if g.monto_pagado > 0 and not g.pagado else 'false' }}">
 
             {# CARD HEADER DEL GRUPO #}
             <div class="card-header bg-white py-3">
@@ -1096,7 +1097,7 @@
                             <span class="spinner-border spinner-border-sm me-1"></span> Obteniendo cotización...
                         </div>
                         <div id="cot-datos" class="d-none">
-                            <div class="text-muted small mb-2" id="cot-label">Dólar Blue — venta: <strong id="cot-valor">–</strong></div>
+                            <div class="text-muted small mb-2" id="cot-label">Dólar Blue — compra: <strong id="cot-valor">–</strong></div>
                             <div class="fs-5 fw-bold text-primary">
                                 = <span id="cot-resultado">$0</span> ARS
                             </div>
@@ -1259,7 +1260,16 @@ function filtrarDashboard() {
     document.querySelectorAll('.fila-busqueda').forEach(fila => {
         let txt = fila.textContent.toLowerCase();
         let est = fila.getAttribute('data-estado');
-        fila.style.display = (txt.includes(texto) && (estado === 'todos' || est === estado)) ? '' : 'none';
+        let parcial = fila.getAttribute('data-pago-parcial');
+        let visible = txt.includes(texto);
+        if (visible && estado !== 'todos') {
+            if (estado === 'saldar') {
+                visible = parcial === 'true';
+            } else {
+                visible = est === estado;
+            }
+        }
+        fila.style.display = visible ? '' : 'none';
     });
 }
 
@@ -1313,10 +1323,10 @@ function cargarCotizacion() {
         .then(function (d) {
             document.getElementById('cot-loading').classList.add('d-none');
             if (!d.ok) throw new Error(d.error || 'Error');
-            _cotizacion = d.venta;
+            _cotizacion = d.compra;
             document.getElementById('modal_cotizacion_usd').value = _cotizacion;
             document.getElementById('cot-label').innerHTML =
-                d.label + ' &mdash; venta: <strong>$' +
+                d.label + ' &mdash; compra: <strong>$' +
                 new Intl.NumberFormat('es-AR').format(_cotizacion) + '</strong>';
             document.getElementById('cot-datos').classList.remove('d-none');
             actualizarConversion();
@@ -1420,11 +1430,32 @@ window.addEventListener('load', () => {
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-3 d-grid gap-2" id="cuerpoFiltroHoja">
-                <a id="hoja-todos"       class="btn btn-dark fw-bold"            target="_blank">Todos</a>
-                <a id="hoja-pendiente"   class="btn btn-outline-secondary fw-bold" target="_blank">Pendientes</a>
-                <a id="hoja-pagado"      class="btn btn-outline-success fw-bold"   target="_blank">Pagados</a>
-                <a id="hoja-notificado"  class="btn btn-outline-info fw-bold"      target="_blank">Notificados</a>
-                <a id="hoja-saldar"      class="btn btn-outline-warning fw-bold"   target="_blank">Saldar</a>
+                <a id="hoja-todos"  class="btn btn-dark fw-bold" target="_blank">
+                    <i class="bi bi-list-ul me-1"></i>Todos
+                </a>
+                <a id="hoja-pagado" class="btn btn-outline-success fw-bold" target="_blank">
+                    <i class="bi bi-check-circle me-1"></i>Pagados
+                </a>
+                <hr class="my-1">
+                <div class="d-flex gap-0">
+                    <a id="hoja-pendiente" class="btn btn-outline-secondary fw-bold flex-grow-1 rounded-end-0" target="_blank">
+                        <i class="bi bi-hourglass-split me-1"></i>Pendientes
+                    </a>
+                    <button class="btn btn-outline-secondary fw-bold rounded-start-0 border-start-0 px-3"
+                            type="button" data-bs-toggle="collapse" data-bs-target="#subPendiente" aria-expanded="false">
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                </div>
+                <div class="collapse" id="subPendiente">
+                    <div class="d-grid gap-1 ps-3 pt-1">
+                        <a id="hoja-saldar" class="btn btn-sm btn-outline-warning fw-bold" target="_blank">
+                            <i class="bi bi-cash-coin me-1"></i>Saldar
+                        </a>
+                        <a id="hoja-notificado" class="btn btn-sm btn-outline-info fw-bold" target="_blank">
+                            <i class="bi bi-bell me-1"></i>Notificados
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

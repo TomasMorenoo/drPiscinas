@@ -136,12 +136,19 @@
                 </td>
 
                 <td class="text-right col-total">
-                    ${{ f.total_a_pagar | pesos }}
+                    ${{ f.restante | pesos }}
+                    {% if f.pago_parcial %}
+                        <br><span style="font-size:9px; color:#888; font-weight:normal;">
+                            (pagó ${{ f.monto_pagado | pesos }})
+                        </span>
+                    {% endif %}
                 </td>
 
                 <td class="text-center">
                     {% if f.pagado %}
                         <span class="texto-pago">PAGÓ</span>
+                    {% elif f.pago_parcial %}
+                        <span class="texto-pago" style="color:#b45309;">PARCIAL</span>
                     {% else %}
                         <div class="box-lapicera"></div>
                     {% endif %}
@@ -195,7 +202,10 @@
                 </td>
 
                 <td class="text-right text-muted" style="font-size: 10px;">
-                    ${{ f.total_a_pagar | pesos }}
+                    ${{ f.restante | pesos }}
+                    {% if f.pago_parcial %}
+                        <br><span style="font-size:8px; color:#aaa;">(pagó ${{ f.monto_pagado | pesos }})</span>
+                    {% endif %}
                 </td>
 
                 <td class="text-center" style="border-top: none; border-bottom: none; background-color: {% if g.grupo_pagado %}#f9f9f9{% else %}#e6ecf2{% endif %};"></td>
@@ -237,6 +247,20 @@
             document.querySelectorAll('[data-grupo-padre="' + idx + '"]').forEach(function (hijo) {
                 hijo.style.display = 'none';
             });
+        }
+    });
+
+    // Si un grupo está visible pero ningún hijo es visible, ocultar el encabezado también
+    document.querySelectorAll('.fila-grupo-header').forEach(function (header) {
+        if (header.style.display !== 'none') {
+            var idx = header.dataset.grupo;
+            var hijos = document.querySelectorAll('[data-grupo-padre="' + idx + '"]');
+            var tieneVisibles = Array.from(hijos).some(function (h) {
+                return h.style.display !== 'none';
+            });
+            if (!tieneVisibles) {
+                header.style.display = 'none';
+            }
         }
     });
 

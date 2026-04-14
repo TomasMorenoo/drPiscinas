@@ -339,8 +339,13 @@ def editar_casa(id):
             
         nombre_cliente = request.form.get("nombre_cliente", "").strip()
         telefono = request.form.get("telefono", "").strip()
-        email = request.form.get("email", "").strip() # NUEVO
-        
+        email = request.form.get("email", "").strip()
+        fecha_creacion_str = request.form.get("fecha_creacion", "").strip()
+        try:
+            nueva_fecha_creacion = datetime.strptime(fecha_creacion_str, '%Y-%m-%d') if fecha_creacion_str else casa.fecha_creacion
+        except ValueError:
+            nueva_fecha_creacion = casa.fecha_creacion
+
         try:
             nuevo_precio = float(request.form.get("precio_base", 0))
         except ValueError:
@@ -388,7 +393,8 @@ def editar_casa(id):
         casa.barrio_id = barrio_id
         casa.nombre_cliente = nombre_cliente
         casa.telefono = telefono
-        casa.email = email if email else None # NUEVO
+        casa.email = email if email else None
+        casa.fecha_creacion = nueva_fecha_creacion
         
         db.session.commit()
         flash("Cliente actualizado.", "success")
@@ -419,7 +425,12 @@ def crear_casa():
         barrio_id = request.form.get("barrio_id") or None
         nombre_cliente = request.form.get("nombre_cliente", "").strip()
         telefono = request.form.get("telefono", "").strip()
-        email = request.form.get("email", "").strip() # NUEVO
+        email = request.form.get("email", "").strip()
+        fecha_creacion_str = request.form.get("fecha_creacion", "").strip()
+        try:
+            fecha_creacion_obj = datetime.strptime(fecha_creacion_str, '%Y-%m-%d') if fecha_creacion_str else datetime.now()
+        except ValueError:
+            fecha_creacion_obj = datetime.now()
 
         if not numeros_input or not precio_base or not country_id or not telefono:
             flash("Faltan datos obligatorios (incluyendo el Teléfono).", "error")
@@ -442,13 +453,14 @@ def crear_casa():
                 continue 
 
             nueva_casa = Casa(
-                numero=num, 
-                precio_base=precio_base, 
-                country_id=country_id, 
+                numero=num,
+                precio_base=precio_base,
+                country_id=country_id,
                 barrio_id=barrio_id,
                 nombre_cliente=nombre_cliente,
                 telefono=telefono,
-                email=email if email else None # NUEVO
+                email=email if email else None,
+                fecha_creacion=fecha_creacion_obj
             )
             db.session.add(nueva_casa)
             creados += 1

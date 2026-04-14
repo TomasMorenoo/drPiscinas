@@ -72,11 +72,22 @@
                         </div>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="form-label fw-bold text-secondary small text-uppercase">Email del Cliente (Opcional)</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light"><i class="bi bi-envelope text-primary"></i></span>
-                            <input type="email" name="email" class="form-control" placeholder="Ej: cliente@correo.com">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-secondary small text-uppercase">Email del Cliente (Opcional)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-envelope text-primary"></i></span>
+                                <input type="email" name="email" class="form-control" placeholder="Ej: cliente@correo.com">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="fecha_creacion" class="form-label fw-bold text-secondary small text-uppercase">Cliente Desde <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-calendar-event text-primary"></i></span>
+                                <input type="date" name="fecha_creacion" id="fecha_creacion" class="form-control" required>
+                            </div>
+                            <div class="form-text small text-muted">Mes desde el que se factura al cliente.</div>
                         </div>
                     </div>
 
@@ -95,6 +106,18 @@
 </div>
 
 <script>
+// 0. Default fecha_creacion = hoy
+document.addEventListener('DOMContentLoaded', function() {
+    var fc = document.getElementById('fecha_creacion');
+    if (fc && !fc.value) {
+        var hoy = new Date();
+        var yyyy = hoy.getFullYear();
+        var mm = String(hoy.getMonth() + 1).padStart(2, '0');
+        var dd = String(hoy.getDate()).padStart(2, '0');
+        fc.value = yyyy + '-' + mm + '-' + dd;
+    }
+});
+
 // 1. Lógica para el checkbox S/N
 function toggleNumero() {
     const check = document.getElementById('sinNumeroCheck');

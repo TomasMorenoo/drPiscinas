@@ -33,7 +33,7 @@
 
     <div class="row g-4">
         <div class="col-md-4">
-            <div class="card border-0 shadow-sm border-top border-4 border-primary h-100">
+            <div class="card border-0 shadow-sm border-top border-4 border-primary">
                 <div class="card-body">
                     <h5 class="fw-bold mb-4"><i class="bi bi-person-badge text-primary me-2"></i>Datos del Cliente</h5>
                     
@@ -69,6 +69,14 @@
                         <small class="text-muted d-block text-uppercase fw-bold">Abono Base Actual</small>
                         <span class="fs-5 text-success fw-bold">${{ casa.precio_base | pesos }}</span>
                     </div>
+
+                    {% if casa.fecha_creacion %}
+                    {% set meses_nombre = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'] %}
+                    <div class="mb-3">
+                        <small class="text-muted d-block text-uppercase fw-bold">Cliente desde</small>
+                        <span class="text-muted">{{ meses_nombre[casa.fecha_creacion.month - 1] }} {{ casa.fecha_creacion.year }}</span>
+                    </div>
+                    {% endif %}
 
                     <div class="mt-4">
                         <a href="{{ url_for('casas.editar_casa', id=casa.id) }}" class="btn btn-warning w-100 fw-bold">
@@ -127,8 +135,8 @@
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white border-bottom-0 pt-3 pb-0">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white pt-3 pb-0" style="border-bottom: 2px solid #dee2e6;">
                     <ul class="nav nav-tabs border-0" id="perfilTabs" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active fw-bold border-0 text-dark" id="visitas-tab" data-bs-toggle="tab" data-bs-target="#visitas" type="button" role="tab"><i class="bi bi-calendar-check me-1"></i> Historial de Visitas</button>
@@ -139,7 +147,7 @@
                     </ul>
                 </div>
                 <div class="card-body bg-light rounded-bottom p-0">
-                    <div class="tab-content h-100" id="perfilTabsContent">
+                    <div class="tab-content" id="perfilTabsContent">
                         
                         <div class="tab-pane fade show active p-3" id="visitas" role="tabpanel">
                             <ul class="list-group list-group-flush rounded shadow-sm">
@@ -200,7 +208,7 @@
                                                         style="cursor: help;"
                                                         data-bs-toggle="tooltip"
                                                         data-bs-placement="top"
-                                                        {% if d.historial and d.historial.cobrado_por %}
+                                                        {% if d.historial and d.historial.cobrado_por and d.historial.fecha_pago %}
                                                         title="Cobrado por {{ d.historial.cobrado_por }} el {{ d.historial.fecha_pago.strftime('%d/%m/%Y a las %H:%M') }}"
                                                         {% else %}
                                                         title="Pago registrado antes de la implementación del auditor"
@@ -212,7 +220,7 @@
                                                         style="cursor: help;"
                                                         data-bs-toggle="tooltip" 
                                                         data-bs-placement="top" 
-                                                        {% if d.historial and d.historial.cobrado_por %}
+                                                        {% if d.historial and d.historial.cobrado_por and d.historial.fecha_pago %}
                                                         title="Marcado por {{ d.historial.cobrado_por }} el {{ d.historial.fecha_pago.strftime('%d/%m/%Y a las %H:%M') }}"
                                                         {% else %}
                                                         title="Marcado como pagado antes de la implementación de esta función"
@@ -364,6 +372,21 @@
 </script>
 
 <style>
-    .nav-tabs .nav-link.active { background-color: #f8f9fa; border-bottom: 3px solid #0d6efd !important; }
+    #perfilTabs .nav-link {
+        color: #6c757d;
+        padding-bottom: 10px;
+        margin-bottom: -2px; /* se superpone al border-bottom del header para el efecto "activo" */
+        border-radius: 0;
+    }
+    #perfilTabs .nav-link.active {
+        color: #0d6efd;
+        font-weight: 700;
+        background: transparent;
+        border-bottom: 3px solid #0d6efd !important;
+    }
+    #perfilTabs .nav-link:hover:not(.active) {
+        color: #343a40;
+        border-bottom: 3px solid #dee2e6 !important;
+    }
 </style>
 {% endblock %}

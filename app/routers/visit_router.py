@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app import db
 from app.models.visit import Visit
+from app.models.auditoria import AuditoriaLog
 from app.models.visit_product import VisitProduct
 from app.models.casa import Casa
 from app.models.products import Product
@@ -18,6 +19,12 @@ visit_bp = Blueprint(
 )
 
 # --- FUNCIÓN DE AYUDA PARA SABER SI EL MES ESTÁ CERRADO ---
+def registrar_auditoria_visita(usuario, accion, detalle):
+    from datetime import timedelta, timezone
+    tz_ar = timezone(timedelta(hours=-3))
+    ahora_ar = datetime.now(tz_ar).replace(tzinfo=None)
+    db.session.add(AuditoriaLog(fecha=ahora_ar, usuario=usuario, accion=accion, detalle=detalle))
+
 def is_mes_cerrado(mes, anio):
     # AHORA MIRA EL CANDADO NUEVO
     return CierreMes.query.filter_by(mes=mes, anio=anio).first() is not None
@@ -86,6 +93,19 @@ def crear_visit():
             flash("Casa y fecha son obligatorios", "error")
             return redirect(url_for("visits.crear_visit"))
 
+        # Validar que la visita no sea anterior al inicio del cliente
+        if casa_id:
+            casa_check = Casa.query.get(casa_id)
+            if casa_check and casa_check.fecha_creacion:
+                inicio = casa_check.fecha_creacion.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                visita_inicio_mes = fecha_obj.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                if visita_inicio_mes < inicio:
+                    meses = ['enero','febrero','marzo','abril','mayo','junio',
+                             'julio','agosto','septiembre','octubre','noviembre','diciembre']
+                    desde = f"{meses[casa_check.fecha_creacion.month-1].capitalize()} {casa_check.fecha_creacion.year}"
+                    flash(f"❌ No podés cargar visitas anteriores al inicio del cliente ({desde}).", "error")
+                    return redirect(url_for("visits.crear_visit"))
+
         # Crear la visita principal
         visit = Visit(
             casa_id=casa_id,
@@ -110,19 +130,22 @@ def crear_visit():
                     )
                     db.session.add(vp)
         
+        registrar_auditoria_visita(
+            current_user.username, 'CREAR_VISITA',
+            f"{visit.casa.nombre_formateado()} — {fecha_obj.strftime('%d/%m/%Y')}"
+        )
         db.session.commit()
         flash("Visita registrada correctamente", "success")
         return redirect(url_for("visits.listar_visits"))
         
     # --- MÉTODO GET: CARGA DE FORMULARIO ---
-    
-    # FILTRO OPERATIVO: Solo traemos las casas que NO están de baja para el select
+    # Mostramos todas las casas activas. El POST ya valida que la fecha de visita
+    # no sea anterior al inicio del cliente (fecha_creacion).
     casas = Casa.query.filter_by(activo=True).order_by(Casa.numero).all()
-    
-    # También filtramos productos y promos activas por las dudas
+
     products = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
     promos = Promo.query.filter_by(activo=True).order_by(Promo.nombre).all()
-    
+
     return render_template("visits/create.html", casas=casas, products=products, promos=promos)
 
 @visit_bp.route("/delete/<int:id>", methods=["POST"])
@@ -134,8 +157,10 @@ def eliminar_visit(id):
         flash("❌ No podés eliminar una visita de un mes cerrado.", "error")
         return redirect(url_for("visits.listar_visits"))
 
+    detalle_elim = f"{visit.casa.nombre_formateado()} — {visit.fecha.strftime('%d/%m/%Y')}"
     VisitProduct.query.filter_by(visit_id=id).delete()
     db.session.delete(visit)
+    registrar_auditoria_visita(current_user.username, 'ELIMINAR_VISITA', detalle_elim)
     db.session.commit()
     flash("Visita eliminada", "success")
     return redirect(url_for("visits.listar_visits"))
@@ -156,7 +181,19 @@ def editar_visit(id):
             flash("❌ No podés mover la visita a un mes que ya está cerrado.", "error")
             return redirect(url_for("visits.listar_visits"))
 
-        visit.casa_id = request.form.get("casa_id")
+        nueva_casa_id = request.form.get("casa_id")
+        casa_edit = Casa.query.get(nueva_casa_id) if nueva_casa_id else None
+        if casa_edit and casa_edit.fecha_creacion:
+            inicio_e = casa_edit.fecha_creacion.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            visita_inicio_mes_e = nueva_fecha.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            if visita_inicio_mes_e < inicio_e:
+                meses_e = ['enero','febrero','marzo','abril','mayo','junio',
+                           'julio','agosto','septiembre','octubre','noviembre','diciembre']
+                desde_e = f"{meses_e[casa_edit.fecha_creacion.month-1].capitalize()} {casa_edit.fecha_creacion.year}"
+                flash(f"❌ No podés mover la visita a antes del inicio del cliente ({desde_e}).", "error")
+                return redirect(url_for("visits.listar_visits"))
+
+        visit.casa_id = nueva_casa_id
         visit.fecha = nueva_fecha
         visit.observaciones = request.form.get("observaciones", "").strip()
         visit.promo_id = request.form.get("promo_id") or None
@@ -172,6 +209,10 @@ def editar_visit(id):
                     vp = VisitProduct(visit_id=id, product_id=p_id, cantidad=float(cant), precio_unitario=prod.precio)
                     db.session.add(vp)
         
+        registrar_auditoria_visita(
+            current_user.username, 'EDITAR_VISITA',
+            f"{visit.casa.nombre_formateado()} — {nueva_fecha.strftime('%d/%m/%Y')}"
+        )
         db.session.commit()
         flash("Visita actualizada", "success")
         return redirect(url_for("visits.listar_visits"))

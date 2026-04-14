@@ -363,20 +363,33 @@ def index():
                 historial.detalle_pagos = f"{txn_id}:{abono_mes + extras}"
                 hubo_cambios = True
 
+        # Estado para filtros: pagado > notificado > saldar > pendiente
+        # "saldar" = solo quienes hicieron un pago parcial
+        _pago_parcial_flag = pagos_en_este_dashboard > 0 and not esta_pagado
+        if esta_pagado:
+            estado_item = "pagado"
+        elif mensaje_enviado:
+            estado_item = "notificado"
+        elif _pago_parcial_flag:
+            estado_item = "saldar"
+        else:
+            estado_item = "pendiente"
+
         item_casa = {
             "id_historial": historial.id if historial else None,
-            "historial_obj": historial, 
+            "historial_obj": historial,
             "casa": casa,
             "abono": abono_mes,
             "extras": extras,
-            "total_mes": total_mes, 
+            "total_mes": total_mes,
             "saldo_anterior": saldo_anterior_visual,
-            "saldo_restante": saldo_restante, 
+            "saldo_restante": saldo_restante,
             "monto_pagado": pagos_en_este_dashboard, # Se lo pasamos al HTML como si fuera un solo monto
             "pagado": esta_pagado,
             "mensaje_enviado": mensaje_enviado,
             "pagos_en_este_dashboard": pagos_en_este_dashboard,
-            "url_wa": "" 
+            "estado": estado_item,
+            "url_wa": ""
         }
 
         if casa.grupo_id:
@@ -429,6 +442,16 @@ def index():
             g["pagado"] = all(c["pagado"] for c in g["casas"])
             g["mensaje_enviado"] = all(c["mensaje_enviado"] for c in g["casas"])
 
+        # Estado del grupo para filtros
+        if g["pagado"]:
+            g["estado"] = "pagado"
+        elif g.get("mensaje_enviado"):
+            g["estado"] = "notificado"
+        elif any(c.get("estado") == "saldar" for c in g["casas"]):
+            g["estado"] = "saldar"
+        else:
+            g["estado"] = "pendiente"
+
         if g["telefono"]:
             num_tel = limpiar_telefono(g["telefono"])
             texto_wa = generar_wa_grupo(g['nombre'], g["casas"], mes, anio, g['total_mes'], g['saldo_anterior'], g['monto_pagado'])
@@ -437,6 +460,14 @@ def index():
     if hubo_cambios:
         db.session.commit()
 
+    # KPI Falta Saldar
+    kpi_saldar_count = sum(1 for it in reporte_sueltas if it.get("estado") == "saldar")
+    kpi_saldar_monto = sum(it.get("saldo_restante", 0) for it in reporte_sueltas if it.get("estado") == "saldar")
+    for g in reporte_grupos.values():
+        if g.get("estado") == "saldar":
+            kpi_saldar_count += 1
+            kpi_saldar_monto += g.get("saldo_restante", 0)
+
     return render_template(
         "dashboard/index.html",
         reporte_sueltas=reporte_sueltas,
@@ -444,7 +475,8 @@ def index():
         mes=mes, anio=anio, mes_congelado=mes_congelado,
         kpi_clientes=total_clientes, kpi_abono=total_abono, kpi_extras=total_extras,
         kpi_deuda=total_deuda_anterior, kpi_recaudado=total_recaudado,
-        kpi_pendiente=total_general - total_recaudado, kpi_total=total_general
+        kpi_pendiente=total_general - total_recaudado, kpi_total=total_general,
+        kpi_saldar_count=kpi_saldar_count, kpi_saldar_monto=kpi_saldar_monto
     )
 
 @dashboard_bp.route("/marcar-mensaje/<int:id>", methods=["POST"])
@@ -863,9 +895,13 @@ def planilla_impresion():
 
     casas_raw = Casa.query.all()
     historial_dict = {h.casa_id: h for h in AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()}
-    
+
     casas = []
     for c in casas_raw:
+        # Excluir clientes cuya fecha de inicio es posterior al mes consultado
+        if c.fecha_creacion:
+            if (c.fecha_creacion.year, c.fecha_creacion.month) > (anio, mes):
+                continue
         datos_v = c.obtener_gastos_mensuales(mes, anio)
         if not c.activo and float(datos_v.get("extras", 0)) <= 0:
             continue
@@ -895,26 +931,31 @@ def planilla_impresion():
             continue
 
         monto_pagado_mes_actual = float(getattr(historial, 'monto_pagado', 0) or 0)
-        pagos_en_este_dashboard = monto_pagado_mes_actual
 
         esta_pagado = False
-        if historial and getattr(historial, 'pagado', False) and (total_a_pagar - pagos_en_este_dashboard) <= 0.01:
+        if historial and getattr(historial, 'pagado', False) and (total_a_pagar - monto_pagado_mes_actual) <= 0.01:
             esta_pagado = True
         elif total_a_pagar <= 0.01 and historial and getattr(historial, 'pagado', False):
             esta_pagado = True
 
         notificado = bool(getattr(historial, 'mensaje_enviado', False)) if historial else False
         tiene_saldo = saldo_anterior_visual > 0.1
+        pago_parcial = monto_pagado_mes_actual > 0 and not esta_pagado
 
         # Estado para filtros: pagado > notificado > saldar > pendiente
+        # "saldar" = solo quienes hicieron un pago parcial (tienen el botón amarillo)
+        # Saldo anterior sin pago = pendiente o notificado, no saldar
         if esta_pagado:
             estado = "pagado"
         elif notificado:
             estado = "notificado"
-        elif tiene_saldo:
+        elif pago_parcial:
             estado = "saldar"
         else:
             estado = "pendiente"
+
+        # Monto restante a cobrar (total menos lo ya pagado este mes)
+        restante = max(0.0, total_a_pagar - monto_pagado_mes_actual)
 
         # Agrupa productos del mes (normales + extras) sin distinguir origen
         prods_agrupados = {}
@@ -943,9 +984,12 @@ def planilla_impresion():
             "abono": abono,
             "saldo_anterior": saldo_anterior_visual,
             "total_a_pagar": total_a_pagar,
+            "restante": restante,
+            "monto_pagado": monto_pagado_mes_actual,
             "pagado": esta_pagado,
             "notificado": notificado,
             "tiene_saldo": tiene_saldo,
+            "pago_parcial": pago_parcial,
             "estado": estado,
         }
 
@@ -961,7 +1005,7 @@ def planilla_impresion():
                     "grupo_tiene_saldo": False,
                 }
             reporte_grupos[casa.grupo_id]["filas"].append(item)
-            reporte_grupos[casa.grupo_id]["total_grupo"] += total_a_pagar
+            reporte_grupos[casa.grupo_id]["total_grupo"] += restante
             if not esta_pagado:
                 reporte_grupos[casa.grupo_id]["grupo_pagado"] = False
             if notificado:
@@ -972,12 +1016,14 @@ def planilla_impresion():
             reporte_sueltas.append(item)
         
     # Calcular estado de cada grupo para filtros
+    # "saldar" = solo si algún miembro hizo pago parcial (mismo criterio que filas)
     for g in reporte_grupos.values():
+        any_parcial = any(f.get("pago_parcial") for f in g["filas"])
         if g["grupo_pagado"]:
             g["estado"] = "pagado"
         elif g["grupo_notificado"]:
             g["estado"] = "notificado"
-        elif g["grupo_tiene_saldo"]:
+        elif any_parcial:
             g["estado"] = "saldar"
         else:
             g["estado"] = "pendiente"

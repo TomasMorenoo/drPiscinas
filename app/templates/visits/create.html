@@ -188,16 +188,46 @@
     const hiddenInput = document.getElementById('casa_id_hidden');
     const autocompleteList = document.getElementById('custom-autocomplete-list');
 
+    // Incluimos fechaInicio (YYYY-MM) para filtrar por fecha de visita
     const casasData = [
         {% for casa in casas %}
-        { id: "{{ casa.id }}", nombre: "{{ casa.nombre_formateado() | escape }}" }{% if not loop.last %},{% endif %}
+        {
+            id: "{{ casa.id }}",
+            nombre: "{{ casa.nombre_formateado() | escape }}",
+            fechaInicio: "{{ casa.fecha_creacion.strftime('%Y-%m') if casa.fecha_creacion else '0000-01' }}"
+        }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
 
+    // Array activo según la fecha seleccionada
+    let casasFiltradas = [...casasData];
+
+    function actualizarCasasFiltradas() {
+        const fechaVal = fechaInput.value;
+        if (!fechaVal) {
+            casasFiltradas = [...casasData];
+            return;
+        }
+        const mesSel = fechaVal.substring(0, 7); // YYYY-MM
+        casasFiltradas = casasData.filter(c => c.fechaInicio <= mesSel);
+
+        // Si el cliente seleccionado ya no aplica para esta fecha, limpiarlo
+        const idActual = hiddenInput.value;
+        if (idActual && !casasFiltradas.find(c => c.id === idActual)) {
+            searchInput.value = '';
+            hiddenInput.value = '';
+            searchInput.classList.remove('is-valid');
+            autocompleteList.style.display = 'none';
+        }
+    }
+
+    // Filtrar al cargar (por si ya hay fecha pre-cargada en edición)
+    actualizarCasasFiltradas();
+
     searchInput.addEventListener('input', function() {
         const val = this.value.toLowerCase();
-        autocompleteList.innerHTML = ''; 
-        hiddenInput.value = ''; 
+        autocompleteList.innerHTML = '';
+        hiddenInput.value = '';
         searchInput.classList.remove('is-valid');
 
         if (!val) {
@@ -205,16 +235,16 @@
             return;
         }
 
-        let matches = casasData.filter(casa => casa.nombre.toLowerCase().includes(val));
+        let matches = casasFiltradas.filter(casa => casa.nombre.toLowerCase().includes(val));
 
         if (matches.length > 0) {
             autocompleteList.style.display = 'block';
-            
+
             matches.forEach(match => {
                 const item = document.createElement('a');
                 item.className = 'dropdown-item py-2 border-bottom text-wrap';
                 item.href = 'javascript:void(0)';
-                
+
                 const regex = new RegExp(`(${val})`, "gi");
                 const highlightedName = match.nombre.replace(regex, "<strong class='text-primary'>$1</strong>");
 
@@ -226,16 +256,14 @@
                     hiddenInput.value = match.id;
                     searchInput.classList.add('is-valid');
                     autocompleteList.style.display = 'none';
-                    
-                    // --- DISPARAMOS LA VERIFICACIÓN DE DUPLICADO ACÁ ---
                     verificarDuplicado();
                 });
-                
+
                 autocompleteList.appendChild(item);
             });
         } else {
             autocompleteList.style.display = 'block';
-            autocompleteList.innerHTML = '<div class="px-3 py-2 text-muted small"><i class="bi bi-emoji-frown me-1"></i> No se encontraron propiedades...</div>';
+            autocompleteList.innerHTML = '<div class="px-3 py-2 text-muted small"><i class="bi bi-emoji-frown me-1"></i> No se encontraron propiedades para esta fecha...</div>';
         }
     });
 
@@ -298,6 +326,9 @@
         }
     }
 
-    fechaInput.addEventListener('change', verificarDuplicado);
+    fechaInput.addEventListener('change', function() {
+        actualizarCasasFiltradas();
+        verificarDuplicado();
+    });
 </script>
 {% endblock %}
