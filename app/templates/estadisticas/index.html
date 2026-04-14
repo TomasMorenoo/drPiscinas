@@ -5,7 +5,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="mb-4">
         <h1 class="h3 mb-0 text-gray-800 fw-bold"><i class="bi bi-bar-chart-fill me-2 text-primary"></i>Estadísticas {{ anio_actual }}</h1>
     </div>
 
@@ -55,14 +55,24 @@
         </div>
     </div>
 
+    <div class="d-flex justify-content-end mb-3">
+        <label for="switchProyeccion" class="d-flex align-items-center gap-2 bg-white shadow-sm rounded-pill px-3 py-2 border" style="cursor:pointer;">
+            <i class="bi bi-graph-up-arrow text-secondary" style="font-size:0.85rem;"></i>
+            <span class="text-secondary fw-bold text-uppercase" style="font-size:0.75rem; letter-spacing:0.05em;">Proyección anual</span>
+            <div class="form-check form-switch mb-0 ms-1">
+                <input class="form-check-input" type="checkbox" role="switch" id="switchProyeccion" onchange="toggleProyeccion(this.checked)" style="cursor:pointer;">
+            </div>
+        </label>
+    </div>
+
     <div class="row g-3 mb-4">
         <div class="col-12 col-lg-6">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header bg-white border-0 pt-4 pb-2 d-flex justify-content-between align-items-end">
                     <h5 class="fw-bold text-dark mb-0"><i class="bi bi-currency-dollar text-success me-1"></i>Abonos Anual</h5>
                     <div class="text-end">
-                        <span class="d-block small text-muted text-uppercase fw-bold">Total Acumulado</span>
-                        <span class="badge bg-success fs-5 shadow-sm">${{ total_anual_abonos | pesos }}</span>
+                        <span class="d-block small text-muted text-uppercase fw-bold" id="labelAbonos">Total Real</span>
+                        <span class="badge bg-success fs-5 shadow-sm" id="badgeAbonos">${{ total_anual_abonos | pesos }}</span>
                     </div>
                 </div>
                 <div class="card-body">
@@ -94,8 +104,8 @@
                 <div class="card-header bg-white border-0 pt-4 pb-2 d-flex justify-content-between align-items-end">
                     <h5 class="fw-bold text-dark mb-0"><i class="bi bi-graph-up-arrow text-primary me-1"></i>Total Anual</h5>
                     <div class="text-end">
-                        <span class="d-block small text-muted text-uppercase fw-bold">Total Acumulado</span>
-                        <span class="badge bg-primary fs-5 shadow-sm">${{ (total_anual_abonos + total_anual_productos) | pesos }}</span>
+                        <span class="d-block small text-muted text-uppercase fw-bold" id="labelTotal">Total Real</span>
+                        <span class="badge bg-primary fs-5 shadow-sm" id="badgeTotalGlobal">${{ (total_anual_abonos + total_anual_productos) | pesos }}</span>
                     </div>
                 </div>
                 <div class="card-body">
@@ -211,6 +221,8 @@
     const datosAbonos = JSON.parse('{{ meses_abonos | safe }}');
     const datosProductos = JSON.parse('{{ meses_productos | safe }}');
 
+    const mesesProyectados = JSON.parse('{{ meses_proyectados | safe }}');
+
     const chartConfig = {
         type: 'line',
         options: {
@@ -220,34 +232,143 @@
         }
     };
 
-    new Chart(document.getElementById('chartAbonos'), { ...chartConfig, data: { labels: nombresMeses, datasets: [{ label: 'Abonos', data: datosAbonos, borderColor: '#198754', backgroundColor: 'rgba(25, 135, 84, 0.2)', fill: true, tension: 0.4 }] }});
+    // Abonos: dos datasets — reales (sólido) y proyectados (punteado)
+    const abonosReales     = datosAbonos.map((v, i) => mesesProyectados[i] ? null : v);
+    const abonosProyectados = datosAbonos.map((v, i) => {
+        // El segmento punteado arranca desde el último mes real para que la línea sea continua
+        if (!mesesProyectados[i]) return null;
+        // Punto de conexión: incluir el último mes real justo antes
+        const anteriorReal = datosAbonos.slice(0, i).reverse().find((_, j) => !mesesProyectados[i - 1 - j]);
+        return v;
+    });
+    // Punto de empalme: el primer mes proyectado toma también el valor del último mes real
+    const primerProy = mesesProyectados.indexOf(true);
+    if (primerProy > 0) abonosProyectados[primerProy - 1] = datosAbonos[primerProy - 1];
+
+    let chartAbonosInstance = new Chart(document.getElementById('chartAbonos'), {
+        type: 'line',
+        data: {
+            labels: nombresMeses,
+            datasets: [
+                {
+                    label: 'Abonos reales',
+                    data: abonosReales,
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25, 135, 84, 0.15)',
+                    fill: true, tension: 0.4, spanGaps: false
+                },
+                {
+                    label: 'Proyectado',
+                    data: abonosProyectados,
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25, 135, 84, 0.05)',
+                    borderDash: [6, 4],
+                    fill: true, tension: 0.4, spanGaps: true,
+                    pointStyle: 'circle', pointRadius: 3, pointBorderColor: '#198754',
+                    pointBackgroundColor: '#fff',
+                    hidden: true
+                }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return '$' + v.toLocaleString('es-AR'); } } } },
+            plugins: {
+                legend: { display: true, labels: { boxWidth: 20, font: { size: 11 }, filter: function(item) { return !item.hidden; } } },
+                tooltip: { callbacks: { label: function(ctx) {
+                    const etiqueta = mesesProyectados[ctx.dataIndex] ? ' (estimado)' : '';
+                    return '$ ' + (ctx.parsed.y || 0).toLocaleString('es-AR') + etiqueta;
+                }}}
+            }
+        }
+    });
+
     new Chart(document.getElementById('chartProductos'), { ...chartConfig, data: { labels: nombresMeses, datasets: [{ label: 'Productos', data: datosProductos, borderColor: '#0dcaf0', backgroundColor: 'rgba(13, 202, 240, 0.2)', fill: true, tension: 0.4 }] }});
 
-    // Gráfico Total: línea única con la suma de abonos + productos
-    const datosTotal = datosAbonos.map((a, i) => a + datosProductos[i]);
-    new Chart(document.getElementById('chartTotal'), { ...chartConfig, data: { labels: nombresMeses, datasets: [{ label: 'Total', data: datosTotal, borderColor: '#0d6efd', backgroundColor: 'rgba(13, 110, 253, 0.15)', fill: true, tension: 0.4 }] } });
+    // Gráfico Total: dos datasets (real + proyectado), proyectado oculto por defecto
+    const totalReales      = abonosReales.map((a, i) => a !== null ? a + datosProductos[i] : null);
+    const totalProyectados = abonosProyectados.map((a, i) => a !== null ? a + datosProductos[i] : null);
 
-    // Stats extras del total
-    (function() {
-        const mesesConDatos = datosTotal.filter(v => v > 0);
+    let chartTotalInstance = new Chart(document.getElementById('chartTotal'), {
+        type: 'line',
+        data: {
+            labels: nombresMeses,
+            datasets: [
+                {
+                    label: 'Total real',
+                    data: totalReales,
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.15)',
+                    fill: true, tension: 0.4, spanGaps: false
+                },
+                {
+                    label: 'Proyectado',
+                    data: totalProyectados,
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.05)',
+                    borderDash: [6, 4],
+                    fill: true, tension: 0.4, spanGaps: true,
+                    pointStyle: 'circle', pointRadius: 3, pointBorderColor: '#0d6efd',
+                    pointBackgroundColor: '#fff',
+                    hidden: true
+                }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return '$' + v.toLocaleString('es-AR'); } } } },
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: function(ctx) {
+                    const etiqueta = mesesProyectados[ctx.dataIndex] ? ' (estimado)' : '';
+                    return '$ ' + (ctx.parsed.y || 0).toLocaleString('es-AR') + etiqueta;
+                }}}
+            }
+        }
+    });
+
+    // --- TOTALES Y BADGES ---
+    const totalRealAbonos = abonosReales.reduce((s, v) => s + (v !== null ? v : 0), 0);
+    const totalProyAbonos = datosAbonos.reduce((s, v) => s + v, 0);
+    const totalProductos  = datosProductos.reduce((s, v) => s + v, 0);
+    const fmtPesos = v => '$' + Math.round(v).toLocaleString('es-AR');
+
+    function actualizarBadges(conProyeccion) {
+        const abonos = conProyeccion ? totalProyAbonos : totalRealAbonos;
+        const labelTxt = conProyeccion ? 'Total con Proyección' : 'Total Acumulado';
+        document.getElementById('badgeAbonos').textContent     = fmtPesos(abonos);
+        document.getElementById('labelAbonos').textContent     = labelTxt;
+        document.getElementById('badgeTotalGlobal').textContent = fmtPesos(abonos + totalProductos);
+        document.getElementById('labelTotal').textContent      = labelTxt;
+    }
+
+    // --- STATS TOTALES (recalculables) ---
+    function renderStatsTotal(conProyeccion) {
+        const base = conProyeccion
+            ? datosAbonos.map((a, i) => a + datosProductos[i])
+            : totalReales.map(v => v !== null ? v : 0);
+
+        const mesesConDatos = base.filter(v => v > 0);
         if (!mesesConDatos.length) return;
 
         const promedio = mesesConDatos.reduce((a, b) => a + b, 0) / mesesConDatos.length;
-        const maxVal = Math.max(...datosTotal);
+        const maxVal = Math.max(...mesesConDatos);
         const minVal = Math.min(...mesesConDatos);
-        const maxMes = nombresMeses[datosTotal.indexOf(maxVal)];
-        const minMes = nombresMeses[datosTotal.indexOf(minVal)];
-        const fmt = v => '$' + Math.round(v).toLocaleString('es-AR');
+        const maxMes = nombresMeses[base.indexOf(maxVal)];
+        const minMes = nombresMeses[base.indexOf(minVal)];
+
+        const labelMeses = conProyeccion
+            ? (mesesConDatos.length + ' de 12 <span class="text-muted fw-normal">(inc. proyectados)</span>')
+            : (mesesConDatos.length + ' de 12');
 
         const stats = [
-            { icon: 'bi-calendar-check', label: 'Promedio mensual', valor: fmt(promedio), color: 'text-primary' },
-            { icon: 'bi-arrow-up-circle-fill', label: 'Mejor mes', valor: fmt(maxVal) + ' (' + maxMes + ')', color: 'text-success' },
-            { icon: 'bi-arrow-down-circle-fill', label: 'Mes más bajo', valor: fmt(minVal) + ' (' + minMes + ')', color: 'text-warning' },
-            { icon: 'bi-calendar2-range', label: 'Meses con datos', valor: mesesConDatos.length + ' de 12', color: 'text-secondary' },
+            { icon: 'bi-calendar-check',      label: 'Promedio mensual', valor: fmtPesos(promedio),                         color: 'text-primary' },
+            { icon: 'bi-arrow-up-circle-fill', label: 'Mejor mes',        valor: fmtPesos(maxVal) + ' (' + maxMes + ')',   color: 'text-success' },
+            { icon: 'bi-arrow-down-circle-fill',label: 'Mes más bajo',    valor: fmtPesos(minVal) + ' (' + minMes + ')',   color: 'text-warning' },
+            { icon: 'bi-calendar2-range',      label: 'Meses con datos',  valor: labelMeses,                               color: 'text-secondary' },
         ];
 
-        const container = document.getElementById('statsTotal');
-        container.innerHTML = stats.map(s => `
+        document.getElementById('statsTotal').innerHTML = stats.map(s => `
             <div class="col-6 col-md-3">
                 <div class="bg-light rounded p-2 h-100">
                     <div class="small text-muted text-uppercase fw-bold mb-1"><i class="bi ${s.icon} me-1"></i>${s.label}</div>
@@ -255,7 +376,21 @@
                 </div>
             </div>
         `).join('');
-    })();
+    }
+
+    // --- TOGGLE PROYECCIÓN ---
+    function toggleProyeccion(checked) {
+        chartAbonosInstance.data.datasets[1].hidden = !checked;
+        chartTotalInstance.data.datasets[1].hidden  = !checked;
+        chartAbonosInstance.update();
+        chartTotalInstance.update();
+        actualizarBadges(checked);
+        renderStatsTotal(checked);
+    }
+
+    // Inicializar con proyección desactivada
+    actualizarBadges(false);
+    renderStatsTotal(false);
 
     // --- 3. LÓGICA DE TEMPORADA ALTA Y BAJA CON MEMORIA DE SERVIDOR ---
     const usoProductosDB = JSON.parse('{{ uso_productos_mes | safe }}');

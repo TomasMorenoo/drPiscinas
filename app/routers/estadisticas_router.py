@@ -54,11 +54,31 @@ def index():
     # 3. Estadísticas Anuales de Dinero ($ Abonos y $ Productos del año actual)
     meses_abonos = [0.0] * 12
     meses_productos = [0.0] * 12
-    
-    abonos_db = db.session.query(AbonoHistorico.mes, func.sum(AbonoHistorico.monto)).filter(AbonoHistorico.anio == anio_actual).group_by(AbonoHistorico.mes).all()
+    meses_proyectados = [False] * 12   # True = sin registro real, valor estimado
+
+    abonos_db = db.session.query(AbonoHistorico.mes, func.sum(AbonoHistorico.monto)).filter(
+        AbonoHistorico.anio == anio_actual
+    ).group_by(AbonoHistorico.mes).all()
+
+    meses_con_datos = set()
     for mes, total in abonos_db:
         meses_abonos[mes - 1] = float(total)
-        
+        meses_con_datos.add(mes)
+
+    # Para los meses sin AbonoHistorico, estimar desde precio_base de clientes activos
+    casas_activas = Casa.query.filter_by(activo=True).all()
+    for i in range(12):
+        mes = i + 1
+        if mes not in meses_con_datos:
+            estimado = sum(
+                float(c.precio_base or 0)
+                for c in casas_activas
+                if not c.fecha_creacion or
+                   (c.fecha_creacion.year, c.fecha_creacion.month) <= (anio_actual, mes)
+            )
+            meses_abonos[i] = estimado
+            meses_proyectados[i] = True
+
     total_anual_abonos = sum(meses_abonos)
 
     # 4. Eager Loading
@@ -113,6 +133,7 @@ def index():
         lista_countries=json.dumps(lista_countries),
         meses_abonos=json.dumps(meses_abonos),
         meses_productos=json.dumps(meses_productos),
+        meses_proyectados=json.dumps(meses_proyectados),
         total_anual_abonos=total_anual_abonos,
         total_anual_productos=total_anual_productos,
         uso_productos_mes=json.dumps(uso_productos_mes),
