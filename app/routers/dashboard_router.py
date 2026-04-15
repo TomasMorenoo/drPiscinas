@@ -265,13 +265,19 @@ def aplicar_pago_en_cascada(casa, monto_ingresado, username, mes_contexto, anio_
 @login_required
 @admin_required
 def index():
+    _now = datetime.now()
+    mes_actual = _now.month
+    anio_actual = _now.year
+    _default_mes  = 12 if mes_actual == 1 else mes_actual - 1
+    _default_anio = anio_actual - 1 if mes_actual == 1 else anio_actual
+
     try:
-        mes = int(request.args.get("mes", datetime.now().month))
-        anio = int(request.args.get("anio", datetime.now().year))
+        mes = int(request.args.get("mes", _default_mes))
+        anio = int(request.args.get("anio", _default_anio))
     except ValueError:
-        mes = datetime.now().month
-        anio = datetime.now().year
-    
+        mes = _default_mes
+        anio = _default_anio
+
     registro_congelado = CierreMes.query.filter_by(mes=mes, anio=anio).first()
     mes_congelado = True if registro_congelado else False
 
@@ -473,6 +479,7 @@ def index():
         reporte_sueltas=reporte_sueltas,
         reporte_grupos=list(reporte_grupos.values()),
         mes=mes, anio=anio, mes_congelado=mes_congelado,
+        mes_actual=mes_actual, anio_actual=anio_actual,
         kpi_clientes=total_clientes, kpi_abono=total_abono, kpi_extras=total_extras,
         kpi_deuda=total_deuda_anterior, kpi_recaudado=total_recaudado,
         kpi_pendiente=total_general - total_recaudado, kpi_total=total_general,
@@ -628,19 +635,21 @@ def sync_abonos():
     for casa in Casa.query.all():
         datos_v = casa.obtener_gastos_mensuales(mes, anio)
         extras_v = float(datos_v.get("extras", 0))
-        
+
         if not casa.activo and extras_v <= 0:
             continue
-            
+
         abono_a_guardar = float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0
-            
+
         hist = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
         if not hist:
             db.session.add(AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=abono_a_guardar))
         else:
             if not getattr(hist, 'pagado', False) and float(hist.monto_pagado or 0) == 0:
                 hist.monto = abono_a_guardar
-            
+
+    mes_nombre_s = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mes - 1]
+    registrar_auditoria(current_user.username, 'CERRAR_MES', f"{mes_nombre_s} {anio}")
     db.session.commit()
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
 
@@ -656,6 +665,8 @@ def unsync_abonos():
         for f in fantasmas:
             if (not f.monto_pagado or float(f.monto_pagado) <= 0.01) and not getattr(f, 'mensaje_enviado', False):
                 db.session.delete(f)
+        mes_nombre_u = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mes - 1]
+        registrar_auditoria(current_user.username, 'ABRIR_MES', f"{mes_nombre_u} {anio}")
         db.session.commit()
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
 
@@ -809,6 +820,8 @@ def registrar_pago_grupo(grupo_id):
     mes = request.json.get("mes")
     anio = request.json.get("anio")
     monto_ingresado = float(request.json.get("monto", 0))
+    monto_usd = request.json.get("monto_usd")
+    cotizacion_usd = request.json.get("cotizacion_usd")
 
     casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).all()
     historiales = AbonoHistorico.query.filter(
@@ -821,11 +834,10 @@ def registrar_pago_grupo(grupo_id):
     if casas_grupo and monto_ingresado > 0:
         grupo_obj_rg = casas_grupo[0].grupo
         mes_nombre_rg = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mes - 1]
-        registrar_auditoria(
-            current_user.username,
-            'PAGO_PARCIAL',
-            f"Grupo {grupo_obj_rg.nombre if grupo_obj_rg else grupo_id} — {mes_nombre_rg} {anio} — ${format_money(monto_ingresado)}"
-        )
+        detalle_rg = f"Grupo {grupo_obj_rg.nombre if grupo_obj_rg else grupo_id} — {mes_nombre_rg} {anio} — ${format_money(monto_ingresado)}"
+        if monto_usd and cotizacion_usd:
+            detalle_rg += f" [USD {format_money(monto_usd)} @ ${format_money(cotizacion_usd)}]"
+        registrar_auditoria(current_user.username, 'PAGO_PARCIAL', detalle_rg)
 
     deudas = []
     total_deuda_grupo = 0
@@ -867,15 +879,16 @@ def registrar_pago_grupo(grupo_id):
 def registrar_pago_especial(id_historial):
     registro = AbonoHistorico.query.get_or_404(id_historial)
     monto_ingresado = float(request.json.get("monto", 0))
+    monto_usd = request.json.get("monto_usd")
+    cotizacion_usd = request.json.get("cotizacion_usd")
 
     if monto_ingresado > 0:
         # --- AUDITORÍA ---
         mes_nombre_e = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][registro.mes - 1]
-        registrar_auditoria(
-            current_user.username,
-            'PAGO_PARCIAL',
-            f"{registro.casa.nombre_formateado()} — {mes_nombre_e} {registro.anio} — ${format_money(monto_ingresado)}"
-        )
+        detalle_e = f"{registro.casa.nombre_formateado()} — {mes_nombre_e} {registro.anio} — ${format_money(monto_ingresado)}"
+        if monto_usd and cotizacion_usd:
+            detalle_e += f" [USD {format_money(monto_usd)} @ ${format_money(cotizacion_usd)}]"
+        registrar_auditoria(current_user.username, 'PAGO_PARCIAL', detalle_e)
         aplicar_pago_en_cascada(registro.casa, monto_ingresado, current_user.username, registro.mes, registro.anio)
 
     db.session.commit()

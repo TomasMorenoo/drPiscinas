@@ -472,6 +472,10 @@
                                         <span class="badge bg-secondary"><i class="bi bi-pause-circle me-1"></i>INACTIVÓ</span>
                                     {% elif log.accion == 'ACTIVAR_CLIENTE' %}
                                         <span class="badge bg-success"><i class="bi bi-play-circle me-1"></i>ACTIVÓ</span>
+                                    {% elif log.accion == 'CERRAR_MES' %}
+                                        <span class="badge bg-dark"><i class="bi bi-lock-fill me-1"></i>CERRÓ MES</span>
+                                    {% elif log.accion == 'ABRIR_MES' %}
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-unlock-fill me-1"></i>ABRIÓ MES</span>
                                     {% elif log.accion == 'CREAR_VISITA' %}
                                         <span class="badge bg-primary"><i class="bi bi-calendar-plus me-1"></i>NUEVA VISITA</span>
                                     {% elif log.accion == 'EDITAR_VISITA' %}
@@ -482,7 +486,17 @@
                                         <span class="badge bg-light text-dark">{{ log.accion }}</span>
                                     {% endif %}
                                 </td>
-                                <td class="text-muted">{{ log.detalle }}</td>
+                                <td class="text-muted">
+                                    {% if log.detalle and '[USD ' in log.detalle %}
+                                        {% set partes = log.detalle.split('[USD ') %}
+                                        {{ partes[0] }}
+                                        <span class="badge bg-primary ms-1" title="Pago en dólares">
+                                            <i class="bi bi-currency-dollar"></i> USD {{ partes[1].rstrip(']') }}
+                                        </span>
+                                    {% else %}
+                                        {{ log.detalle }}
+                                    {% endif %}
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>

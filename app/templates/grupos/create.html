@@ -25,16 +25,17 @@
 
                 <div class="mb-4 p-3 bg-white border rounded shadow-sm border-start border-4 border-primary">
                     <label class="form-label fw-bold text-primary text-uppercase small"><i class="bi bi-house-add-fill me-1"></i> Agregar Casa Manualmente</label>
-                    <div class="input-group">
-                        <select id="select_casa_manual" class="form-select border-secondary fw-bold">
-                            <option value="">Seleccionar casa suelta del sistema...</option>
-                            {% for c in casas_libres %}
-                            <option value="{{ c.id }}" data-nombre="{{ c.nombre_formateado() }}" data-cliente="{{ c.nombre_cliente or 'Sin nombre' }}" data-abono="{{ c.precio_base }}">
-                                {{ c.nombre_formateado() }} ({{ c.country.nombre }})
-                            </option>
-                            {% endfor %}
-                        </select>
+                    <div class="input-group position-relative">
+                        <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                        <input type="text" id="input_casa_manual" class="form-control border-secondary fw-bold"
+                               placeholder="Escribí para buscar una casa suelta..." autocomplete="off">
                         <button class="btn btn-primary fw-bold" type="button" onclick="agregarCasaManual()"><i class="bi bi-plus-lg me-1"></i> Agregar a la lista</button>
+                        <div id="autocomplete_casas" class="list-group shadow position-absolute w-100 d-none"
+                             style="top: 100%; left: 0; z-index: 1000; max-height: 260px; overflow-y: auto; border-top: none;">
+                        </div>
+                    </div>
+                    <div id="casa_seleccionada_info" class="form-text text-success fw-bold d-none mt-1">
+                        <i class="bi bi-check-circle-fill me-1"></i><span id="casa_seleccionada_label"></span>
                     </div>
                 </div>
 
@@ -161,21 +162,115 @@ function buscarCasas() {
         });
 }
 
-function agregarCasaManual() {
-    const select = document.getElementById('select_casa_manual');
-    const opcionSeleccionada = select.options[select.selectedIndex];
-    
-    if(!opcionSeleccionada.value) return;
-    
-    const id = opcionSeleccionada.value;
-    const nombre = opcionSeleccionada.getAttribute('data-nombre');
-    const cliente = opcionSeleccionada.getAttribute('data-cliente');
-    const abono = opcionSeleccionada.getAttribute('data-abono');
-    
-    renderizarFilaCasa(id, nombre, cliente, abono);
-    
-    // Reseteamos el select
-    select.value = "";
+// Datos de casas libres embebidos desde el servidor
+const casasLibresData = [
+    {% for c in casas_libres %}
+    {
+        id: "{{ c.id }}",
+        nombre: "{{ c.nombre_formateado() }}",
+        country: "{{ c.country.nombre }}",
+        cliente: "{{ c.nombre_cliente or 'Sin nombre' }}",
+        abono: "{{ c.precio_base }}"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+let casaSeleccionada = null;
+
+function normalizarTexto(texto) {
+    return texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
+
+function mostrarSugerencias(query) {
+    const dropdown = document.getElementById('autocomplete_casas');
+    dropdown.innerHTML = '';
+
+    if (!query || query.length < 1) {
+        dropdown.classList.add('d-none');
+        return;
+    }
+
+    const q = normalizarTexto(query);
+    const resultados = casasLibresData.filter(c =>
+        normalizarTexto(c.nombre).includes(q) ||
+        normalizarTexto(c.country).includes(q) ||
+        normalizarTexto(c.cliente).includes(q)
+    ).slice(0, 12);
+
+    if (resultados.length === 0) {
+        dropdown.innerHTML = '<div class="list-group-item text-muted fst-italic small py-2">Sin resultados</div>';
+        dropdown.classList.remove('d-none');
+        return;
+    }
+
+    resultados.forEach(c => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'list-group-item list-group-item-action py-2 px-3';
+        item.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="fw-bold text-dark">${c.nombre}</span>
+                    <span class="text-muted small ms-2">(${c.country})</span>
+                </div>
+                <span class="badge bg-light text-secondary border small font-monospace">$${parseFloat(c.abono).toLocaleString('es-AR')}</span>
+            </div>
+            <div class="text-muted small"><i class="bi bi-person-fill me-1"></i>${c.cliente}</div>
+        `;
+        item.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            seleccionarCasa(c);
+        });
+        dropdown.appendChild(item);
+    });
+
+    dropdown.classList.remove('d-none');
+}
+
+function seleccionarCasa(casa) {
+    casaSeleccionada = casa;
+    document.getElementById('input_casa_manual').value = `${casa.nombre} (${casa.country})`;
+    document.getElementById('autocomplete_casas').classList.add('d-none');
+    document.getElementById('casa_seleccionada_label').textContent = `${casa.nombre} — ${casa.cliente}`;
+    document.getElementById('casa_seleccionada_info').classList.remove('d-none');
+}
+
+function agregarCasaManual() {
+    if (!casaSeleccionada) return;
+
+    renderizarFilaCasa(casaSeleccionada.id, casaSeleccionada.nombre, casaSeleccionada.cliente, casaSeleccionada.abono);
+
+    // Resetear el campo
+    casaSeleccionada = null;
+    document.getElementById('input_casa_manual').value = '';
+    document.getElementById('autocomplete_casas').classList.add('d-none');
+    document.getElementById('casa_seleccionada_info').classList.add('d-none');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('input_casa_manual');
+    const dropdown = document.getElementById('autocomplete_casas');
+
+    input.addEventListener('input', () => {
+        casaSeleccionada = null;
+        document.getElementById('casa_seleccionada_info').classList.add('d-none');
+        mostrarSugerencias(input.value);
+    });
+
+    input.addEventListener('focus', () => {
+        if (input.value.length > 0 && !casaSeleccionada) mostrarSugerencias(input.value);
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => dropdown.classList.add('d-none'), 150);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            agregarCasaManual();
+        }
+    });
+});
 </script>
 {% endblock %}

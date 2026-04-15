@@ -395,6 +395,19 @@
                         </button>
                     </form>
                     {% else %}
+                    {% if mes == mes_actual and anio == anio_actual %}
+                    {# Mes en curso: botón abre modal de advertencia #}
+                    <form id="formCerrarMesActual" method="POST" action="{{ url_for('dashboard.sync_abonos') }}" class="m-0">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="mes" value="{{ mes }}">
+                        <input type="hidden" name="anio" value="{{ anio }}">
+                        <button type="button" class="btn btn-sm btn-warning fw-bold"
+                                data-bs-toggle="modal" data-bs-target="#modalCerrarMesActual">
+                            <i class="bi bi-lock-fill"></i>
+                            <span class="btn-cerrar-mes-texto ms-1">CERRAR MES</span>
+                        </button>
+                    </form>
+                    {% else %}
                     <form method="POST" action="{{ url_for('dashboard.sync_abonos') }}" class="m-0"
                           onsubmit="return confirm('¿Cerrar el mes? Se sellarán los abonos y se bloqueará la edición.');">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -405,6 +418,7 @@
                             <span class="btn-cerrar-mes-texto ms-1">CERRAR MES</span>
                         </button>
                     </form>
+                    {% endif %}
                     {% endif %}
                 </div>
 
@@ -1375,6 +1389,12 @@ function enviarPagoParcial() {
         ? `/dashboard/registrar-pago-grupo/${id_referencia}`
         : `/dashboard/registrar-pago-especial/${id_referencia}`;
     const bodyData = { monto };
+    if (esUSD) {
+        const usd = parseFloat(document.getElementById('monto_entregado').value) || 0;
+        const cotizacion = parseFloat(document.getElementById('modal_cotizacion_usd').value) || 0;
+        bodyData.monto_usd = usd;
+        bodyData.cotizacion_usd = cotizacion;
+    }
     if (tipo === 'grupo') { bodyData.mes = {{ mes }}; bodyData.anio = {{ anio }}; }
 
     fetch(url, {
@@ -1474,4 +1494,104 @@ document.getElementById('modalFiltroHoja').addEventListener('show.bs.modal', fun
     document.getElementById('hoja-saldar').href      = `${base}?${params}&filtro=saldar`;
 });
 </script>
+
+{% if mes == mes_actual and anio == anio_actual and not mes_congelado %}
+{# ══ MODAL ADVERTENCIA CERRAR MES EN CURSO ══ #}
+<div class="modal fade" id="modalCerrarMesActual" tabindex="-1" aria-labelledby="modalCerrarMesActualLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 overflow-hidden">
+
+            {# Cabecera roja intensa #}
+            <div class="modal-header border-0 text-white py-4"
+                 style="background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);">
+                <div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-exclamation-triangle-fill fs-1"></i>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0" id="modalCerrarMesActualLabel">
+                            ¡Mes en curso!
+                        </h5>
+                        <div class="small opacity-75">Esta acción no se puede deshacer fácilmente</div>
+                    </div>
+                </div>
+            </div>
+
+            {# Cuerpo con franjas de advertencia #}
+            <div class="modal-body p-0">
+                <div class="px-4 py-3"
+                     style="background: repeating-linear-gradient(
+                         -45deg,
+                         #fff9e6,
+                         #fff9e6 12px,
+                         #fff3cd 12px,
+                         #fff3cd 24px
+                     );">
+                    <div class="d-flex align-items-start gap-3">
+                        <i class="bi bi-cone-striped text-warning fs-2 flex-shrink-0 mt-1"></i>
+                        <div>
+                            <p class="fw-bold text-dark mb-1 fs-6">
+                                <strong>{{ nombres_meses[mes - 1] }} {{ anio }}</strong> todavía está en curso.
+                            </p>
+                            <p class="text-muted small mb-0">
+                                Cerrar un mes activo puede dejar pagos sin registrar.
+                                Asegurate de haber cargado todas las cobranzas antes de continuar.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="px-4 py-3 bg-white border-top">
+                    <p class="small text-muted mb-0">
+                        <i class="bi bi-info-circle me-1 text-danger"></i>
+                        Al cerrar el mes se sellarán los abonos y se bloqueará la edición de pagos.
+                    </p>
+                </div>
+            </div>
+
+            {# Footer #}
+            <div class="modal-footer border-0 bg-light gap-2">
+                <button type="button" class="btn btn-secondary fw-bold px-4"
+                        data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i>Cancelar
+                </button>
+                <button type="button" id="btnConfirmarCierreActual"
+                        class="btn btn-danger fw-bold px-4" disabled
+                        onclick="document.getElementById('formCerrarMesActual').submit();">
+                    <i class="bi bi-lock-fill me-1"></i>
+                    Cerrar igual
+                    <span id="cuentaRegresivaCierre" class="badge bg-white text-danger ms-1">3</span>
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('modalCerrarMesActual').addEventListener('show.bs.modal', function () {
+    const btn = document.getElementById('btnConfirmarCierreActual');
+    const cuenta = document.getElementById('cuentaRegresivaCierre');
+    btn.disabled = true;
+    cuenta.textContent = '3';
+    cuenta.classList.remove('d-none');
+    let segundos = 3;
+    const intervalo = setInterval(function () {
+        segundos--;
+        if (segundos <= 0) {
+            clearInterval(intervalo);
+            btn.disabled = false;
+            cuenta.classList.add('d-none');
+        } else {
+            cuenta.textContent = segundos;
+        }
+    }, 1000);
+});
+
+document.getElementById('modalCerrarMesActual').addEventListener('hide.bs.modal', function () {
+    const btn = document.getElementById('btnConfirmarCierreActual');
+    btn.disabled = true;
+    document.getElementById('cuentaRegresivaCierre').textContent = '3';
+    document.getElementById('cuentaRegresivaCierre').classList.remove('d-none');
+});
+</script>
+{% endif %}
+
 {% endblock %}         
