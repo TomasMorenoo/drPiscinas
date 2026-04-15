@@ -570,7 +570,12 @@ def perfil(id):
     detalles_pagos = []
     saldo_acumulado = 0.0
     nombres_meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-    
+
+    # Filtrar meses anteriores a la fecha de alta del cliente en el sistema
+    if casa.fecha_creacion:
+        _fc = casa.fecha_creacion
+        historial_asc = [h for h in historial_asc if (h.anio, h.mes) >= (_fc.year, _fc.month)]
+
     for h in historial_asc:
         gastos = casa.obtener_gastos_mensuales(h.mes, h.anio)
         total_mes = gastos['total']
