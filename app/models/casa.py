@@ -39,25 +39,31 @@ class Casa(db.Model):
     def obtener_gastos_mensuales(self, mes, anio):
         from app.models.abono_historico import AbonoHistorico
         total_extras = 0
-        
+
         # Buscamos si existe la "foto" histórica de ese mes
         hist = AbonoHistorico.query.filter_by(casa_id=self.id, mes=mes, anio=anio).first()
         mes_cerrado = hist is not None
 
         for visita in self.visitas:
             if visita.fecha.month == mes and visita.fecha.year == anio:
+                # No cobrar visitas anteriores a la fecha de alta del cliente en el sistema
+                if self.fecha_creacion:
+                    _fv = visita.fecha.date() if isinstance(visita.fecha, datetime) else visita.fecha
+                    _fa = self.fecha_creacion.date() if isinstance(self.fecha_creacion, datetime) else self.fecha_creacion
+                    if _fv < _fa:
+                        continue
                 for vp in visita.productos:
                     if mes_cerrado and vp.precio_unitario:
                         total_extras += float(vp.cantidad) * float(vp.precio_unitario)
                     else:
                         total_extras += float(vp.cantidad) * float(vp.product.precio)
-                
+
                 if visita.promo:
                     total_extras += float(visita.promo.precio)
-        
+
         # MAGIA: Si hay historial, usa el precio congelado. Si no, usa el actual (precio_base).
         abono_final = float(hist.monto) if hist else float(self.precio_base or 0)
-            
+
         return {
             "abono": abono_final,
             "extras": round(total_extras, 2),
@@ -74,13 +80,19 @@ class Casa(db.Model):
     def obtener_saldo_anterior(self, mes, anio):
         saldo = 0.0
         historiales_ordenados = sorted(self.historial_abonos, key=lambda x: (x.anio, x.mes))
-        
+
         for hist in historiales_ordenados:
             if hist.anio < anio or (hist.anio == anio and hist.mes < mes):
                 abono_hist = float(hist.monto)
                 extras_hist = 0.0
                 for visita in self.visitas:
                     if visita.fecha.month == hist.mes and visita.fecha.year == hist.anio:
+                        # No cobrar visitas anteriores a la fecha de alta del cliente en el sistema
+                        if self.fecha_creacion:
+                            _fv = visita.fecha.date() if isinstance(visita.fecha, datetime) else visita.fecha
+                            _fa = self.fecha_creacion.date() if isinstance(self.fecha_creacion, datetime) else self.fecha_creacion
+                            if _fv < _fa:
+                                continue
                         for vp in visita.productos:
                             if vp.precio_unitario:
                                 extras_hist += float(vp.cantidad) * float(vp.precio_unitario)
@@ -88,17 +100,17 @@ class Casa(db.Model):
                                 extras_hist += float(vp.cantidad) * float(vp.product.precio)
                         if visita.promo:
                             extras_hist += float(visita.promo.precio)
-                
+
                 total_hist = abono_hist + extras_hist
                 pagado_hist = float(getattr(hist, 'monto_pagado', 0) or 0)
-                
+
                 saldo += total_hist
                 saldo -= pagado_hist
-                
+
                 # Reseteamos el saldo a 0 si la cuota figura pagada completamente por otro medio
                 if getattr(hist, 'pagado', False) and pagado_hist == 0 and saldo > 0.01:
                     saldo = 0.0
-                    
+
         return round(saldo, 2)
 
 
