@@ -83,6 +83,12 @@ class Casa(db.Model):
 
         for hist in historiales_ordenados:
             if hist.anio < anio or (hist.anio == anio and hist.mes < mes):
+                # Saltear meses anteriores a la fecha de alta del cliente en el sistema
+                if self.fecha_creacion:
+                    _fa = self.fecha_creacion.date() if isinstance(self.fecha_creacion, datetime) else self.fecha_creacion
+                    if (hist.anio, hist.mes) < (_fa.year, _fa.month):
+                        continue
+
                 abono_hist = float(hist.monto)
                 extras_hist = 0.0
                 for visita in self.visitas:
