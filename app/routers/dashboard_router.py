@@ -114,7 +114,7 @@ def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_vis
             texto_wa += f"* {p}\n"
             
     if saldo_anterior_visual > 0.1:
-        texto_wa += f"Deuda meses anteriores: ${format_money(saldo_anterior_visual)}\n"
+        texto_wa += f"Saldo adeudado de meses anteriores: ${format_money(saldo_anterior_visual)}\n"
         
     if pagos_en_este_dashboard > 0.1:
         texto_wa += f"Entregado este mes: -${format_money(pagos_en_este_dashboard)}\n"
@@ -122,34 +122,45 @@ def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_vis
     texto_wa += "\nMuchas Gracias."
     return texto_wa
 
-def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard):
+def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard, saldo_a_favor=0.0):
     saludo = obtener_saludo_tiempo(grupo_nombre)
     cant = len(casas_data)
-    
-    total_final = total_grupo_mes + total_grupo_saldo_ant_visual - total_pagos_dashboard
-    
+
+    total_final = total_grupo_mes + total_grupo_saldo_ant_visual - total_pagos_dashboard - saldo_a_favor
+
     texto_wa = f"{saludo} Te paso el resumen de las {cant} propiedades.\n\n"
     if total_final <= 0.01:
         texto_wa += "*-- CUENTAS AL DÍA --*\n\n"
     else:
         texto_wa += f"*-- TOTAL A PAGAR: ${format_money(total_final)} --*\n\n"
-    
+
     for c in casas_data:
         casa_obj = c['casa']
         nombre_casa = get_nombre_limpio(casa_obj)
         abono = c['abono']
         extras = c['extras']
+        saldo_ant = c.get('saldo_anterior', 0.0)
         total_c = abono + extras
-        texto_wa += f"• *{nombre_casa}:* Abono ${format_money(abono)} + Prod. ${format_money(extras)} = *${format_money(total_c)}*\n"
-        
+        a_pagar_casa = total_c + saldo_ant
+        linea = f"• *{nombre_casa}:* Abono ${format_money(abono)} + Prod. ${format_money(extras)}"
+        if saldo_ant > 0.1:
+            linea += f" + Deuda anterior ${format_money(saldo_ant)}"
+        elif saldo_ant < -0.1:
+            linea += f" - Saldo a favor ${format_money(abs(saldo_ant))}"
+        linea += f" = *${format_money(a_pagar_casa)}*"
+        texto_wa += linea + "\n"
+
     texto_wa += "\n"
-    
+
     if total_grupo_saldo_ant_visual > 0.1:
-        texto_wa += f"Deuda meses anteriores: *${format_money(total_grupo_saldo_ant_visual)}*\n"
-        
+        texto_wa += f"Saldo adeudado de meses anteriores: ${format_money(total_grupo_saldo_ant_visual)}\n"
+
     if total_pagos_dashboard > 0.1:
         texto_wa += f"Entregado este mes: *-${format_money(total_pagos_dashboard)}*\n"
-        
+
+    if saldo_a_favor > 0.1:
+        texto_wa += f"_(*) El total ya incluye un descuento de ${format_money(saldo_a_favor)} por saldo a favor acumulado._\n"
+
     texto_wa += "\nMuchas Gracias."
     return texto_wa
 
@@ -512,7 +523,7 @@ def index():
 
         if g["telefono"]:
             num_tel = limpiar_telefono(g["telefono"])
-            texto_wa = generar_wa_grupo(g['nombre'], g["casas"], mes, anio, g['total_mes'], g['saldo_anterior'], g['monto_pagado'])
+            texto_wa = generar_wa_grupo(g['nombre'], g["casas"], mes, anio, g['total_mes'], g['saldo_anterior'], g['monto_pagado'], g.get('saldo_a_favor', 0.0))
             g["url_wa"] = f"whatsapp://send?phone={num_tel}&text={urllib.parse.quote(texto_wa)}"
 
     if hubo_cambios:
@@ -866,9 +877,10 @@ def toggle_pago_grupo(grupo_id):
                     total_grupo_saldo_ant_visual += saldo_ant
                     total_pagos_dashboard += float(h.monto_pagado or 0)
 
-                    casas_data.append({'casa': c, 'abono': abono, 'extras': extras})
+                    casas_data.append({'casa': c, 'abono': abono, 'extras': extras, 'saldo_anterior': saldo_ant})
 
-                texto_wa = generar_wa_grupo(grupo.nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard)
+                saldo_a_favor_grupo = _saldo_grupo_para_mes(grupo, mes, anio)
+                texto_wa = generar_wa_grupo(grupo.nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard, saldo_a_favor_grupo)
 
                 tel = re.sub(r'\D', '', telefono_repr)
                 if len(tel) == 10: tel = "549" + tel
