@@ -141,7 +141,7 @@ def crear_visit():
     # --- MÉTODO GET: CARGA DE FORMULARIO ---
     # Mostramos todas las casas activas. El POST ya valida que la fecha de visita
     # no sea anterior al inicio del cliente (fecha_creacion).
-    casas = Casa.query.filter_by(activo=True).order_by(Casa.numero).all()
+    casas = Casa.query.filter_by(activo=True, pausado=False).order_by(Casa.numero).all()
 
     products = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
     promos = Promo.query.filter_by(activo=True).order_by(Promo.nombre).all()

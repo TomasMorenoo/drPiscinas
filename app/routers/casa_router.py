@@ -160,20 +160,27 @@ def listar_casas():
     casas.sort(key=natural_sort_key)
 
     countries = Country.query.filter_by(activo=True).order_by(Country.nombre).all()
-    
+
     barrios = []
     if country_id:
         barrios = Barrio.query.filter_by(country_id=country_id, activo=True).order_by(Barrio.nombre).all()
 
+    activos_count = Casa.query.filter_by(activo=True).count()
+    pausados_count = Casa.query.filter_by(activo=True, pausado=True).count()
+    inactivos_count = Casa.query.filter_by(activo=False).count()
+
     return render_template(
-        "casas/list.html", 
-        casas=casas, 
-        countries=countries, 
+        "casas/list.html",
+        casas=casas,
+        countries=countries,
         barrios=barrios,
         buscar_actual=buscar,
         estado_actual=estado,
         country_actual=country_id,
-        barrio_actual=barrio_id
+        barrio_actual=barrio_id,
+        activos_count=activos_count,
+        pausados_count=pausados_count,
+        inactivos_count=inactivos_count,
     )
 
 # ==========================================
@@ -603,7 +610,7 @@ def perfil(id):
         
     detalles_pagos.reverse()
     
-    return render_template("casas/perfil.html", casa=casa, visitas=visitas, detalles_pagos=detalles_pagos, productos=productos)
+    return render_template("casas/perfil.html", casa=casa, visitas=visitas, detalles_pagos=detalles_pagos, productos=productos, now=datetime.now())
 
 # ==========================================
 # OTRAS RUTAS
@@ -734,8 +741,47 @@ def aumento_individual(id):
         
     return redirect(request.referrer or url_for('casas.listar_casas'))
 
-@casa_bp.route("/create_form", methods=["GET"]) 
+@casa_bp.route("/create_form", methods=["GET"])
 @login_required
 @admin_required
 def form_crear_casa():
     return crear_casa()
+
+
+@casa_bp.route("/<int:id>/pausar", methods=["POST"])
+@login_required
+@admin_required
+def pausar_casa(id):
+    from app.models.pausa import Pausa
+    from datetime import date
+    casa = Casa.query.get_or_404(id)
+    desde_str = request.form.get("desde")
+    hasta_str = request.form.get("hasta")
+    desde = datetime.strptime(desde_str, "%Y-%m-%d").date() if desde_str else date.today()
+    hasta = datetime.strptime(hasta_str, "%Y-%m-%d").date() if hasta_str else None
+    casa.pausado = True
+    db.session.add(Pausa(casa_id=casa.id, desde=desde, hasta=hasta, pausado_por=current_user.username))
+    detalle_audit = f"{casa.nombre_formateado()} — desde {desde}" + (f" hasta {hasta}" if hasta else "")
+    registrar_auditoria(current_user.username, "PAUSAR", detalle_audit)
+    db.session.commit()
+    flash("Servicio pausado.", "warning")
+    return redirect(url_for("casas.perfil", id=id))
+
+
+@casa_bp.route("/<int:id>/reanudar", methods=["POST"])
+@login_required
+@admin_required
+def reanudar_casa(id):
+    from app.models.pausa import Pausa
+    from datetime import date
+    casa = Casa.query.get_or_404(id)
+    hasta_str = request.form.get("hasta")
+    hasta = datetime.strptime(hasta_str, "%Y-%m-%d").date() if hasta_str else date.today()
+    pausa = Pausa.query.filter_by(casa_id=casa.id, hasta=None).order_by(Pausa.desde.desc()).first()
+    if pausa:
+        pausa.hasta = hasta
+    casa.pausado = False
+    registrar_auditoria(current_user.username, "REANUDAR", f"{casa.nombre_formateado()} — hasta {hasta}")
+    db.session.commit()
+    flash("Servicio reanudado.", "success")
+    return redirect(url_for("casas.perfil", id=id))

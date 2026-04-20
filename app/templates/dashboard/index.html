@@ -473,26 +473,25 @@
 
     </div>
 
-    {# ---- BUSCADOR ---- #}
+    {# ---- BUSCADOR + FILTROS ---- #}
     <div class="mb-4 d-print-none bg-white p-3 rounded border shadow-sm">
-        <div class="row g-2">
-            <div class="col-md-8">
+        <div class="row g-2 align-items-center">
+            <div class="col-12 col-md-8">
                 <div class="input-group">
                     <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
-                    <input type="text" id="busquedaRealTime" class="form-control border-start-0" placeholder="Filtrar por Lote, Barrio o Country en este mes...">
+                    <input type="text" id="busquedaRealTime" class="form-control border-start-0" placeholder="Filtrar por lote, barrio o country...">
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="input-group">
-                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-funnel text-muted"></i></span>
-                    <select id="filtroEstado" class="form-select border-start-0 fw-bold text-secondary">
-                        <option value="todos">Todos los estados</option>
-                        <option value="pendiente">🕒 Pendientes</option>
-                        <option value="notificado">✉️ Notificados</option>
-                        <option value="saldar">⚠️ Falta Saldar</option>
-                        <option value="pagado">✅ Pagados</option>
-                    </select>
-                </div>
+            <div class="col-12 col-md-4">
+                <select id="filtroEstado" class="form-select fw-semibold" style="color: #495057; border-color: #dee2e6;">
+                    <option value="todos">— Todos los estados</option>
+                    <option value="pagado">✅ Pagados</option>
+                    <option value="no_pagado">❌ No pagados</option>
+                    <option disabled style="color: #ccc;">──────────────</option>
+                    <option value="pendiente">↳ 🕒 Pendientes</option>
+                    <option value="notificado">↳ 📨 Notificados</option>
+                    <option value="saldar">↳ ⚠️ Falta saldar</option>
+                </select>
             </div>
         </div>
     </div>
@@ -542,16 +541,17 @@
                             {% endif %}
                         {% endif %}
                         
-                        <tr class="fila-busqueda" data-estado="{{ estado_clase }}" data-pago-parcial="{{ 'true' if item.pagos_en_este_dashboard > 0 and not item.pagado else 'false' }}">
+                        <tr class="fila-busqueda {% if item.pausado %}table-secondary{% endif %}" data-estado="{{ estado_clase }}" data-pago-parcial="{{ 'true' if item.pagos_en_este_dashboard > 0 and not item.pagado else 'false' }}">
 
                             {# 1. NOMBRE #}
                             <td class="ps-3 td-nombre" style="max-width: 200px;">
                                 <a href="{{ url_for('casas.perfil', id=item.casa.id) }}"
-                                   class="text-decoration-none text-dark d-inline-block text-truncate align-middle"
+                                   class="text-decoration-none {% if item.pausado %}text-secondary{% else %}text-dark{% endif %} d-inline-block text-truncate align-middle"
                                    title="{{ item.casa.nombre_formateado() }}" style="max-width: 100%;">
                                     {{ item.casa.nombre_formateado() }}
                                 </a>
-                                {% if not item.casa.activo %}
+                                {% if item.pausado %}
+                                {% elif not item.casa.activo %}
                                     <span class="badge bg-secondary ms-1 badge-baja" title="Dado de baja">BAJA</span>
                                 {% endif %}
                             </td>
@@ -618,7 +618,9 @@
 
                                 {# Acciones inline en mobile #}
                                 <div class="acciones-mobile-inline d-md-none d-print-none mt-1 justify-content-end">
-                                    {% if mes_congelado and item.id_historial %}
+                                    {% if item.pausado %}
+                                        <span class="badge bg-secondary"><i class="bi bi-pause-circle-fill"></i></span>
+                                    {% elif mes_congelado and item.id_historial %}
                                         {% if item.pagado %}
                                             <button onclick="togglePago({{ item.id_historial }}, 'undo')" class="btn btn-sm {% if pagado_atrasado %}btn-secondary{% else %}btn-success{% endif %}" title="Pagado">
                                                 <i class="bi {% if pagado_atrasado %}bi-clock-history{% else %}bi-check-circle-fill{% endif %}"></i>
@@ -659,7 +661,13 @@
 
                             {# 6. ACCIONES DESKTOP #}
                             <td class="p-1 align-middle d-none d-md-table-cell d-print-none" style="width: 140px;">
-                                {% if mes_congelado and item.id_historial %}
+                                {% if item.pausado %}
+                                    <a href="{{ url_for('casas.perfil', id=item.casa.id) }}"
+                                       class="btn btn-secondary btn-sm w-100 d-flex flex-column justify-content-center align-items-center shadow-sm fw-bold"
+                                       style="height: 74px; border-style: dashed;">
+                                        <i class="bi bi-pause-circle-fill fs-4"></i>
+                                    </a>
+                                {% elif mes_congelado and item.id_historial %}
                                     <div id="bloqueo-{{ item.id_historial }}" class="{% if not item.pagado %}d-none{% endif %}">
                                         <button id="btn-deshacer-{{ item.id_historial }}"
                                                 onclick="togglePago({{ item.id_historial }}, 'undo')"
@@ -1162,19 +1170,21 @@
 <!-- Modal de confirmación para deshacer pago -->
 <div class="modal fade" id="modalConfirmarDeshacer" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title w-100 text-center fw-bold text-danger">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>¿Deshacer pago?
-                </h5>
+        <div class="modal-content border-0 shadow overflow-hidden">
+            <div class="modal-header border-0 text-white py-4" style="background: linear-gradient(135deg, #dc3545, #c0392b);">
+                <div class="w-100 text-center">
+                    <i class="bi bi-arrow-counterclockwise fs-1 mb-2 d-block opacity-90"></i>
+                    <h5 class="modal-title fw-bold mb-0">¿Deshacer pago?</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body text-center py-3">
-                <p class="mb-1 text-secondary small">Esta acción revertirá el pago registrado.</p>
-                <p class="mb-0 fw-bold" id="deshacer-nombre-cliente"></p>
+            <div class="modal-body text-center px-4 py-3">
+                <p class="mb-1 text-muted small">Esta acción revertirá el pago registrado de:</p>
+                <p class="mb-0 fw-bold text-dark" id="deshacer-nombre-cliente"></p>
             </div>
-            <div class="modal-footer border-0 pt-0 d-flex justify-content-center gap-2 pb-4">
-                <button type="button" class="btn btn-outline-secondary px-4 fw-bold" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-danger px-4 fw-bold" id="btn-confirmar-deshacer">
+            <div class="modal-footer border-0 px-4 pb-4 pt-0 d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm fw-bold flex-fill" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger btn-sm fw-bold flex-fill" id="btn-confirmar-deshacer">
                     <i class="bi bi-arrow-counterclockwise me-1"></i>Deshacer
                 </button>
             </div>
@@ -1347,11 +1357,10 @@ function filtrarDashboard() {
     document.querySelectorAll('.fila-busqueda').forEach(fila => {
         let txt = fila.textContent.toLowerCase();
         let est = fila.getAttribute('data-estado');
-        let parcial = fila.getAttribute('data-pago-parcial');
         let visible = txt.includes(texto);
         if (visible && estado !== 'todos') {
-            if (estado === 'saldar') {
-                visible = parcial === 'true';
+            if (estado === 'no_pagado') {
+                visible = est !== 'pagado';
             } else {
                 visible = est === estado;
             }

@@ -32,6 +32,7 @@ class Casa(db.Model):
     
     inactivado_por = db.Column(db.String(100), nullable=True)
     fecha_inactivacion = db.Column(db.DateTime, nullable=True)
+    pausado = db.Column(db.Boolean, default=False, nullable=False)
 
     def __repr__(self):
         return f"<Casa {self.numero}>"
@@ -61,8 +62,19 @@ class Casa(db.Model):
                 if visita.promo:
                     total_extras += float(visita.promo.precio)
 
-        # MAGIA: Si hay historial, usa el precio congelado. Si no, usa el actual (precio_base).
+        # Si está pausada y mes/año cae dentro del período de pausa activa → abono $0
         abono_final = float(hist.monto) if hist else float(self.precio_base or 0)
+        if abono_final > 0:
+            mes_actual = (anio, mes)
+            for p in self.historial_pausas:
+                inicio = (p.desde.year, p.desde.month)
+                fin = (p.hasta.year, p.hasta.month) if p.hasta else None
+                if inicio <= mes_actual and (fin is None or fin >= mes_actual):
+                    # Pausa inicia este mes y hay extras → cobrar este mes
+                    if inicio == mes_actual and total_extras > 0:
+                        continue
+                    abono_final = 0.0
+                    break
 
         return {
             "abono": abono_final,

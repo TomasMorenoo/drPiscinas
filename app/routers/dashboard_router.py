@@ -267,6 +267,25 @@ def aplicar_pago_en_cascada(casa, monto_ingresado, username, mes_contexto, anio_
         elif txn_id not in actual:
             hist_actual.detalle_pagos = f"{actual}|{detalle_str}"
 
+def _casa_pausada_en_mes(casa, mes, anio, extras=0.0):
+    """True si la casa tiene una pausa que cubre el mes dado.
+
+    - Soporta pausas con 'hasta' (rango cerrado).
+    - Funciona aunque la casa ya esté reanudada (no depende del flag pausado).
+    - Si la pausa inicia en este mismo mes y la casa tiene extras (fue visitada),
+      la pausa aplica recién desde el mes siguiente para cobrar ese mes.
+    """
+    mes_actual = (anio, mes)
+    for p in getattr(casa, 'historial_pausas', []):
+        inicio = (p.desde.year, p.desde.month)
+        fin = (p.hasta.year, p.hasta.month) if p.hasta else None
+        if inicio <= mes_actual and (fin is None or fin >= mes_actual):
+            # Pausa inicia este mes y hay productos → cobrar este mes, pausar desde el siguiente
+            if inicio == mes_actual and extras > 0:
+                continue
+            return True
+    return False
+
 def _saldo_grupo_para_mes(grupo, mes, anio):
     """Retorna el saldo_a_favor del grupo solo si aplica al mes consultado (mes posterior al de origen)."""
     saldo = float(grupo.saldo_a_favor or 0)
@@ -357,7 +376,10 @@ def index():
             abono_mes = float(historial.monto)
         else:
             abono_mes = float(casa.precio_base or 0) if (casa.activo or extras > 0) else 0.0
-            
+
+        if _casa_pausada_en_mes(casa, mes, anio, extras):
+            abono_mes = 0.0
+
         total_mes = abono_mes + extras
 
         # --- LÓGICA VISUAL DE FOTO DEL MES ---
@@ -423,7 +445,8 @@ def index():
             "mensaje_enviado": mensaje_enviado,
             "pagos_en_este_dashboard": pagos_en_este_dashboard,
             "estado": estado_item,
-            "url_wa": ""
+            "url_wa": "",
+            "pausado": _casa_pausada_en_mes(casa, mes, anio, extras)
         }
 
         if casa.grupo_id:
@@ -668,7 +691,10 @@ def sync_abonos():
         if not casa.activo and extras_v <= 0:
             continue
 
-        abono_a_guardar = float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0
+        if _casa_pausada_en_mes(casa, mes, anio, extras_v):
+            abono_a_guardar = 0.0
+        else:
+            abono_a_guardar = float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0
 
         hist = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
         if not hist:
@@ -1144,7 +1170,10 @@ def api_totales():
             abono_mes = float(historial.monto)
         else:
             abono_mes = float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0
-            
+
+        if _casa_pausada_en_mes(casa, mes, anio, extras_v):
+            abono_mes = 0.0
+
         # obtener_saldo_anterior ya refleja correctamente todos los pagos en cascada
         saldo_anterior_visual = saldo_anterior_real
 

@@ -6,33 +6,22 @@
 <div class="card mb-4 border-0 shadow-sm">
     <div class="card-body d-flex justify-content-between align-items-center py-3">
         
-        <div class="d-flex align-items-center">
-            {% set activas = casas | selectattr('activo') | list | length %}
-            {% set pausadas = casas | rejectattr('activo') | list | length %}
-            
-            {% if estado_actual == 'inactivos' %}
-                <span class="text-uppercase small fw-bold text-muted">
-                    <i class="bi bi-person-dash-fill me-1"></i> Clientes Pausados:
-                </span>
-                <span class="badge bg-secondary text-white ms-1" style="font-size: 0.9rem;">
-                    {{ pausadas }}
-                </span>
-            {% else %}
-                <span class="text-uppercase small fw-bold text-muted">
-                    <i class="bi bi-person-check-fill me-1"></i> Clientes Activos:
-                </span>
-                <span class="badge bg-success ms-1" style="font-size: 0.9rem;">
-                    {{ activas }}
-                </span>
+        <div class="d-flex align-items-center flex-wrap gap-3">
+            <span class="text-uppercase small fw-bold text-muted">
+                <i class="bi bi-person-check-fill me-1 text-success"></i> Activos:
+                <span class="badge bg-success ms-1" style="font-size: 0.85rem;">{{ activos_count }}</span>
+            </span>
 
-                {% if estado_actual == 'todo' and pausadas > 0 %}
-                <span class="text-uppercase small fw-bold text-muted ms-3 d-none d-sm-inline">
-                    <i class="bi bi-pause-circle-fill me-1"></i> Inactivos:
-                </span>
-                <span class="badge bg-secondary ms-1 d-none d-sm-inline" style="font-size: 0.9rem;">
-                    {{ pausadas }}
-                </span>
-                {% endif %}
+            <span class="text-uppercase small fw-bold text-muted">
+                <i class="bi bi-person-dash-fill me-1 text-danger"></i> Inactivos:
+                <span class="badge bg-danger ms-1" style="font-size: 0.85rem;">{{ inactivos_count }}</span>
+            </span>
+
+            {% if pausados_count > 0 %}
+            <span class="text-uppercase small fw-bold text-muted">
+                <i class="bi bi-pause-circle-fill me-1"></i> Pausados:
+                <span class="badge bg-secondary ms-1" style="font-size: 0.85rem;">{{ pausados_count }}</span>
+            </span>
             {% endif %}
         </div>
 
@@ -117,8 +106,9 @@
             </thead>
             <tbody>
                 {% for casa in casas %}
-                <tr class="{{ '' if casa.activo else 'table-danger' }}" style="{{ '' if casa.activo else 'opacity: 0.75;' }}">
-                    
+                {% set fila_class = 'table-secondary' if casa.pausado else ('' if casa.activo else 'table-danger') %}
+                <tr class="{{ fila_class }}" style="{{ '' if casa.activo else 'opacity: 0.75;' }}">
+
                     <td class="fw-bold text-dark">
                         <a href="{{ url_for('casas.perfil', id=casa.id) }}" class="text-reset text-decoration-none d-block" title="Ver Ficha del Cliente">
                             {{ casa.nombre_formateado() }}
@@ -130,15 +120,27 @@
                     </td>
 
                     <td class="text-center">
-                        {% if casa.activo %}
+                        {% if casa.pausado %}
+                            {% set pausa_activa = namespace(obj=None) %}
+                            {% for p in casa.historial_pausas %}
+                                {% if not p.hasta %}{% set pausa_activa.obj = p %}{% endif %}
+                            {% endfor %}
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill text-uppercase"
+                                  style="font-size: 0.7rem; cursor: help;"
+                                  data-bs-toggle="tooltip"
+                                  data-bs-placement="top"
+                                  title="Pausado por {{ pausa_activa.obj.pausado_por if pausa_activa.obj and pausa_activa.obj.pausado_por else '—' }} desde {{ pausa_activa.obj.desde.strftime('%d/%m/%Y') if pausa_activa.obj else '' }}{% if pausa_activa.obj and pausa_activa.obj.hasta %} hasta {{ pausa_activa.obj.hasta.strftime('%d/%m/%Y') }}{% endif %}">
+                                Pausado
+                            </span>
+                        {% elif casa.activo %}
                             <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill text-uppercase" style="font-size: 0.7rem;">
                                 Activo
                             </span>
                         {% else %}
-                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill text-uppercase" 
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill text-uppercase"
                                   style="font-size: 0.7rem; cursor: help;"
-                                  data-bs-toggle="tooltip" 
-                                  data-bs-placement="top" 
+                                  data-bs-toggle="tooltip"
+                                  data-bs-placement="top"
                                   {% if casa.inactivado_por %}
                                   title="Inactivado por {{ casa.inactivado_por }} el {{ casa.fecha_inactivacion.strftime('%d/%m/%Y a las %H:%M') }}"
                                   {% else %}
@@ -192,7 +194,12 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    
+
+    // --- TOOLTIPS ---
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+        new bootstrap.Tooltip(el);
+    });
+
     // --- LÓGICA DEL BUSCADOR EN TIEMPO REAL ---
     const inputBuscar = document.querySelector('input[name="buscar"]');
     if (inputBuscar) {

@@ -78,10 +78,33 @@
                     </div>
                     {% endif %}
 
-                    <div class="mt-4">
+                    {% if casa.pausado %}
+                    <div class="alert alert-secondary py-2 mb-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-pause-circle-fill fs-5"></i>
+                        <span class="fw-bold">Servicio Pausado</span>
+                        {% set pausa_activa = casa.historial_pausas | selectattr('hasta', 'none') | list | first %}
+                        {% if pausa_activa %}
+                        <small class="text-muted ms-1">desde {{ pausa_activa.desde.strftime('%d/%m/%Y') }}</small>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="mt-4 d-flex flex-column gap-2">
                         <a href="{{ url_for('casas.editar_casa', id=casa.id) }}" class="btn btn-warning w-100 fw-bold">
                             <i class="bi bi-pencil"></i> Editar Datos
                         </a>
+
+                        {% if not casa.pausado %}
+                        <button type="button" class="btn btn-secondary w-100 fw-bold"
+                                data-bs-toggle="modal" data-bs-target="#modalPausar">
+                            <i class="bi bi-pause-circle me-1"></i> Pausar Servicio
+                        </button>
+                        {% else %}
+                        <button type="button" class="btn btn-success w-100 fw-bold"
+                                data-bs-toggle="modal" data-bs-target="#modalReanudar">
+                            <i class="bi bi-play-circle me-1"></i> Reanudar Servicio
+                        </button>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -389,4 +412,88 @@
         border-bottom: 3px solid #dee2e6 !important;
     }
 </style>
+
+{# Modal Pausar Servicio #}
+<div class="modal fade" id="modalPausar" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pause-circle me-2"></i>Pausar Servicio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('casas.pausar_casa', id=casa.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body d-flex flex-column gap-3">
+                    <div>
+                        <label class="form-label fw-bold mb-1">Desde</label>
+                        <input type="date" name="desde" class="form-control"
+                               value="{{ now.strftime('%Y-%m-%d') }}" required>
+                    </div>
+                    <div>
+                        <label class="form-label fw-bold mb-1">Hasta <span class="text-muted fw-normal">(opcional)</span></label>
+                        <input type="date" name="hasta" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-secondary fw-bold btn-sm">Pausar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# Modal Reanudar Servicio #}
+<div class="modal fade" id="modalReanudar" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 shadow overflow-hidden">
+            <div class="modal-header border-0 text-white py-4" style="background: linear-gradient(135deg, #198754, #20c997);">
+                <div class="w-100 text-center">
+                    <i class="bi bi-play-circle-fill fs-1 mb-2 d-block opacity-90"></i>
+                    <h5 class="modal-title fw-bold mb-0">Reanudar Servicio</h5>
+                    <small class="opacity-75">{{ casa.nombre_formateado() }}</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('casas.reanudar_casa', id=casa.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body px-4 py-3 d-flex flex-column gap-3">
+                    <p class="mb-0 text-center text-muted small">¿Confirma que desea reanudar el servicio?</p>
+                    <div class="bg-light rounded p-3">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="toggleFechaReanudar">
+                            <label class="form-check-label fw-semibold small" for="toggleFechaReanudar">Fecha de finalización personalizada</label>
+                        </div>
+                        <input type="date" name="hasta" id="fechaReanudar"
+                               class="form-control form-control-sm d-none"
+                               value="{{ now.strftime('%Y-%m-%d') }}">
+                        <small class="text-muted" id="textoFechaReanudar"><i class="bi bi-calendar-check me-1"></i>Se usará la fecha de hoy.</small>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 pb-4 pt-0 d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success btn-sm fw-bold flex-fill">
+                        <i class="bi bi-play-circle me-1"></i>Reanudar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('toggleFechaReanudar').addEventListener('change', function() {
+    const input = document.getElementById('fechaReanudar');
+    const texto = document.getElementById('textoFechaReanudar');
+    if (this.checked) {
+        input.classList.remove('d-none');
+        texto.classList.add('d-none');
+    } else {
+        input.classList.add('d-none');
+        texto.classList.remove('d-none');
+        input.value = '{{ now.strftime("%Y-%m-%d") }}';
+    }
+});
+</script>
+
 {% endblock %}
