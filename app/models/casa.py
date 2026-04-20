@@ -89,6 +89,14 @@ class Casa(db.Model):
                     if (hist.anio, hist.mes) < (_fa.year, _fa.month):
                         continue
 
+                pagado_hist = float(getattr(hist, 'monto_pagado', 0) or 0)
+
+                # Pago estilo antiguo: marcado como pagado pero sin monto registrado.
+                # Se asume que ese mes está saldado en su totalidad → no suma deuda.
+                # (Reemplaza la lógica de "reset" que ocultaba deudas reales de meses anteriores.)
+                if getattr(hist, 'pagado', False) and pagado_hist == 0:
+                    continue
+
                 abono_hist = float(hist.monto)
                 extras_hist = 0.0
                 for visita in self.visitas:
@@ -108,16 +116,9 @@ class Casa(db.Model):
                             extras_hist += float(visita.promo.precio)
 
                 total_hist = abono_hist + extras_hist
-                pagado_hist = float(getattr(hist, 'monto_pagado', 0) or 0)
+                saldo += total_hist - pagado_hist
 
-                saldo += total_hist
-                saldo -= pagado_hist
-
-                # Reseteamos el saldo a 0 si la cuota figura pagada completamente por otro medio
-                if getattr(hist, 'pagado', False) and pagado_hist == 0 and saldo > 0.01:
-                    saldo = 0.0
-
-        return round(saldo, 2)
+        return round(max(0.0, saldo), 2)
 
 
 class HistorialAumento(db.Model):

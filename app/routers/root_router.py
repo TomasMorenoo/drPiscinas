@@ -1,5 +1,7 @@
 import os
 import subprocess
+import threading
+import tempfile
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, Response, send_file, abort, current_app
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -18,6 +20,103 @@ root_bp = Blueprint("root", __name__, url_prefix="/root")
 
 FLAG_PATH = os.path.join(os.getcwd(), 'mantenimiento.flag')
 LOG_AUMENTOS = os.path.join(os.getcwd(), 'registro_aumentos.txt')
+
+# Estado compartido del restore (single-instance, in-memory)
+_restore_state = {"status": "idle", "message": ""}  # idle | running | ok | error
+_restore_lock = threading.Lock()
+
+
+_RESET_SEQUENCES_SQL = b"""
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN
+        SELECT sequence_name
+        FROM information_schema.sequences
+        WHERE sequence_schema = 'public'
+    LOOP
+        BEGIN
+            EXECUTE format(
+                'SELECT setval(%L, COALESCE((SELECT MAX(id) FROM %I), 1))',
+                r.sequence_name,
+                replace(r.sequence_name, '_id_seq', '')
+            );
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+"""
+
+
+_TRUNCATE_ALL_SQL = b"""
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+    LOOP
+        EXECUTE format('TRUNCATE TABLE %I CASCADE', r.tablename);
+    END LOOP;
+END $$;
+"""
+
+
+def _run_restore_bg(sql_path, cmd, env):
+    """Ejecuta psql en background y actualiza _restore_state."""
+    global _restore_state
+    try:
+        with open(sql_path, "rb") as f:
+            sql_content = f.read()
+
+        # Si el backup no trae DROP TABLE (backup viejo o de GDrive sin --clean),
+        # vaciamos todas las tablas primero para que los INSERTs no fallen en duplicados.
+        has_drop = b"DROP TABLE" in sql_content or b"drop table" in sql_content
+        if not has_drop:
+            pre = subprocess.run(
+                cmd, input=_TRUNCATE_ALL_SQL, capture_output=True, env=env, timeout=30
+            )
+            if pre.returncode != 0:
+                err = pre.stderr.decode("utf-8", errors="replace")
+                with _restore_lock:
+                    _restore_state = {"status": "error", "message": f"Error al limpiar tablas: {err[:200]}"}
+                return
+
+        # Deshabilitar FK triggers durante el restore para evitar errores de orden
+        # (el backup puede copiar abonos antes que casas, etc.)
+        # session_replication_role = replica requiere superusuario (drPiscinas lo es en Docker).
+        sql_wrapped = (
+            b"SET session_replication_role = replica;\n"
+            + sql_content
+            + b"\nSET session_replication_role = DEFAULT;\n"
+        )
+
+        resultado = subprocess.run(
+            cmd, input=sql_wrapped, capture_output=True, env=env, timeout=600
+        )
+        if resultado.returncode != 0:
+            error_msg = resultado.stderr.decode("utf-8", errors="replace")
+            with _restore_lock:
+                _restore_state = {"status": "error", "message": error_msg[:300]}
+            return
+
+        # Resetear secuencias para evitar UniqueViolation en futuros INSERTs
+        subprocess.run(
+            cmd, input=_RESET_SEQUENCES_SQL, capture_output=True, env=env, timeout=30
+        )
+
+        with _restore_lock:
+            _restore_state = {"status": "ok", "message": ""}
+
+    except subprocess.TimeoutExpired:
+        with _restore_lock:
+            _restore_state = {"status": "error", "message": "La restauración tardó más de 10 minutos y fue cancelada."}
+    except Exception as e:
+        with _restore_lock:
+            _restore_state = {"status": "error", "message": str(e)}
+    finally:
+        try:
+            os.unlink(sql_path)
+        except OSError:
+            pass
 
 
 # ================================================
@@ -285,6 +384,8 @@ def backup_db():
                 "--no-password",
                 "--format=plain",
                 "--encoding=UTF8",
+                "--clean",       # genera DROP TABLE IF EXISTS antes de cada CREATE
+                "--if-exists",   # evita errores si la tabla no existe al hacer DROP
             ],
             capture_output=True,
             env=env,
@@ -322,6 +423,81 @@ def backup_db():
     except Exception as e:
         flash(f"❌ Error inesperado: {str(e)}", "error")
         return redirect(url_for("root.panel"))
+
+
+# ================================================
+# RESTAURAR BACKUP DE LA BASE DE DATOS
+# ================================================
+@root_bp.route("/restore-db", methods=["POST"])
+@login_required
+@root_required
+def restore_db():
+    """
+    Recibe un archivo .sql y lo inyecta en la base de datos via psql en background.
+    OPERACIÓN DESTRUCTIVA: sobreescribe datos existentes.
+    """
+    import urllib.parse as _urlparse
+    global _restore_state
+
+    with _restore_lock:
+        if _restore_state["status"] == "running":
+            flash("Ya hay una restauración en curso. Esperá a que termine.", "error")
+            return redirect(url_for("root.panel"))
+
+    archivo = request.files.get("backup_file")
+    if not archivo or archivo.filename == "":
+        flash("No se seleccionó ningún archivo.", "error")
+        return redirect(url_for("root.panel"))
+
+    ext = os.path.splitext(secure_filename(archivo.filename))[1].lower()
+    if ext != ".sql":
+        flash("Solo se aceptan archivos .sql", "error")
+        return redirect(url_for("root.panel"))
+
+    # Leer credenciales
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        parsed = _urlparse.urlparse(database_url)
+        db_user = parsed.username
+        db_pass = parsed.password
+        db_host = parsed.hostname
+        db_port = str(parsed.port or 5432)
+        db_name = parsed.path.lstrip("/")
+    else:
+        db_user = os.getenv("DB_USER", "drPiscinas")
+        db_pass = os.getenv("DB_PASS", "administrador")
+        db_host = os.getenv("DB_HOST", "db")
+        db_port = "5432"
+        db_name = os.getenv("DB_NAME", "drPiscinas_db")
+
+    # Guardar SQL en archivo temporal (el thread lo limpia al terminar)
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".sql")
+    archivo.save(tmp.name)
+    tmp.close()
+
+    env = os.environ.copy()
+    env["PGPASSWORD"] = db_pass or ""
+
+    cmd = ["psql", "-h", db_host, "-p", db_port, "-U", db_user, "-d", db_name, "--no-password"]
+
+    with _restore_lock:
+        _restore_state = {"status": "running", "message": ""}
+
+    t = threading.Thread(target=_run_restore_bg, args=(tmp.name, cmd, env), daemon=True)
+    t.start()
+
+    flash("⏳ Restauración iniciada. La página se actualizará automáticamente cuando termine.", "info")
+    return redirect(url_for("root.panel"))
+
+
+@root_bp.route("/restore-status")
+@login_required
+@root_required
+def restore_status():
+    """Devuelve el estado actual del restore en JSON para polling desde el frontend."""
+    with _restore_lock:
+        state = dict(_restore_state)
+    return jsonify(state)
 
 
 # ================================================

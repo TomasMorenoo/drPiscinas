@@ -206,9 +206,19 @@ def aplicar_pago_en_cascada(casa, monto_ingresado, username, mes_contexto, anio_
     historiales = AbonoHistorico.query.filter_by(casa_id=casa.id).order_by(AbonoHistorico.anio.asc(), AbonoHistorico.mes.asc()).all()
     plata = float(monto_ingresado)
     
+    # Calcular el mes/anio mínimo a considerar según fecha_creacion de la casa
+    _fa = None
+    if casa.fecha_creacion:
+        from datetime import datetime as _dt
+        _fa_raw = casa.fecha_creacion
+        _fa = _fa_raw.date() if isinstance(_fa_raw, _dt) else _fa_raw
+
     for h in historiales:
         if plata <= 0.01:
             break
+        # Saltar meses anteriores a la fecha de alta del cliente (mismo criterio que obtener_saldo_anterior)
+        if _fa and (h.anio, h.mes) < (_fa.year, _fa.month):
+            continue
         if not h.pagado:
             datos = casa.obtener_gastos_mensuales(h.mes, h.anio)
             total_mes = float(h.monto) + float(datos['extras'])
@@ -705,14 +715,15 @@ def toggle_pago_grupo(grupo_id):
     ).all()
 
     if not historiales:
-        return jsonify({"success": False})
+        return jsonify({"success": False, "message": "Sin historiales para este período. Cerrá el mes primero."})
 
-    all_pagado = all(h.pagado for h in historiales)
-    all_enviado = all(h.mensaje_enviado for h in historiales)
+    # Usar len() > 0 para evitar que all([]) = True engañe la lógica de estado
+    all_pagado  = len(historiales) > 0 and all(h.pagado for h in historiales)
+    all_enviado = len(historiales) > 0 and all(h.mensaje_enviado for h in historiales)
     url_wa = None
 
-    if action == 'undo' or (all_pagado and action != 'advance'):
-        # --- AUDITORÍA: deshacer pago grupo ---
+    if action == 'undo':
+        # ── DESHACER PAGO ────────────────────────────────────────────
         if casas_grupo:
             grupo_obj_aud = casas_grupo[0].grupo
             mes_nombre_gu = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mes - 1]
@@ -745,42 +756,13 @@ def toggle_pago_grupo(grupo_id):
             for h in historiales:
                 revertir_transaccion(h, "VIEJO")
 
-    elif action == 'advance' or not all_pagado:
-        if not all_pagado and not all_enviado:
-            for h in historiales:
-                h.mensaje_enviado = True
-                h.pagado = False
-                
-            grupo = casas_grupo[0].grupo
-            telefono_repr = next((c.telefono for c in casas_grupo if c.telefono), None)
-            
-            if telefono_repr:
-                casas_data = []
-                total_grupo_mes = 0
-                total_grupo_saldo_ant_visual = 0
-                total_pagos_dashboard = 0
+    elif action == 'advance':
+        if all_pagado:
+            # Ya están todos pagados, nada que hacer
+            pass
 
-                for h in historiales:
-                    c = h.casa
-                    abono = float(h.monto)
-                    extras = float(c.obtener_gastos_mensuales(mes, anio)['extras'])
-                    # obtener_saldo_anterior ya refleja correctamente todos los pagos en cascada
-                    saldo_ant = c.obtener_saldo_anterior(mes, anio)
-
-                    total_grupo_mes += (abono + extras)
-                    total_grupo_saldo_ant_visual += saldo_ant
-                    total_pagos_dashboard += float(h.monto_pagado or 0)
-
-                    casas_data.append({'casa': c, 'abono': abono, 'extras': extras})
-
-                texto_wa = generar_wa_grupo(grupo.nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard)
-                
-                tel = re.sub(r'\D', '', telefono_repr)
-                if len(tel) == 10: tel = "549" + tel
-                url_wa = f"whatsapp://send?phone={tel}&text={urllib.parse.quote(texto_wa)}"
-
-        else:
-            # --- AUDITORÍA: marcar pagado grupo ---
+        elif all_enviado:
+            # ── NOTIFICADO → PAGADO ──────────────────────────────────
             if casas_grupo:
                 grupo_obj_p = casas_grupo[0].grupo
                 mes_nombre_gp = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mes - 1]
@@ -809,6 +791,39 @@ def toggle_pago_grupo(grupo_id):
                         detalle_str = f"{txn_id}:{total_a_pagar}"
                         actual = getattr(h, 'detalle_pagos', None)
                         h.detalle_pagos = f"{actual}|{detalle_str}" if actual else detalle_str
+
+        else:
+            # ── PENDIENTE → NOTIFICADO ───────────────────────────────
+            for h in historiales:
+                h.mensaje_enviado = True
+                h.pagado = False
+
+            grupo = casas_grupo[0].grupo
+            telefono_repr = next((c.telefono for c in casas_grupo if c.telefono), None)
+
+            if telefono_repr:
+                casas_data = []
+                total_grupo_mes = 0
+                total_grupo_saldo_ant_visual = 0
+                total_pagos_dashboard = 0
+
+                for h in historiales:
+                    c = h.casa
+                    abono = float(h.monto)
+                    extras = float(c.obtener_gastos_mensuales(mes, anio)['extras'])
+                    saldo_ant = c.obtener_saldo_anterior(mes, anio)
+
+                    total_grupo_mes += (abono + extras)
+                    total_grupo_saldo_ant_visual += saldo_ant
+                    total_pagos_dashboard += float(h.monto_pagado or 0)
+
+                    casas_data.append({'casa': c, 'abono': abono, 'extras': extras})
+
+                texto_wa = generar_wa_grupo(grupo.nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard)
+
+                tel = re.sub(r'\D', '', telefono_repr)
+                if len(tel) == 10: tel = "549" + tel
+                url_wa = f"whatsapp://send?phone={tel}&text={urllib.parse.quote(texto_wa)}"
 
     db.session.commit()
     return jsonify({"success": True, "url_wa": url_wa})

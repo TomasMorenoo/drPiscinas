@@ -24,7 +24,7 @@ services:
     depends_on:
       - db
     environment:
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://${DB_USER:-drPiscinas}:${DB_PASS:-administrador}@db:5432/${DB_NAME:-drPiscinas_db}
       - SECRET_KEY=${SECRET_KEY}
       - TZ=America/Argentina/Buenos_Aires
     ports:

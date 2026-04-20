@@ -1140,17 +1140,49 @@
 
 </div>
 
+<!-- Modal de confirmación para deshacer pago -->
+<div class="modal fade" id="modalConfirmarDeshacer" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title w-100 text-center fw-bold text-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>¿Deshacer pago?
+                </h5>
+            </div>
+            <div class="modal-body text-center py-3">
+                <p class="mb-1 text-secondary small">Esta acción revertirá el pago registrado.</p>
+                <p class="mb-0 fw-bold" id="deshacer-nombre-cliente"></p>
+            </div>
+            <div class="modal-footer border-0 pt-0 d-flex justify-content-center gap-2 pb-4">
+                <button type="button" class="btn btn-outline-secondary px-4 fw-bold" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger px-4 fw-bold" id="btn-confirmar-deshacer">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Deshacer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 /* ============================================================
    RECARGA INVISIBLE (Sincroniza toda la tabla)
    ============================================================ */
 function recargarPanel() {
+    // Guardar scroll y estados de collapse antes de tocar el DOM
+    const scrollY = window.scrollY;
+    const colapsados = new Set();
+    document.querySelectorAll('[id^="collapseGrupo"]').forEach(el => {
+        if (!el.classList.contains('show')) colapsados.add(el.id);
+    });
+    if (!document.getElementById('collapseSueltas')?.classList.contains('show')) colapsados.add('collapseSueltas');
+    if (!document.getElementById('collapseGruposMain')?.classList.contains('show')) colapsados.add('collapseGruposMain');
+
     return fetch(window.location.href)
         .then(res => res.text())
         .then(html => {
             const doc = new DOMParser().parseFromString(html, "text/html");
-            
-            // Actualizamos ambas tablas y los KPIs
+
+            // Actualizar tablas y KPIs
             const ids = ['collapseSueltas', 'collapseGruposMain', 'kpi-deuda', 'kpi-total', 'kpi-recaudado', 'kpi-pendiente'];
             ids.forEach(id => {
                 const actual = document.getElementById(id);
@@ -1158,11 +1190,20 @@ function recargarPanel() {
                 if (actual && nuevo) actual.innerHTML = nuevo.innerHTML;
             });
 
+            // Restaurar estados de collapse (los que estaban cerrados vuelven a cerrarse)
+            colapsados.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.classList.remove('show'); }
+            });
+
+            // Reaplicar filtro de búsqueda
             filtrarDashboard();
-            
+
             // Reiniciar tooltips
-            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-            tooltipTriggerList.map(function (t) { return new bootstrap.Tooltip(t); });
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(t => new bootstrap.Tooltip(t));
+
+            // Restaurar scroll
+            window.scrollTo(0, scrollY);
         })
         .catch(() => location.reload());
 }
@@ -1199,8 +1240,15 @@ function togglePago(id, actionType) {
             }
         }
     } else if (actionType === 'undo' && btnDeshacer) {
-        btnDeshacer.className = "btn btn-sm btn-outline-warning w-100 d-flex flex-column justify-content-center align-items-center shadow-sm text-dark";
-        btnDeshacer.innerHTML = '<i class="bi bi-arrow-counterclockwise fs-4 mb-1"></i><small class="fw-bold" style="font-size: 0.7rem;">DESHACIENDO...</small>';
+        const nombreFila = document.querySelector(`#fila-${id} .nombre-casa, [data-id="${id}"] .nombre-casa`) || null;
+        confirmarDeshacer(nombreFila ? nombreFila.textContent.trim() : '', () => {
+            btnDeshacer.className = "btn btn-sm btn-outline-warning w-100 d-flex flex-column justify-content-center align-items-center shadow-sm text-dark";
+            btnDeshacer.innerHTML = '<i class="bi bi-arrow-counterclockwise fs-4 mb-1"></i><small class="fw-bold" style="font-size: 0.7rem;">DESHACIENDO...</small>';
+            fetch(`/dashboard/toggle-pago/${id}`, {
+                method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType })
+            }).then(() => recargarPanel());
+        });
+        return;
     }
 
     fetch(`/dashboard/toggle-pago/${id}`, {
@@ -1247,7 +1295,13 @@ function togglePagoSimple(id, btn) {
             parentDiv.innerHTML = `<button class="btn btn-sm shadow-sm py-1 px-2 btn-success"><i class="bi bi-check-circle-fill"></i></button>`;
         }
     } else {
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        confirmarDeshacer('', () => {
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            fetch(`/dashboard/toggle-pago/${id}`, {
+                method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType })
+            }).then(() => recargarPanel());
+        });
+        return;
     }
 
     fetch(`/dashboard/toggle-pago/${id}`, {
@@ -1406,7 +1460,7 @@ function enviarPagoParcial() {
     .then(function (data) {
         if (data.success) {
             bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
-            setTimeout(function () { location.reload(); }, 150);
+            setTimeout(function () { recargarPanel(); }, 150);
         }
     })
     .catch(function () {
@@ -1430,6 +1484,89 @@ function abrirModalPago(tipo, id_referencia, nombre, deuda) {
     _cotizacion = 0;
     new bootstrap.Modal(document.getElementById('modalPago')).show();
     setTimeout(function () { document.getElementById('monto_entregado').focus(); }, 500);
+}
+
+/* ============================================================
+   GRUPOS — toggle pago / notificado
+   Siempre recarga el panel tras la respuesta para que el estado
+   del grupo Y de cada casa interna queden sincronizados.
+   ============================================================ */
+function togglePagoGrupo(grupo_id, mes, anio, btn) {
+    const isPagado = btn.classList.contains('btn-success');
+    const action   = isPagado ? 'undo' : 'advance';
+
+    if (action === 'undo') {
+        const nombreGrupo = btn.closest('[data-grupo-nombre]')?.getAttribute('data-grupo-nombre') || '';
+        confirmarDeshacer(nombreGrupo, () => _ejecutarToggleGrupo(grupo_id, mes, anio, btn, action));
+        return;
+    }
+    _ejecutarToggleGrupo(grupo_id, mes, anio, btn, action);
+}
+
+function _ejecutarToggleGrupo(grupo_id, mes, anio, btn, action) {
+    // Spinner mientras espera
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+    fetch(`/dashboard/toggle-pago-grupo/${grupo_id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+        body: JSON.stringify({ mes: mes, anio: anio, action: action })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success === false) {
+            // Sin historiales — mostrar aviso y restaurar botón
+            btn.innerHTML = original;
+            btn.disabled = false;
+            alert(data.message || 'No hay historiales para este período. Cerrá el mes primero.');
+        } else {
+            recargarPanel();
+        }
+    })
+    .catch(() => {
+        btn.innerHTML = original;
+        btn.disabled = false;
+    });
+}
+
+/* ============================================================
+   CONFIRMACIÓN DESHACER PAGO
+   ============================================================ */
+let _deshacerCallback = null;
+let _modalDeshacerInstance = null;
+
+function _getModalDeshacer() {
+    if (!_modalDeshacerInstance) {
+        _modalDeshacerInstance = new bootstrap.Modal(document.getElementById('modalConfirmarDeshacer'));
+        document.getElementById('btn-confirmar-deshacer').addEventListener('click', () => {
+            _modalDeshacerInstance.hide();
+            if (_deshacerCallback) { _deshacerCallback(); _deshacerCallback = null; }
+        });
+    }
+    return _modalDeshacerInstance;
+}
+
+function confirmarDeshacer(nombreCliente, callback) {
+    _deshacerCallback = callback;
+    document.getElementById('deshacer-nombre-cliente').textContent = nombreCliente || '';
+    _getModalDeshacer().show();
+}
+
+function marcarEnviadoGrupo(grupo_id, mes, anio) {
+    fetch(`/dashboard/marcar-mensaje-grupo/${grupo_id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+        body: JSON.stringify({ mes: mes, anio: anio })
+    });
+}
+
+function marcarEnviado(id) {
+    fetch(`/dashboard/marcar-mensaje/${id}`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
+    });
 }
 
 window.addEventListener('beforeunload', () => sessionStorage.setItem('scrollPosition', window.scrollY));

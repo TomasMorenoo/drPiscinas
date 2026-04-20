@@ -65,10 +65,108 @@
                     </div>
                 </div>
                 <a href="{{ url_for('root.backup_db') }}"
+                   id="btn-backup"
                    class="btn btn-dark btn-lg fw-bold px-4"
-                   onclick="this.innerHTML='<span class=\'spinner-border spinner-border-sm me-2\'></span>Generando...'; this.classList.add('disabled');">
+                   onclick="var b=this; b.innerHTML='<span class=\'spinner-border spinner-border-sm me-2\'></span>Generando...'; b.classList.add('disabled'); setTimeout(function(){ b.innerHTML='<i class=\'bi bi-download me-2\'></i>Descargar Backup'; b.classList.remove('disabled'); }, 15000);">
                     <i class="bi bi-download me-2"></i>Descargar Backup
                 </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════
+   FILA 1b2: RESTAURAR BACKUP
+══════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm border-start border-5 border-danger">
+            <div class="card-body py-4">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <i class="bi bi-database-up fs-1 text-danger"></i>
+                    <div>
+                        <div class="fw-bold fs-5 text-dark">Inyectar Backup</div>
+                        <div class="text-muted small">
+                            Restaura la base de datos a partir de un archivo <code>.sql</code>.
+                            <span class="text-danger fw-bold">Esta operación sobreescribe datos existentes.</span>
+                        </div>
+                    </div>
+                </div>
+                {# Banner de progreso (visible solo cuando hay restore en curso o terminado) #}
+                <div id="restore-banner" class="alert mb-3 d-none" role="alert"></div>
+
+                <form id="restore-form" method="POST"
+                      action="{{ url_for('root.restore_db') }}"
+                      enctype="multipart/form-data"
+                      onsubmit="if(!confirm('⚠️ ATENCIÓN: Esta operación inyectará el SQL directamente en la base de datos. Los datos existentes pueden quedar sobreescritos.\n\n¿Estás seguro?')) return false; startRestorePolling();">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="input-group" style="max-width: 480px;">
+                        <input type="file"
+                               name="backup_file"
+                               accept=".sql"
+                               class="form-control"
+                               required>
+                        <button type="submit" class="btn btn-danger fw-bold px-4">
+                            <i class="bi bi-upload me-2"></i>Restaurar
+                        </button>
+                    </div>
+                    <div class="form-text text-danger mt-1">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                        Solo archivos <code>.sql</code> generados por <em>Descargar Backup</em>.
+                    </div>
+                </form>
+
+                <script>
+                (function() {
+                    var pollTimer = null;
+
+                    function showBanner(cls, html) {
+                        var b = document.getElementById('restore-banner');
+                        b.className = 'alert mb-3 ' + cls;
+                        b.innerHTML = html;
+                        b.classList.remove('d-none');
+                    }
+
+                    function poll() {
+                        fetch("{{ url_for('root.restore_status') }}")
+                            .then(function(r) { return r.json(); })
+                            .then(function(data) {
+                                if (data.status === 'running') {
+                                    showBanner('alert-warning', '<span class="spinner-border spinner-border-sm me-2"></span><strong>Restaurando base de datos...</strong> Esto puede tardar varios minutos. No cerrés la pestaña.');
+                                    pollTimer = setTimeout(poll, 3000);
+                                } else if (data.status === 'ok') {
+                                    clearTimeout(pollTimer);
+                                    showBanner('alert-success', '<i class="bi bi-check-circle-fill me-2"></i><strong>¡Restauración completada!</strong> La base de datos fue restaurada correctamente.');
+                                } else if (data.status === 'error') {
+                                    clearTimeout(pollTimer);
+                                    showBanner('alert-danger', '<i class="bi bi-x-circle-fill me-2"></i><strong>Error en la restauración:</strong> ' + (data.message || 'Error desconocido'));
+                                }
+                            })
+                            .catch(function() {
+                                pollTimer = setTimeout(poll, 5000);
+                            });
+                    }
+
+                    window.startRestorePolling = function() {
+                        showBanner('alert-warning', '<span class="spinner-border spinner-border-sm me-2"></span><strong>Enviando archivo...</strong>');
+                        setTimeout(poll, 2000);
+                    };
+
+                    // Al cargar la página, verificar si hay un restore en curso
+                    fetch("{{ url_for('root.restore_status') }}")
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) {
+                            if (data.status === 'running') {
+                                showBanner('alert-warning', '<span class="spinner-border spinner-border-sm me-2"></span><strong>Restaurando base de datos...</strong> Esto puede tardar varios minutos.');
+                                pollTimer = setTimeout(poll, 3000);
+                            } else if (data.status === 'ok') {
+                                showBanner('alert-success', '<i class="bi bi-check-circle-fill me-2"></i><strong>¡Última restauración completada exitosamente!</strong>');
+                            } else if (data.status === 'error') {
+                                showBanner('alert-danger', '<i class="bi bi-x-circle-fill me-2"></i><strong>La última restauración falló:</strong> ' + (data.message || ''));
+                            }
+                        });
+                })();
+                </script>
             </div>
         </div>
     </div>

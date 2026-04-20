@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+sueltos/
+.env
+venv/
+db_data
+preindex.html
+reset.py
+purga.py
+registro_aumentos.txt
+.claude/
