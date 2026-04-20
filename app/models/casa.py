@@ -62,19 +62,27 @@ class Casa(db.Model):
                 if visita.promo:
                     total_extras += float(visita.promo.precio)
 
-        # Si está pausada y mes/año cae dentro del período de pausa activa → abono $0
-        abono_final = float(hist.monto) if hist else float(self.precio_base or 0)
-        if abono_final > 0:
-            mes_actual = (anio, mes)
-            for p in self.historial_pausas:
-                inicio = (p.desde.year, p.desde.month)
-                fin = (p.hasta.year, p.hasta.month) if p.hasta else None
-                if inicio <= mes_actual and (fin is None or fin >= mes_actual):
-                    # Pausa inicia este mes y hay extras → cobrar este mes
-                    if inicio == mes_actual and total_extras > 0:
-                        continue
-                    abono_final = 0.0
-                    break
+        # Verificar si hay pausa activa en este mes
+        mes_actual = (anio, mes)
+        pausa_en_mes = False
+        for p in self.historial_pausas:
+            inicio = (p.desde.year, p.desde.month)
+            fin = (p.hasta.year, p.hasta.month) if p.hasta else None
+            if inicio <= mes_actual and (fin is None or fin >= mes_actual):
+                # Si hay productos en el mes, la pausa no aplica ese mes
+                if total_extras > 0:
+                    continue
+                pausa_en_mes = True
+                break
+
+        if pausa_en_mes:
+            abono_final = 0.0
+        elif hist:
+            # Mes cerrado: usar monto registrado, pero si era 0 por pausa que ya no aplica
+            # (pausa deshecha retroactivamente), recalcular desde precio_base
+            abono_final = float(hist.monto) if float(hist.monto) > 0 else float(self.precio_base or 0)
+        else:
+            abono_final = float(self.precio_base or 0)
 
         return {
             "abono": abono_final,
@@ -105,29 +113,14 @@ class Casa(db.Model):
 
                 # Pago estilo antiguo: marcado como pagado pero sin monto registrado.
                 # Se asume que ese mes está saldado en su totalidad → no suma deuda.
-                # (Reemplaza la lógica de "reset" que ocultaba deudas reales de meses anteriores.)
                 if getattr(hist, 'pagado', False) and pagado_hist == 0:
                     continue
 
-                abono_hist = float(hist.monto)
-                extras_hist = 0.0
-                for visita in self.visitas:
-                    if visita.fecha.month == hist.mes and visita.fecha.year == hist.anio:
-                        # No cobrar visitas anteriores a la fecha de alta del cliente en el sistema
-                        if self.fecha_creacion:
-                            _fv = visita.fecha.date() if isinstance(visita.fecha, datetime) else visita.fecha
-                            _fa = self.fecha_creacion.date() if isinstance(self.fecha_creacion, datetime) else self.fecha_creacion
-                            if _fv < _fa:
-                                continue
-                        for vp in visita.productos:
-                            if vp.precio_unitario:
-                                extras_hist += float(vp.cantidad) * float(vp.precio_unitario)
-                            else:
-                                extras_hist += float(vp.cantidad) * float(vp.product.precio)
-                        if visita.promo:
-                            extras_hist += float(visita.promo.precio)
+                # Usar obtener_gastos_mensuales para consistencia total:
+                # respeta pausas, precios congelados y cualquier lógica futura.
+                gastos = self.obtener_gastos_mensuales(hist.mes, hist.anio)
+                total_hist = gastos['total']
 
-                total_hist = abono_hist + extras_hist
                 saldo += total_hist - pagado_hist
 
         return round(saldo, 2)

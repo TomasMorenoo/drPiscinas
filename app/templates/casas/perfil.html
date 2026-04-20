@@ -104,6 +104,10 @@
                                 data-bs-toggle="modal" data-bs-target="#modalReanudar">
                             <i class="bi bi-play-circle me-1"></i> Reanudar Servicio
                         </button>
+                        <button type="button" class="btn btn-outline-danger w-100 btn-sm"
+                                data-bs-toggle="modal" data-bs-target="#modalDeshacerPausa">
+                            <i class="bi bi-x-circle me-1"></i> Deshacer Pausa
+                        </button>
                         {% endif %}
                     </div>
                 </div>
@@ -474,6 +478,48 @@
                     <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-success btn-sm fw-bold flex-fill">
                         <i class="bi bi-play-circle me-1"></i>Reanudar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# Modal Deshacer Pausa #}
+<div class="modal fade" id="modalDeshacerPausa" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 shadow overflow-hidden">
+            <div class="modal-header border-0 text-white py-4" style="background: linear-gradient(135deg, #6c757d, #495057);">
+                <div class="w-100 text-center">
+                    <i class="bi bi-x-circle-fill fs-1 mb-2 d-block opacity-90"></i>
+                    <h5 class="modal-title fw-bold mb-0">Deshacer Pausa</h5>
+                    <small class="opacity-75">{{ casa.nombre_formateado() }}</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('casas.deshacer_pausa', id=casa.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body px-4 py-3 d-flex flex-column gap-2">
+                    <p class="mb-2 text-center text-muted small">¿Qué desea deshacer?</p>
+                    <div class="form-check bg-light rounded p-3 mb-1">
+                        <input class="form-check-input" type="radio" name="tipo" id="tipo_mes" value="este_mes" checked>
+                        <label class="form-check-label fw-semibold" for="tipo_mes">
+                            Solo este mes
+                            <div class="text-muted small fw-normal">La pausa continúa a partir del mes que viene.</div>
+                        </label>
+                    </div>
+                    <div class="form-check bg-light rounded p-3">
+                        <input class="form-check-input" type="radio" name="tipo" id="tipo_completa" value="completa">
+                        <label class="form-check-label fw-semibold" for="tipo_completa">
+                            Eliminar pausa completa
+                            <div class="text-muted small fw-normal">Se borra el registro de pausa. El cliente vuelve a ser activo.</div>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 pb-4 pt-0 d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger btn-sm fw-bold flex-fill">
+                        <i class="bi bi-x-circle me-1"></i>Deshacer
                     </button>
                 </div>
             </form>

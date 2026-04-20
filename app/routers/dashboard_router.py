@@ -124,17 +124,17 @@ def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_vis
 
 def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard, saldo_a_favor=0.0):
     saludo = obtener_saludo_tiempo(grupo_nombre)
-    cant = len(casas_data)
-
     total_final = total_grupo_mes + total_grupo_saldo_ant_visual - total_pagos_dashboard - saldo_a_favor
 
-    texto_wa = f"{saludo} Te paso el resumen de las {cant} propiedades.\n\n"
-    if total_final <= 0.01:
-        texto_wa += "*-- CUENTAS AL DÍA --*\n\n"
-    else:
-        texto_wa += f"*-- TOTAL A PAGAR: ${format_money(total_final)} --*\n\n"
+    casas_visibles = [c for c in casas_data if not (c.get('pausado', False) and (c['abono'] + c['extras']) == 0)]
+    cant = len(casas_visibles)
 
-    for c in casas_data:
+    if total_final <= 0.01:
+        texto_wa = f"{saludo} Te paso el resumen de las {cant} propiedades.\n\n*-- CUENTAS AL DÍA --*\n\n"
+    else:
+        texto_wa = f"{saludo} Te paso el resumen de las {cant} propiedades.\n\n*-- TOTAL A PAGAR: ${format_money(total_final)} --*\n\n"
+
+    for c in casas_visibles:
         casa_obj = c['casa']
         nombre_casa = get_nombre_limpio(casa_obj)
         abono = c['abono']
@@ -142,12 +142,9 @@ def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo_mes, total
         saldo_ant = c.get('saldo_anterior', 0.0)
         total_c = abono + extras
         a_pagar_casa = total_c + saldo_ant
-        linea = f"• *{nombre_casa}:* Abono ${format_money(abono)} + Prod. ${format_money(extras)}"
-        if saldo_ant > 0.1:
-            linea += f" + Deuda anterior ${format_money(saldo_ant)}"
-        elif saldo_ant < -0.1:
-            linea += f" - Saldo a favor ${format_money(abs(saldo_ant))}"
-        linea += f" = *${format_money(a_pagar_casa)}*"
+        linea = f"• *{nombre_casa}:* Abono ${format_money(abono)} + Prod. ${format_money(extras)} = *${format_money(total_c)}*"
+        if saldo_ant < -0.1:
+            linea += f" _(saldo a favor: ${format_money(abs(saldo_ant))})_"
         texto_wa += linea + "\n"
 
     texto_wa += "\n"
@@ -291,8 +288,8 @@ def _casa_pausada_en_mes(casa, mes, anio, extras=0.0):
         inicio = (p.desde.year, p.desde.month)
         fin = (p.hasta.year, p.hasta.month) if p.hasta else None
         if inicio <= mes_actual and (fin is None or fin >= mes_actual):
-            # Pausa inicia este mes y hay productos → cobrar este mes, pausar desde el siguiente
-            if inicio == mes_actual and extras > 0:
+            # Si hay productos en el mes, la pausa no aplica ese mes
+            if extras > 0:
                 continue
             return True
     return False
@@ -383,13 +380,13 @@ def index():
         saldo_anterior_real = casa.obtener_saldo_anterior(mes, anio)
         historial = historial_dict.get(casa.id)
         
-        if historial:
-            abono_mes = float(historial.monto)
+        pausado_mes = _casa_pausada_en_mes(casa, mes, anio, extras)
+        if pausado_mes:
+            abono_mes = 0.0
+        elif historial:
+            abono_mes = float(historial.monto) if float(historial.monto) > 0 else float(casa.precio_base or 0) if (casa.activo or extras > 0) else 0.0
         else:
             abono_mes = float(casa.precio_base or 0) if (casa.activo or extras > 0) else 0.0
-
-        if _casa_pausada_en_mes(casa, mes, anio, extras):
-            abono_mes = 0.0
 
         total_mes = abono_mes + extras
 
@@ -877,7 +874,7 @@ def toggle_pago_grupo(grupo_id):
                     total_grupo_saldo_ant_visual += saldo_ant
                     total_pagos_dashboard += float(h.monto_pagado or 0)
 
-                    casas_data.append({'casa': c, 'abono': abono, 'extras': extras, 'saldo_anterior': saldo_ant})
+                    casas_data.append({'casa': c, 'abono': abono, 'extras': extras, 'saldo_anterior': saldo_ant, 'pausado': _casa_pausada_en_mes(c, mes, anio, extras)})
 
                 saldo_a_favor_grupo = _saldo_grupo_para_mes(grupo, mes, anio)
                 texto_wa = generar_wa_grupo(grupo.nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard, saldo_a_favor_grupo)
@@ -1178,13 +1175,13 @@ def api_totales():
         saldo_anterior_real = casa.obtener_saldo_anterior(mes, anio)
         historial = historial_dict.get(casa.id)
         
-        if historial:
-            abono_mes = float(historial.monto)
+        pausado_mes = _casa_pausada_en_mes(casa, mes, anio, extras_v)
+        if pausado_mes:
+            abono_mes = 0.0
+        elif historial:
+            abono_mes = float(historial.monto) if float(historial.monto) > 0 else float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0
         else:
             abono_mes = float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0
-
-        if _casa_pausada_en_mes(casa, mes, anio, extras_v):
-            abono_mes = 0.0
 
         # obtener_saldo_anterior ya refleja correctamente todos los pagos en cascada
         saldo_anterior_visual = saldo_anterior_real

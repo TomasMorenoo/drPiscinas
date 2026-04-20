@@ -146,9 +146,11 @@ def listar_casas():
         )
 
     if estado == "activos":
-        query = query.filter(Casa.activo == True)
+        query = query.filter(Casa.activo == True, Casa.pausado == False)
     elif estado == "inactivos":
         query = query.filter(Casa.activo == False)
+    elif estado == "pausados":
+        query = query.filter(Casa.pausado == True)
 
     if country_id:
         query = query.filter(Casa.country_id == country_id)
@@ -630,6 +632,14 @@ def toggle_casa(id):
         casa.activo = False
         casa.inactivado_por = current_user.username
         casa.fecha_inactivacion = datetime.now()
+        # Si estaba pausada, cerrar la pausa al dar de baja
+        if casa.pausado:
+            from app.models.pausa import Pausa
+            from datetime import date
+            pausa = Pausa.query.filter_by(casa_id=casa.id, hasta=None).order_by(Pausa.desde.desc()).first()
+            if pausa:
+                pausa.hasta = date.today()
+            casa.pausado = False
         registrar_auditoria(
             current_user.username,
             'INACTIVAR_CLIENTE',
@@ -755,16 +765,36 @@ def pausar_casa(id):
     from app.models.pausa import Pausa
     from datetime import date
     casa = Casa.query.get_or_404(id)
+    if not casa.activo:
+        flash("No se puede pausar un cliente dado de baja.", "danger")
+        return redirect(url_for("casas.perfil", id=id))
+    import calendar as cal
     desde_str = request.form.get("desde")
     hasta_str = request.form.get("hasta")
     desde = datetime.strptime(desde_str, "%Y-%m-%d").date() if desde_str else date.today()
     hasta = datetime.strptime(hasta_str, "%Y-%m-%d").date() if hasta_str else None
+
+    # Si el mes de inicio ya tiene productos cargados, diferir al primer día del mes siguiente
+    gastos_desde = casa.obtener_gastos_mensuales(desde.month, desde.year)
+    diferido = False
+    if gastos_desde['extras'] > 0:
+        ultimo_dia = cal.monthrange(desde.year, desde.month)[1]
+        if desde.month == 12:
+            desde = date(desde.year + 1, 1, 1)
+        else:
+            desde = date(desde.year, desde.month + 1, 1)
+        diferido = True
+
     casa.pausado = True
     db.session.add(Pausa(casa_id=casa.id, desde=desde, hasta=hasta, pausado_por=current_user.username))
     detalle_audit = f"{casa.nombre_formateado()} — desde {desde}" + (f" hasta {hasta}" if hasta else "")
     registrar_auditoria(current_user.username, "PAUSAR", detalle_audit)
     db.session.commit()
-    flash("Servicio pausado.", "warning")
+
+    if diferido:
+        flash(f"El mes actual tiene productos cargados. La pausa se aplicará desde {desde.strftime('%d/%m/%Y')}.", "info")
+    else:
+        flash("Servicio pausado.", "warning")
     return redirect(url_for("casas.perfil", id=id))
 
 
@@ -785,3 +815,63 @@ def reanudar_casa(id):
     db.session.commit()
     flash("Servicio reanudado.", "success")
     return redirect(url_for("casas.perfil", id=id))
+
+
+@casa_bp.route("/<int:id>/deshacer-pausa", methods=["POST"])
+@login_required
+@admin_required
+def deshacer_pausa(id):
+    from app.models.pausa import Pausa
+    from datetime import date
+    import calendar as cal
+    casa = Casa.query.get_or_404(id)
+    tipo = request.form.get("tipo", "completa")  # "completa" o "este_mes"
+
+    try:
+        mes_ctx = int(request.form.get("mes", date.today().month))
+        anio_ctx = int(request.form.get("anio", date.today().year))
+    except (TypeError, ValueError):
+        mes_ctx = date.today().month
+        anio_ctx = date.today().year
+
+    # Buscar la pausa que cubre el mes solicitado (activa o con hasta)
+    pausa = None
+    for p in Pausa.query.filter_by(casa_id=casa.id).all():
+        inicio = (p.desde.year, p.desde.month)
+        fin = (p.hasta.year, p.hasta.month) if p.hasta else None
+        if inicio <= (anio_ctx, mes_ctx) and (fin is None or fin >= (anio_ctx, mes_ctx)):
+            pausa = p
+            break
+
+    if tipo == "este_mes":
+        # Avanzar desde al primer día del mes siguiente al mes solicitado
+        if mes_ctx == 12:
+            nuevo_desde = date(anio_ctx + 1, 1, 1)
+        else:
+            nuevo_desde = date(anio_ctx, mes_ctx + 1, 1)
+
+        if pausa:
+            fin = (pausa.hasta.year, pausa.hasta.month) if pausa.hasta else None
+            if fin and fin <= (anio_ctx, mes_ctx):
+                # La pausa termina en este mes o antes → eliminarla
+                db.session.delete(pausa)
+                casa.pausado = False
+            else:
+                pausa.desde = nuevo_desde
+                # Si el nuevo desde supera el hasta → eliminar
+                if pausa.hasta and pausa.desde > pausa.hasta:
+                    db.session.delete(pausa)
+                    casa.pausado = False
+        registrar_auditoria(current_user.username, "DESHACER_PAUSA_MES",
+                            f"{casa.nombre_formateado()} — mes {mes_ctx}/{anio_ctx}")
+        flash("Pausa deshecha para este mes.", "info")
+    else:
+        if pausa:
+            db.session.delete(pausa)
+        casa.pausado = False
+        registrar_auditoria(current_user.username, "DESHACER_PAUSA_COMPLETA", f"{casa.nombre_formateado()}")
+        flash("Pausa eliminada completamente.", "info")
+
+    db.session.commit()
+    next_url = request.referrer or url_for("casas.perfil", id=id)
+    return redirect(next_url)

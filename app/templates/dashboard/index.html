@@ -619,7 +619,10 @@
                                 {# Acciones inline en mobile #}
                                 <div class="acciones-mobile-inline d-md-none d-print-none mt-1 justify-content-end">
                                     {% if item.pausado %}
-                                        <span class="badge bg-secondary"><i class="bi bi-pause-circle-fill"></i></span>
+                                        <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
+                                                class="btn btn-sm btn-secondary">
+                                            <i class="bi bi-pause-circle-fill"></i>
+                                        </button>
                                     {% elif mes_congelado and item.id_historial %}
                                         {% if item.pagado %}
                                             <button onclick="togglePago({{ item.id_historial }}, 'undo')" class="btn btn-sm {% if pagado_atrasado %}btn-secondary{% else %}btn-success{% endif %}" title="Pagado">
@@ -662,11 +665,11 @@
                             {# 6. ACCIONES DESKTOP #}
                             <td class="p-1 align-middle d-none d-md-table-cell d-print-none" style="width: 140px;">
                                 {% if item.pausado %}
-                                    <a href="{{ url_for('casas.perfil', id=item.casa.id) }}"
-                                       class="btn btn-secondary btn-sm w-100 d-flex flex-column justify-content-center align-items-center shadow-sm fw-bold"
-                                       style="height: 74px; border-style: dashed;">
+                                    <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
+                                            class="btn btn-secondary btn-sm w-100 d-flex flex-column justify-content-center align-items-center shadow-sm fw-bold"
+                                            style="height: 74px; border-style: dashed;">
                                         <i class="bi bi-pause-circle-fill fs-4"></i>
-                                    </a>
+                                    </button>
                                 {% elif mes_congelado and item.id_historial %}
                                     <div id="bloqueo-{{ item.id_historial }}" class="{% if not item.pagado %}d-none{% endif %}">
                                         <button id="btn-deshacer-{{ item.id_historial }}"
@@ -911,13 +914,13 @@
                                         {% set pagado_atrasado = true %}
                                     {% endif %}
                                 {% endif %}
-                            <tr>
+                            <tr class="{% if item.pausado %}table-secondary{% endif %}">
 
                                 {# Nombre #}
                                 <td class="ps-3 ps-md-4 td-nombre fw-bold" style="max-width: 180px;">
                                     <i class="bi bi-arrow-return-right text-muted me-1 d-none d-md-inline d-print-inline"></i>
                                     <a href="{{ url_for('casas.perfil', id=item.casa.id) }}"
-                                       class="text-decoration-none text-dark d-inline-block text-truncate align-middle"
+                                       class="text-decoration-none {% if item.pausado %}text-secondary{% else %}text-dark{% endif %} d-inline-block text-truncate align-middle"
                                        style="max-width: 100%;">
                                         {{ item.casa.nombre_formateado() }}
                                     </a>
@@ -980,7 +983,12 @@
                                     {% endif %}
 
                                     <div class="acciones-mobile-inline d-md-none d-print-none mt-1 justify-content-end">
-                                        {% if mes_congelado and item.id_historial %}
+                                        {% if item.pausado %}
+                                            <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
+                                                    class="btn btn-sm btn-secondary">
+                                                <i class="bi bi-pause-circle-fill"></i>
+                                            </button>
+                                        {% elif mes_congelado and item.id_historial %}
                                             {% if item.pagado %}
                                                 <button onclick="togglePagoSimple({{ item.id_historial }}, this)" class="btn btn-sm {% if pagado_atrasado %}btn-secondary{% else %}btn-success{% endif %}" title="Deshacer estado">
                                                     <i class="bi {% if pagado_atrasado %}bi-clock-history{% else %}bi-check-circle-fill{% endif %}"></i>
@@ -1017,11 +1025,17 @@
 
                                 {# Estado desktop #}
                                 <td class="p-1 align-middle text-center pe-3 d-none d-md-table-cell d-print-none" style="width: 140px;">
-                                    {% if mes_congelado and item.id_historial %}
+                                    {% if item.pausado %}
+                                        <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
+                                                class="btn btn-secondary btn-sm w-100 shadow-sm"
+                                                style="border-style: dashed;">
+                                            <i class="bi bi-pause-circle-fill me-1"></i>Pausado
+                                        </button>
+                                    {% elif mes_congelado and item.id_historial %}
                                         <div class="d-flex justify-content-center gap-1">
                                             {% if item.pagado %}
-                                                <button onclick="togglePagoSimple({{ item.id_historial }}, this)" 
-                                                        class="btn btn-sm shadow-sm py-1 px-2 {% if pagado_atrasado %}btn-secondary{% else %}btn-success{% endif %}" 
+                                                <button onclick="togglePagoSimple({{ item.id_historial }}, this)"
+                                                        class="btn btn-sm shadow-sm py-1 px-2 {% if pagado_atrasado %}btn-secondary{% else %}btn-success{% endif %}"
                                                         title="{% if pagado_atrasado %}Saldado en {{ nombres_meses[item.historial_obj.fecha_pago.month - 1] }}{% else %}Pagado a tiempo{% endif %} - Clic para deshacer">
                                                     {% if pagado_atrasado %}
                                                         <i class="bi bi-clock-history"></i>
@@ -1165,6 +1179,51 @@
         </div>
     </div>
 
+</div>
+
+<!-- Modal deshacer pausa -->
+<div class="modal fade" id="modalDeshacerPausa" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow overflow-hidden">
+            <div class="modal-header border-0 text-white py-4" style="background: linear-gradient(135deg, #6c757d, #495057);">
+                <div class="w-100 text-center">
+                    <i class="bi bi-x-circle-fill fs-1 mb-2 d-block opacity-90"></i>
+                    <h5 class="modal-title fw-bold mb-0">Deshacer Pausa</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formDeshacerPausa" method="POST" action="">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="mes" id="deshacerPausaMes">
+                <input type="hidden" name="anio" id="deshacerPausaAnio">
+                <div class="modal-body text-center px-4 py-3">
+                    <p class="mb-3 text-muted small">Seleccioná cómo querés deshacer la pausa de:<br><strong class="text-dark" id="deshacerPausaNombre"></strong></p>
+                    <div class="d-flex flex-column gap-2">
+                        <div class="form-check bg-light rounded p-3 text-start">
+                            <input class="form-check-input" type="radio" name="tipo" id="dpTipoMes" value="este_mes" checked>
+                            <label class="form-check-label fw-semibold" for="dpTipoMes">
+                                Solo este mes
+                                <div class="text-muted small fw-normal">La pausa continúa desde el mes siguiente.</div>
+                            </label>
+                        </div>
+                        <div class="form-check bg-light rounded p-3 text-start">
+                            <input class="form-check-input" type="radio" name="tipo" id="dpTipoCompleta" value="completa">
+                            <label class="form-check-label fw-semibold" for="dpTipoCompleta">
+                                Eliminar pausa completa
+                                <div class="text-muted small fw-normal">Se borra el registro. El cliente vuelve a activo.</div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 pb-4 pt-0 d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-secondary btn-sm fw-bold flex-fill">
+                        <i class="bi bi-x-circle me-1"></i>Deshacer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <!-- Modal de confirmación para deshacer pago -->
@@ -1495,6 +1554,14 @@ function enviarPagoParcial() {
         btn.innerHTML = contenidoOriginal;
         btn.disabled = false;
     });
+}
+
+function abrirModalDeshacerPausa(casaId, nombre, mes, anio) {
+    document.getElementById('deshacerPausaNombre').textContent = nombre;
+    document.getElementById('deshacerPausaMes').value = mes;
+    document.getElementById('deshacerPausaAnio').value = anio;
+    document.getElementById('formDeshacerPausa').action = '/casas/' + casaId + '/deshacer-pausa';
+    new bootstrap.Modal(document.getElementById('modalDeshacerPausa')).show();
 }
 
 function abrirModalPago(tipo, id_referencia, nombre, deuda) {
