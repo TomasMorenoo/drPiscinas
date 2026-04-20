@@ -42,6 +42,11 @@ def migrar_base_de_datos():
             db.session.execute(text("ALTER TABLE casas ADD COLUMN IF NOT EXISTS telefono VARCHAR(50);"))
             db.session.execute(text("ALTER TABLE casas ADD COLUMN IF NOT EXISTS email VARCHAR(120);"))
 
+            print("⏳ 5/5 - Verificando columnas de saldo en 'grupos_clientes'...")
+            db.session.execute(text("ALTER TABLE grupos_clientes ADD COLUMN IF NOT EXISTS saldo_a_favor NUMERIC(10,2) NOT NULL DEFAULT 0;"))
+            db.session.execute(text("ALTER TABLE grupos_clientes ADD COLUMN IF NOT EXISTS saldo_desde_mes INTEGER;"))
+            db.session.execute(text("ALTER TABLE grupos_clientes ADD COLUMN IF NOT EXISTS saldo_desde_anio INTEGER;"))
+
             # Guardamos los cambios
             db.session.commit()
             print("✅ ¡Base de datos migrada con éxito!")

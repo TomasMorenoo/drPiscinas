@@ -810,18 +810,25 @@
 
                             <div class="grupo-monto-item">
                                 <span class="grupo-monto-label">Total a Pagar</span>
-                                <span class="fw-bold text-dark font-monospace">${{ (g.total_mes + g.saldo_anterior) | pesos }}</span>
+                                <span class="fw-bold text-dark font-monospace">${{ [g.total_mes + g.saldo_anterior - g.saldo_a_favor, 0] | max | pesos }}</span>
                             </div>
+
+                            {% if g.saldo_a_favor > 0.01 %}
+                            <div class="grupo-monto-item">
+                                <span class="grupo-monto-label">Saldo a Favor</span>
+                                <span class="fw-bold text-success font-monospace">+${{ g.saldo_a_favor | pesos }}</span>
+                            </div>
+                            {% endif %}
 
                             <div class="grupo-monto-item">
                                 <span class="grupo-monto-label">Estado</span>
-                                {% set total_deuda = g.total_mes + g.saldo_anterior %}
-                                {% if total_deuda <= 0 %}
+                                {% set deuda_neta = [g.total_mes + g.saldo_anterior - g.saldo_a_favor, 0] | max %}
+                                {% if deuda_neta <= 0.01 %}
                                     <span class="fw-bold text-success small">Al día</span>
-                                {% elif g.pagado or g.monto_pagado >= (total_deuda - 0.1) %}
+                                {% elif g.pagado or g.monto_pagado >= (deuda_neta - 0.1) %}
                                     <span class="fw-bold text-success small"><i class="bi bi-check-circle-fill"></i> Pagado</span>
                                 {% elif g.monto_pagado > 0 %}
-                                    <span class="fw-bold text-warning small"><i class="bi bi-coin me-1"></i>Faltan: ${{ (total_deuda - g.monto_pagado) | pesos }}</span>
+                                    <span class="fw-bold text-warning small"><i class="bi bi-coin me-1"></i>Faltan: ${{ (deuda_neta - g.monto_pagado) | pesos }}</span>
                                 {% else %}
                                     <span class="fw-bold text-danger small"><i class="bi bi-clock-fill"></i> Pendiente</span>
                                 {% endif %}
@@ -841,7 +848,7 @@
                                 {% endif %}
 
                                 {% if not g.pagado %}
-                                <button onclick="abrirModalPago('grupo', {{ g.grupo_id }}, 'GRUPO: {{ g.nombre_display }}', {{ g.total_mes + g.saldo_anterior - g.monto_pagado }})"
+                                <button onclick="abrirModalPago('grupo', {{ g.grupo_id }}, 'GRUPO: {{ g.nombre_display }}', {{ [g.total_mes + g.saldo_anterior - g.monto_pagado - g.saldo_a_favor, 0] | max }})"
                                         class="btn btn-outline-secondary btn-sm rounded-circle d-flex align-items-center justify-content-center shadow-sm"
                                         style="width: 38px; height: 38px;" title="Pago parcial">
                                     <i class="bi bi-cash-stack"></i>
@@ -975,6 +982,9 @@
                                                     <button onclick="marcarPagadoDirectoSimple({{ item.id_historial }}, this)" class="btn btn-sm btn-warning fw-bold text-dark" title="Saldar deuda">
                                                         <i class="bi bi-check-all me-1"></i>Saldar
                                                     </button>
+                                                    <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-dark" title="Pago parcial">
+                                                        <i class="bi bi-cash-stack"></i>
+                                                    </button>
                                                     <button onclick="togglePagoSimple({{ item.id_historial }}, this)" class="btn btn-sm btn-outline-danger" title="Deshacer pago parcial">
                                                         <i class="bi bi-arrow-counterclockwise"></i>
                                                     </button>
@@ -982,6 +992,9 @@
                                                     <button onclick="togglePagoSimple({{ item.id_historial }}, this)" class="btn btn-sm {% if item.mensaje_enviado %}btn-primary{% else %}btn-outline-secondary{% endif %}" title="Avanzar estado">
                                                         {% if item.mensaje_enviado %}<i class="bi bi-send-check-fill text-white"></i>
                                                         {% else %}<i class="bi bi-clock text-muted"></i>{% endif %}
+                                                    </button>
+                                                    <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-dark" title="Pago parcial">
+                                                        <i class="bi bi-cash-stack"></i>
                                                     </button>
                                                     <button onclick="marcarPagadoDirectoSimple({{ item.id_historial }}, this)" class="btn btn-sm btn-success" title="Pagado directo">
                                                         <i class="bi bi-check-lg"></i>
@@ -1013,6 +1026,9 @@
                                                     <button onclick="marcarPagadoDirectoSimple({{ item.id_historial }}, this)" class="btn btn-sm btn-warning shadow-sm py-1 px-3 flex-grow-1 fw-bold text-dark" title="Saldar el resto de la deuda">
                                                         <i class="bi bi-check-all me-1"></i> Saldar
                                                     </button>
+                                                    <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-dark shadow-sm py-1 px-2 flex-grow-0" title="Pago parcial">
+                                                        <i class="bi bi-cash-stack"></i>
+                                                    </button>
                                                     <button onclick="togglePagoSimple({{ item.id_historial }}, this)" class="btn btn-sm btn-outline-danger shadow-sm py-1 px-2 flex-grow-0" title="Deshacer pago parcial">
                                                         <i class="bi bi-arrow-counterclockwise"></i>
                                                     </button>
@@ -1020,6 +1036,9 @@
                                                     <button onclick="togglePagoSimple({{ item.id_historial }}, this)" class="btn btn-sm shadow-sm py-1 px-2 {% if item.mensaje_enviado %}btn-primary{% else %}btn-light border text-danger{% endif %}" title="Avanzar Estado">
                                                         {% if item.mensaje_enviado %}<i class="bi bi-send-check-fill text-white"></i>
                                                         {% else %}<i class="bi bi-clock-fill"></i>{% endif %}
+                                                    </button>
+                                                    <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-dark shadow-sm py-1 px-2" title="Pago parcial">
+                                                        <i class="bi bi-cash-stack"></i>
                                                     </button>
                                                     <button onclick="marcarPagadoDirectoSimple({{ item.id_historial }}, this)" class="btn btn-sm btn-success shadow-sm py-1 px-2" title="Marcar Pagado Directo">
                                                         <i class="bi bi-check-lg"></i>

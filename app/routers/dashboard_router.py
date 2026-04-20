@@ -267,6 +267,16 @@ def aplicar_pago_en_cascada(casa, monto_ingresado, username, mes_contexto, anio_
         elif txn_id not in actual:
             hist_actual.detalle_pagos = f"{actual}|{detalle_str}"
 
+def _saldo_grupo_para_mes(grupo, mes, anio):
+    """Retorna el saldo_a_favor del grupo solo si aplica al mes consultado (mes posterior al de origen)."""
+    saldo = float(grupo.saldo_a_favor or 0)
+    if saldo <= 0.01:
+        return 0.0
+    sm, sy = grupo.saldo_desde_mes, grupo.saldo_desde_anio
+    if sm and sy and (anio, mes) > (sy, sm):
+        return saldo
+    return 0.0
+
 # ==========================================
 # RUTAS DEL DASHBOARD
 # ==========================================
@@ -356,7 +366,15 @@ def index():
         # NO sumamos pago_deudas_este_mes porque eso duplicaría deudas ya saldadas.
         saldo_anterior_visual = saldo_anterior_real
         monto_pagado_mes_actual = float(getattr(historial, 'monto_pagado', 0) or 0)
-        pagos_en_este_dashboard = monto_pagado_mes_actual
+
+        # Si el monto_pagado fue aplicado por cascade de un mes anterior (fecha_pago < mes actual),
+        # tratarlo como crédito en saldo_anterior, no como pago hecho en este período.
+        fp = getattr(historial, 'fecha_pago', None) if historial else None
+        if monto_pagado_mes_actual > 0.01 and fp and (fp.year, fp.month) < (anio, mes):
+            saldo_anterior_visual = saldo_anterior_real - monto_pagado_mes_actual
+            pagos_en_este_dashboard = 0.0
+        else:
+            pagos_en_este_dashboard = monto_pagado_mes_actual
 
         saldo_restante = (total_mes + saldo_anterior_visual) - pagos_en_este_dashboard
         
@@ -416,7 +434,8 @@ def index():
                     "nombre_display": casa.grupo.nombre_display,
                     "casas": [],
                     "total_mes": 0.0, "saldo_anterior": 0.0, "saldo_restante": 0.0,
-                    "monto_pagado": 0.0, "telefono": casa.telefono
+                    "monto_pagado": 0.0, "telefono": casa.telefono,
+                    "saldo_a_favor": _saldo_grupo_para_mes(casa.grupo, mes, anio)
                 }
             g = reporte_grupos[casa.grupo_id]
             g["casas"].append(item_casa)
@@ -724,6 +743,10 @@ def toggle_pago_grupo(grupo_id):
 
     if action == 'undo':
         # ── DESHACER PAGO ────────────────────────────────────────────
+        from app.models.grupo import GrupoCliente
+        grupo_undo = GrupoCliente.query.get(grupo_id)
+        if grupo_undo:
+            grupo_undo.saldo_a_favor = 0.0
         if casas_grupo:
             grupo_obj_aud = casas_grupo[0].grupo
             mes_nombre_gu = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mes - 1]
@@ -838,7 +861,9 @@ def registrar_pago_grupo(grupo_id):
     monto_usd = request.json.get("monto_usd")
     cotizacion_usd = request.json.get("cotizacion_usd")
 
+    from app.models.grupo import GrupoCliente
     casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).all()
+    grupo_obj = GrupoCliente.query.get(grupo_id)
     historiales = AbonoHistorico.query.filter(
         AbonoHistorico.casa_id.in_([c.id for c in casas_grupo]),
         AbonoHistorico.mes == mes,
@@ -847,9 +872,8 @@ def registrar_pago_grupo(grupo_id):
 
     # --- AUDITORÍA ---
     if casas_grupo and monto_ingresado > 0:
-        grupo_obj_rg = casas_grupo[0].grupo
         mes_nombre_rg = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mes - 1]
-        detalle_rg = f"Grupo {grupo_obj_rg.nombre if grupo_obj_rg else grupo_id} — {mes_nombre_rg} {anio} — ${format_money(monto_ingresado)}"
+        detalle_rg = f"Grupo {grupo_obj.nombre if grupo_obj else grupo_id} — {mes_nombre_rg} {anio} — ${format_money(monto_ingresado)}"
         if monto_usd and cotizacion_usd:
             detalle_rg += f" [USD {format_money(monto_usd)} @ ${format_money(cotizacion_usd)}]"
         registrar_auditoria(current_user.username, 'PAGO_PARCIAL', detalle_rg)
@@ -868,15 +892,31 @@ def registrar_pago_grupo(grupo_id):
         total_deuda_grupo += deuda_restante
         deudas.append({"hist": h, "restante": deuda_restante})
 
-    if monto_ingresado >= total_deuda_grupo:
-        sobrante = monto_ingresado - total_deuda_grupo
-        casas_con_deuda = [d for d in deudas if d["restante"] > 0.01]
-        sobrante_por_casa = sobrante / len(casas_con_deuda) if casas_con_deuda else 0
+    # Solo usar saldo_a_favor si fue generado en un mes anterior al actual
+    saldo_grupo = 0.0
+    if grupo_obj and float(grupo_obj.saldo_a_favor or 0) > 0.01:
+        sm, sy = grupo_obj.saldo_desde_mes, grupo_obj.saldo_desde_anio
+        if sm and sy and (anio, mes) > (sy, sm):
+            saldo_grupo = float(grupo_obj.saldo_a_favor)
+    disponible_total = monto_ingresado + saldo_grupo
+
+    if disponible_total >= total_deuda_grupo:
+        # Pagar cada casa exactamente su deuda (sin distribuir sobrante a las casas)
         for d in deudas:
             if d["restante"] > 0.01:
-                aplicar_pago_en_cascada(d["hist"].casa, d["restante"] + sobrante_por_casa, current_user.username, mes, anio)
+                aplicar_pago_en_cascada(d["hist"].casa, d["restante"], current_user.username, mes, anio)
+        # El sobrante queda a favor del grupo, registrado desde este mes
+        if grupo_obj is not None:
+            grupo_obj.saldo_a_favor = disponible_total - total_deuda_grupo
+            grupo_obj.saldo_desde_mes = mes
+            grupo_obj.saldo_desde_anio = anio
     else:
-        plata_disponible = monto_ingresado
+        # Pago parcial: aplica en cascada hasta agotar el disponible (incluyendo saldo del grupo)
+        if grupo_obj is not None:
+            grupo_obj.saldo_a_favor = 0.0
+            grupo_obj.saldo_desde_mes = None
+            grupo_obj.saldo_desde_anio = None
+        plata_disponible = disponible_total
         for d in deudas:
             if plata_disponible <= 0.01:
                 break
