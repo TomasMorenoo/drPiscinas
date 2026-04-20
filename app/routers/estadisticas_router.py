@@ -54,10 +54,17 @@ def index():
     # 3. Estadísticas Anuales de Dinero ($ Abonos y $ Productos del año actual)
     meses_abonos = [0.0] * 12
     meses_productos = [0.0] * 12
-    meses_proyectados = [False] * 12   # True = sin registro real, valor estimado
+    meses_proyectados = [False] * 12   # True = sin cierre oficial, valor estimado
+
+    # Solo consideramos "cerrados" los meses con registro en CierreMes
+    from app.models.cierre_mes import CierreMes
+    meses_cerrados = set(
+        row[0] for row in db.session.query(CierreMes.mes).filter(CierreMes.anio == anio_actual).all()
+    )
 
     abonos_db = db.session.query(AbonoHistorico.mes, func.sum(AbonoHistorico.monto)).filter(
-        AbonoHistorico.anio == anio_actual
+        AbonoHistorico.anio == anio_actual,
+        AbonoHistorico.mes.in_(meses_cerrados)
     ).group_by(AbonoHistorico.mes).all()
 
     meses_con_datos = set()
@@ -65,7 +72,7 @@ def index():
         meses_abonos[mes - 1] = float(total)
         meses_con_datos.add(mes)
 
-    # Para los meses sin AbonoHistorico, estimar desde precio_base de clientes activos
+    # Para los meses sin cierre oficial, estimar desde precio_base de clientes activos
     casas_activas = Casa.query.filter_by(activo=True).all()
     for i in range(12):
         mes = i + 1
