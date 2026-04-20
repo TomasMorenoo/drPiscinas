@@ -856,27 +856,32 @@ def registrar_pago_grupo(grupo_id):
 
     deudas = []
     total_deuda_grupo = 0
-    
+
     for h in historiales:
         c = h.casa
         total_mes = float(h.monto) + float(c.obtener_gastos_mensuales(mes, anio)['extras'])
         saldo_ant = c.obtener_saldo_anterior(mes, anio)
         deuda_total = total_mes + saldo_ant
-        deuda_restante = deuda_total - float(h.monto_pagado or 0)
-        
+        # Clamp a 0: si la casa tiene saldo a favor (deuda_restante < 0), no genera deuda
+        deuda_restante = max(0.0, deuda_total - float(h.monto_pagado or 0))
+
         total_deuda_grupo += deuda_restante
         deudas.append({"hist": h, "restante": deuda_restante})
 
     if monto_ingresado >= total_deuda_grupo:
         sobrante = monto_ingresado - total_deuda_grupo
-        sobrante_por_casa = sobrante / len(deudas) if len(deudas) > 0 else 0
+        casas_con_deuda = [d for d in deudas if d["restante"] > 0.01]
+        sobrante_por_casa = sobrante / len(casas_con_deuda) if casas_con_deuda else 0
         for d in deudas:
-            aplicar_pago_en_cascada(d["hist"].casa, d["restante"] + sobrante_por_casa, current_user.username, mes, anio)
+            if d["restante"] > 0.01:
+                aplicar_pago_en_cascada(d["hist"].casa, d["restante"] + sobrante_por_casa, current_user.username, mes, anio)
     else:
         plata_disponible = monto_ingresado
         for d in deudas:
             if plata_disponible <= 0.01:
                 break
+            if d["restante"] <= 0.01:
+                continue  # casa con saldo a favor, no requiere pago
             if plata_disponible >= d["restante"]:
                 aplicar_pago_en_cascada(d["hist"].casa, d["restante"], current_user.username, mes, anio)
                 plata_disponible -= d["restante"]

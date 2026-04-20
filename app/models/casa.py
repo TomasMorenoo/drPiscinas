@@ -118,7 +118,7 @@ class Casa(db.Model):
                 total_hist = abono_hist + extras_hist
                 saldo += total_hist - pagado_hist
 
-        return round(max(0.0, saldo), 2)
+        return round(saldo, 2)
 
 
 class HistorialAumento(db.Model):
