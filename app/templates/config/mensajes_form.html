@@ -1,0 +1,527 @@
+{% extends "base.html" %}
+{% block title %}{% if accion == 'nueva' %}Nueva Plantilla{% else %}Editar Plantilla{% endif %} - Dr. Piscinas{% endblock %}
+
+{% block content %}
+<style>
+.chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 11px; border-radius: 20px; font-size: 0.82rem;
+    font-weight: 600; cursor: grab; user-select: none;
+    border: 2px solid transparent; transition: transform 0.1s;
+    white-space: nowrap;
+}
+.chip:active { cursor: grabbing; transform: scale(0.95); }
+.chip-always { background: #d1e7ff; border-color: #90c3ff; color: #0a58ca; }
+.chip-cond   { background: #fff3cd; border-color: #ffc107; color: #856404; }
+.chip.dragging { opacity: 0.4; }
+
+/* ── Editor con highlight overlay ── */
+.editor-wrapper {
+    position: relative;
+    background: #e9f5e1;
+    border: 2px dashed #25d366;
+    border-radius: 8px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.editor-wrapper:focus-within {
+    border-color: #128c7e;
+    box-shadow: 0 0 0 3px rgba(18,140,126,0.2);
+}
+/* Capa de highlights (detrás) */
+.editor-overlay {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    padding: 14px; box-sizing: border-box;
+    font-family: 'Segoe UI', sans-serif; font-size: 0.93rem; line-height: 1.65;
+    white-space: pre-wrap; word-break: break-word;
+    overflow: hidden; pointer-events: none;
+    color: #1a1a1a; z-index: 0;
+    border: none; border-radius: 8px;
+}
+/* Variable coloreada */
+.var-hl {
+    background: #ffe58f;
+    color: #7c4f00;
+    border-radius: 4px;
+    padding: 0 2px;
+    font-weight: 600;
+}
+/* Textarea encima, transparente */
+.msg-area {
+    position: relative; z-index: 1;
+    font-family: 'Segoe UI', sans-serif; font-size: 0.93rem; line-height: 1.65;
+    background: transparent; border: none; outline: none;
+    color: transparent; caret-color: #1a1a1a;
+    padding: 14px; box-sizing: border-box;
+    min-height: 220px; resize: vertical; width: 100%;
+}
+
+.drop-zone { background: #f0fdf4; border-radius: 12px; padding: 14px; }
+.drop-zone.over { background: #d4f5e0; outline: 2px dashed #25d366; }
+
+/* Vista previa WhatsApp */
+.wa-preview-screen {
+    background: #e5ddd5;
+    border-radius: 8px;
+    padding: 16px;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: flex-end;
+}
+.wa-bubble {
+    background: #dcf8c6;
+    border-radius: 12px 12px 4px 12px;
+    padding: 10px 14px;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    max-width: 100%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+.wa-time {
+    font-size: 0.68rem; color: #667781;
+    text-align: right; margin-top: 4px;
+}
+.chip-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: #6c757d; margin-bottom: 8px; }
+.chip-desc  { font-size: 0.78rem; color: #6c757d; margin-top: 6px; }
+
+/* ── Tabs editor/preview en mobile ── */
+.editor-tabs .nav-link         { font-size: 0.82rem; padding: 5px 12px; }
+.editor-tabs .nav-link.active  { font-weight: 700; }
+.tab-pane                       { display: none; }
+.tab-pane.active                { display: block; }
+
+@media (max-width: 991px) {
+    /* En mobile los tabs controlan qué se ve */
+    .preview-col { display: none; }
+    .mobile-tabs { display: flex !important; }
+    .show-preview .editor-col  { display: none; }
+    .show-preview .preview-col { display: block; }
+}
+@media (min-width: 992px) {
+    /* En desktop siempre lado a lado */
+    .mobile-tabs    { display: none !important; }
+    .preview-col    { display: block !important; }
+}
+</style>
+
+<div class="d-flex align-items-center gap-3 mb-3">
+    <a href="{{ url_for('config.listar_plantillas') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i>
+    </a>
+    <h1 class="h3 mb-0 fw-bold">
+        <i class="bi bi-whatsapp text-success me-2"></i>
+        {% if accion == 'nueva' %}Nueva Plantilla{% else %}Editar: {{ plantilla.nombre }}{% endif %}
+    </h1>
+</div>
+
+<form method="POST">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+{# Nombre #}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+        <label class="fw-bold text-nowrap mb-0">Nombre de la plantilla:</label>
+        <input type="text" name="nombre" class="form-control"
+               placeholder="Ej: Default, Navidad 2024, Fin de temporada..."
+               value="{{ plantilla.nombre or '' }}" required>
+    </div>
+</div>
+
+{# ══════════════════════════════ INDIVIDUAL ══════════════════════════════ #}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header fw-bold">
+        <i class="bi bi-person-fill text-success me-1"></i> Mensaje para casa suelta
+    </div>
+    <div class="card-body">
+
+        {# Chips #}
+        <div class="mb-3">
+            <div class="chip-label">
+                <span class="d-none d-lg-inline">Arrastrá al texto o hacé click para insertar</span>
+                <span class="d-lg-none">Tocá para insertar en el editor</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2" id="chips-ind">
+                <span class="chip chip-always" draggable="true" data-var="{saludo}"            title="Buenas Tardes / Días + nombre del cliente"><i class="bi bi-hand-wave"></i> {saludo}</span>
+                <span class="chip chip-always" draggable="true" data-var="{resumen_total}"     title="TOTAL A PAGAR o CUENTA AL DÍA (automático)"><i class="bi bi-cash-coin"></i> {resumen_total}</span>
+                <span class="chip chip-always" draggable="true" data-var="${mantenimiento}"    title="Monto del abono mensual"><i class="bi bi-tools"></i> ${mantenimiento}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${extras}"           title="Monto de productos. Se oculta si es $0"><i class="bi bi-box-seam"></i> ${extras}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="{detalle_productos}" title="Lista de productos usados. Se oculta si no hay"><i class="bi bi-list-ul"></i> {detalle_productos}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${saldo_anterior}"   title="Deuda meses anteriores. Se oculta si es $0"><i class="bi bi-clock-history"></i> ${saldo_anterior}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${pagado}"           title="Pagado este mes. Se oculta si es $0"><i class="bi bi-check-circle"></i> ${pagado}</span>
+            </div>
+            <div class="chip-desc">
+                <span class="badge" style="background:#d1e7ff;color:#0a58ca;font-weight:600;">azul</span> siempre aparece &nbsp;|&nbsp;
+                <span class="badge" style="background:#fff3cd;color:#856404;font-weight:600;">amarillo</span> se oculta si el valor es $0
+            </div>
+        </div>
+
+        {# Tabs mobile #}
+        <ul class="nav nav-tabs editor-tabs mb-3 mobile-tabs" id="tabs-ind" style="display:none;">
+            <li class="nav-item">
+                <button class="nav-link active" onclick="switchTab('ind','editor',this)">Editar</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" onclick="switchTab('ind','preview',this)">Vista previa</button>
+            </li>
+        </ul>
+
+        {# Editor + Preview lado a lado #}
+        <div class="row g-3" id="panel-ind">
+            <div class="col-lg-6 editor-col">
+                <div class="drop-zone" id="drop-ind">
+                    <div class="editor-wrapper">
+                        <div class="editor-overlay" id="overlay-ind"></div>
+                        <textarea id="ta-ind" name="template_individual" class="msg-area" rows="13"
+                                  placeholder="Escribí el mensaje acá...">{{ plantilla.template_individual or default_individual }}</textarea>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-2"
+                        onclick="resetTemplate('ta-ind', defaultIndividual)">
+                    <i class="bi bi-arrow-counterclockwise"></i> Restaurar default
+                </button>
+            </div>
+            <div class="col-lg-6 preview-col">
+                <div class="chip-label mb-2 d-none d-lg-block">Vista previa</div>
+                <div class="wa-preview-screen">
+                    <div style="width:100%">
+                        <div class="wa-bubble" id="preview-ind"></div>
+                        <div class="wa-time">12:34 ✓✓</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ══════════════════════════════ GRUPO ══════════════════════════════ #}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header fw-bold">
+        <i class="bi bi-collection-fill text-success me-1"></i> Mensaje para grupo de casas
+    </div>
+    <div class="card-body">
+
+        {# Chips #}
+        <div class="mb-3">
+            <div class="chip-label">
+                <span class="d-none d-lg-inline">Arrastrá al texto o hacé click para insertar</span>
+                <span class="d-lg-none">Tocá para insertar en el editor</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2" id="chips-grp">
+                <span class="chip chip-always" draggable="true" data-var="{saludo}"          title="Buenas Tardes + nombre del grupo"><i class="bi bi-hand-wave"></i> {saludo}</span>
+                <span class="chip chip-always" draggable="true" data-var="{cant}"            title="Cantidad de propiedades"><i class="bi bi-house-fill"></i> {cant}</span>
+                <span class="chip chip-always" draggable="true" data-var="{resumen_total}"   title="Total a pagar o Cuentas al día (automático)"><i class="bi bi-cash-coin"></i> {resumen_total}</span>
+                <span class="chip chip-always" draggable="true" data-var="{lista_casas}"     title="Lista automática de propiedades con sus montos"><i class="bi bi-list-check"></i> {lista_casas}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${saldo_anterior}" title="Deuda meses anteriores. Se oculta si es $0"><i class="bi bi-clock-history"></i> ${saldo_anterior}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${pagado}"         title="Pagado este mes. Se oculta si es $0"><i class="bi bi-check-circle"></i> ${pagado}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${saldo_favor}"    title="Saldo a favor del grupo. Se oculta si es $0"><i class="bi bi-piggy-bank"></i> ${saldo_favor}</span>
+            </div>
+            <div class="chip-desc">
+                <span class="badge" style="background:#d1e7ff;color:#0a58ca;font-weight:600;">azul</span> siempre aparece &nbsp;|&nbsp;
+                <span class="badge" style="background:#fff3cd;color:#856404;font-weight:600;">amarillo</span> se oculta si el valor es $0
+            </div>
+        </div>
+
+        {# Tabs mobile #}
+        <ul class="nav nav-tabs editor-tabs mb-3 mobile-tabs" id="tabs-grp" style="display:none;">
+            <li class="nav-item">
+                <button class="nav-link active" onclick="switchTab('grp','editor',this)">Editar</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" onclick="switchTab('grp','preview',this)">Vista previa</button>
+            </li>
+        </ul>
+
+        {# Editor + Preview #}
+        <div class="row g-3" id="panel-grp">
+            <div class="col-lg-6 editor-col">
+                <div class="drop-zone" id="drop-grp">
+                    <div class="editor-wrapper">
+                        <div class="editor-overlay" id="overlay-grp"></div>
+                        <textarea id="ta-grp" name="template_grupo" class="msg-area" rows="13"
+                                  placeholder="Escribí el mensaje acá...">{{ plantilla.template_grupo or default_grupo }}</textarea>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-2"
+                        onclick="resetTemplate('ta-grp', defaultGrupo)">
+                    <i class="bi bi-arrow-counterclockwise"></i> Restaurar default
+                </button>
+            </div>
+            <div class="col-lg-6 preview-col">
+                <div class="chip-label mb-2 d-none d-lg-block">Vista previa</div>
+                <div class="wa-preview-screen">
+                    <div style="width:100%">
+                        <div class="wa-bubble" id="preview-grp"></div>
+                        <div class="wa-time">12:34 ✓✓</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex gap-2 pb-4">
+    <button type="submit" class="btn btn-success fw-bold shadow-sm px-4">
+        <i class="bi bi-floppy-fill me-1"></i>
+        {% if accion == 'nueva' %}Crear Plantilla{% else %}Guardar Cambios{% endif %}
+    </button>
+    <a href="{{ url_for('config.listar_plantillas') }}" class="btn btn-outline-secondary">Cancelar</a>
+</div>
+</form>
+
+<script>
+const defaultIndividual = {{ default_individual | tojson }};
+const defaultGrupo      = {{ default_grupo | tojson }};
+
+// ── Datos de ejemplo ──
+const SAMPLE_IND = {
+    deuda: {
+        saludo:            'Buenas Tardes Juan García',
+        resumen_total:     '*-- TOTAL A PAGAR: $55.000 --*',
+        mantenimiento:     '40.000',
+        extras:            '10.000',     condExtras: 10000,
+        detalle_productos: '* 2lts de Cloro\n* 500gr de Algicida',  condDetalle: 2,
+        saldo_anterior:    '5.000',      condSaldoAnt: 5000,
+        pagado:            '0',          condPagado: 0,
+    },
+    aldia: {
+        saludo:            'Buenas Tardes Juan García',
+        resumen_total:     '*-- CUENTA AL DÍA --*',
+        mantenimiento:     '40.000',
+        extras:            '0',          condExtras: 0,
+        detalle_productos: '',           condDetalle: 0,
+        saldo_anterior:    '0',          condSaldoAnt: 0,
+        pagado:            '40.000',     condPagado: 40000,
+    }
+};
+
+const SAMPLE_GRP = {
+    deuda: {
+        saludo:         'Buenas Tardes Roberto Sánchez',
+        cant:           '3',
+        resumen_total:  '*-- TOTAL A PAGAR: $130.000 --*',
+        lista_casas:    '• *Casa Rodríguez:* Abono $40.000 + Prod. $5.000 = *$45.000*\n• *Casa López:* Abono $40.000 + Prod. $0 = *$40.000*\n• *Casa Pérez:* Abono $45.000 + Prod. $0 = *$45.000*',
+        saldo_anterior: '10.000',   condSaldoAnt: 10000,
+        pagado:         '0',        condPagado: 0,
+        saldo_favor:    '5.000',    condSaldoFav: 5000,
+    },
+    aldia: {
+        saludo:         'Buenas Tardes Roberto Sánchez',
+        cant:           '3',
+        resumen_total:  '*-- CUENTAS AL DÍA --*',
+        lista_casas:    '• *Casa Rodríguez:* Abono $40.000 + Prod. $0 = *$40.000*\n• *Casa López:* Abono $40.000 + Prod. $0 = *$40.000*\n• *Casa Pérez:* Abono $45.000 + Prod. $0 = *$45.000*',
+        saldo_anterior: '0',        condSaldoAnt: 0,
+        pagado:         '0',        condPagado: 0,
+        saldo_favor:    '0',        condSaldoFav: 0,
+    }
+};
+
+// Variables condicionales (ocultan la línea si su valor numérico es 0)
+const COND_IND = {
+    'extras':            s => s.condExtras,
+    'detalle_productos': s => s.condDetalle,
+    'saldo_anterior':    s => s.condSaldoAnt,
+    'pagado':            s => s.condPagado,
+};
+const COND_GRP = {
+    'saldo_anterior': s => s.condSaldoAnt,
+    'pagado':         s => s.condPagado,
+    'saldo_favor':    s => s.condSaldoFav,
+};
+
+// ── Render ──
+function renderTemplate(template, sample, condDefs) {
+    const lines = template.split('\n');
+    const out = [];
+    for (const line of lines) {
+        let skip = false;
+        for (const [varName, getVal] of Object.entries(condDefs)) {
+            if (line.includes('{' + varName + '}')) {
+                if ((getVal(sample) || 0) <= 0.01) { skip = true; break; }
+            }
+        }
+        if (skip) continue;
+
+        let rendered = line;
+        for (const [key, val] of Object.entries(sample)) {
+            if (typeof val !== 'string') continue;
+            rendered = rendered.split('{' + key + '}').join(val);
+        }
+        out.push(rendered);
+    }
+    return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function waMarkdown(text) {
+    // Escape HTML
+    text = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    // Bold *text*
+    text = text.replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>');
+    // Italic _text_
+    text = text.replace(/_([^_\n]+)_/g, '<em>$1</em>');
+    // Line breaks
+    text = text.replace(/\n/g, '<br>');
+    return text;
+}
+
+function updatePreview(taId, previewId, condDefs, getSample) {
+    const ta      = document.getElementById(taId);
+    const preview = document.getElementById(previewId);
+    const sample  = getSample();
+    const rendered = renderTemplate(ta.value, sample, condDefs);
+    preview.innerHTML = waMarkdown(rendered);
+}
+
+// ── Live update al escribir ──
+document.getElementById('ta-ind').addEventListener('input', () =>
+    updatePreview('ta-ind','preview-ind', COND_IND, () => SAMPLE_IND.deuda));
+document.getElementById('ta-grp').addEventListener('input', () =>
+    updatePreview('ta-grp','preview-grp', COND_GRP, () => SAMPLE_GRP.deuda));
+
+// ── Highlight overlay ──
+function highlightVars(text) {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\$?\{[^{}]+\}/g, m => `<mark class="var-hl">${m}</mark>`);
+}
+
+function syncOverlay(ta, overlay) {
+    overlay.innerHTML = highlightVars(ta.value) + '\n';
+    overlay.scrollTop = ta.scrollTop;
+}
+
+const pares = [
+    ['ta-ind', 'overlay-ind'],
+    ['ta-grp', 'overlay-grp'],
+];
+pares.forEach(([taId, ovId]) => {
+    const ta = document.getElementById(taId);
+    const ov = document.getElementById(ovId);
+    ta.addEventListener('input',  () => syncOverlay(ta, ov));
+    ta.addEventListener('scroll', () => { ov.scrollTop = ta.scrollTop; });
+    syncOverlay(ta, ov); // inicial
+});
+
+// ── Drag & drop ──
+let lastTA = document.getElementById('ta-ind');
+document.querySelectorAll('.msg-area').forEach(ta => {
+    ta.addEventListener('focus', function() { lastTA = this; });
+});
+
+function insertarEnCursor(ta, texto) {
+    ta.focus();
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    ta.value = ta.value.slice(0,s) + texto + ta.value.slice(e);
+    ta.selectionStart = ta.selectionEnd = s + texto.length;
+    ta.dispatchEvent(new Event('input'));
+}
+
+document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => insertarEnCursor(lastTA, chip.dataset.var));
+    chip.addEventListener('dragstart', function(e) {
+        this.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', this.dataset.var);
+        e.dataTransfer.effectAllowed = 'copy';
+    });
+    chip.addEventListener('dragend', function() { this.classList.remove('dragging'); });
+});
+
+document.querySelectorAll('.drop-zone').forEach(zone => {
+    zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+    zone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.classList.remove('over');
+        const ta    = this.querySelector('textarea');
+        const texto = e.dataTransfer.getData('text/plain');
+        if (!texto) return;
+
+        // Leer posición ANTES de focus() para no resetear el cursor
+        const s = ta.selectionStart;
+        ta.value = ta.value.slice(0, s) + texto + ta.value.slice(s);
+        ta.focus();
+        ta.selectionStart = ta.selectionEnd = s + texto.length;
+        ta.dispatchEvent(new Event('input'));
+    });
+});
+
+// ── Restaurar default ──
+function resetTemplate(taId, def) {
+    if (confirm('¿Restaurar al mensaje original? Se perderán los cambios.')) {
+        const ta = document.getElementById(taId);
+        ta.value = def;
+        ta.dispatchEvent(new Event('input'));
+    }
+}
+
+// ── Tabs mobile (Editar / Vista previa) ──
+function switchTab(panel, tab, btn) {
+    const row = document.getElementById('panel-' + panel);
+    if (tab === 'preview') {
+        row.classList.add('show-preview');
+    } else {
+        row.classList.remove('show-preview');
+        // Recuperar foco en el textarea tras volver al editor
+        const ta = document.getElementById('ta-' + panel);
+        setTimeout(() => ta.focus(), 50);
+    }
+    // Toggle active en botones del tab
+    btn.closest('ul').querySelectorAll('.nav-link').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+// ── Init previews ──
+updatePreview('ta-ind','preview-ind', COND_IND, () => SAMPLE_IND.deuda);
+updatePreview('ta-grp','preview-grp', COND_GRP, () => SAMPLE_GRP.deuda);
+
+// ── Borrado atómico de variables {xxx} ──
+// Detecta si el cursor está dentro o pegado a una variable y devuelve {start, end}
+function variableEnCursor(text, pos) {
+    const before = text.slice(0, pos);
+    const after  = text.slice(pos);
+
+    // Cursor DESPUÉS de } — incluye $ opcional antes
+    const matchAntes = before.match(/\$?\{[^{}]+\}$/);
+    if (matchAntes) return { start: pos - matchAntes[0].length, end: pos };
+
+    // Cursor ANTES de { o de ${ — incluye $ opcional
+    const matchDespues = after.match(/^\$?\{[^{}]+\}/);
+    if (matchDespues) return { start: pos, end: pos + matchDespues[0].length };
+
+    // Cursor DENTRO de {xxx}
+    const lastOpen  = before.lastIndexOf('{');
+    const lastClose = before.lastIndexOf('}');
+    if (lastOpen !== -1 && lastOpen > lastClose) {
+        const closePos = after.indexOf('}');
+        if (closePos !== -1 && !after.slice(0, closePos).includes('{')) {
+            // incluir $ si está justo antes de {
+            const start = (lastOpen > 0 && before[lastOpen - 1] === '$') ? lastOpen - 1 : lastOpen;
+            return { start, end: pos + closePos + 1 };
+        }
+    }
+    return null;
+}
+
+document.querySelectorAll('.msg-area').forEach(ta => {
+    ta.addEventListener('keydown', function(e) {
+        // Solo actúa si no hay selección
+        if (this.selectionStart !== this.selectionEnd) return;
+        if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+
+        const v = variableEnCursor(this.value, this.selectionStart);
+        if (!v) return;
+
+        e.preventDefault();
+        this.value = this.value.slice(0, v.start) + this.value.slice(v.end);
+        this.selectionStart = this.selectionEnd = v.start;
+        this.dispatchEvent(new Event('input'));
+    });
+});
+</script>
+{% endblock %}

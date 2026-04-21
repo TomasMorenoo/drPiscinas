@@ -125,6 +125,8 @@
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="{{ url_for('country.listar_countries') }}">Countries</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('barrio.listar_barrios') }}">Barrios</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item fw-bold text-success" href="{{ url_for('config.listar_plantillas') }}"><i class="bi bi-whatsapp me-1"></i> Mensajes WhatsApp</a></li>
                     </ul>
                 </li>
                 {% endif %}

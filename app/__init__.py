@@ -53,6 +53,7 @@ def create_app():
     from app.routers.grupo_router import grupo_bp
     from app.routers.estadisticas_router import estadisticas_bp
     from app.routers.root_router import root_bp
+    from app.routers.config_router import config_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
@@ -67,6 +68,7 @@ def create_app():
     app.register_blueprint(grupo_bp)
     app.register_blueprint(estadisticas_bp)
     app.register_blueprint(root_bp)
+    app.register_blueprint(config_bp)
 
     # --- FILTRO JINJA2: formato pesos argentinos (punto como separador de miles) ---
     @app.template_filter('pesos')

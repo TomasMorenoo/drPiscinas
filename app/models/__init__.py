@@ -10,3 +10,4 @@ from app.models.cierre_mes import CierreMes
 from app.models.configuracion import Configuracion
 from app.models.auditoria import AuditoriaLog
 from app.models.pausa import Pausa
+from app.models.plantilla_mensaje import PlantillaMensaje

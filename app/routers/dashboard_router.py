@@ -93,36 +93,36 @@ def obtener_detalle_productos(casa, mes, anio):
     return detalles
 
 def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_visual, pagos_en_este_dashboard):
+    from app.models.plantilla_mensaje import PlantillaMensaje, renderizar_template
+    pt = PlantillaMensaje.get_activa()
+
     nombre_wa = casa.nombre_cliente if casa.nombre_cliente else get_nombre_limpio(casa)
     saludo = obtener_saludo_tiempo(nombre_wa)
     total_final = abono_mes + extras + saldo_anterior_visual - pagos_en_este_dashboard
-    
-    texto_wa = f"{saludo} como te va, te recuerdo el abono de la pile\n\n"
-    
+
     if total_final <= 0.01:
-        texto_wa += "*-- CUENTA AL DÍA --*\n\n"
+        resumen_total = "*-- CUENTA AL DÍA --*"
     else:
-        texto_wa += f"*-- TOTAL A PAGAR: ${format_money(total_final)} --*\n\n"
-        
-    texto_wa += "Detalle:\n"
-    texto_wa += f"Mes de mantenimiento: ${format_money(abono_mes)}\n"
-    
-    if extras > 0:
-        texto_wa += f"Productos Utilizados: ${format_money(extras)}\n"
-        prods = obtener_detalle_productos(casa, mes, anio)
-        for p in prods:
-            texto_wa += f"* {p}\n"
-            
-    if saldo_anterior_visual > 0.1:
-        texto_wa += f"Saldo adeudado de meses anteriores: ${format_money(saldo_anterior_visual)}\n"
-        
-    if pagos_en_este_dashboard > 0.1:
-        texto_wa += f"Entregado este mes: -${format_money(pagos_en_este_dashboard)}\n"
-        
-    texto_wa += "\nMuchas Gracias."
-    return texto_wa
+        resumen_total = f"*-- TOTAL A PAGAR: ${format_money(total_final)} --*"
+
+    prods = obtener_detalle_productos(casa, mes, anio)
+    detalle_productos = '\n'.join(f'* {p}' for p in prods)
+
+    variables = {
+        'saludo':            (saludo,                          None),
+        'resumen_total':     (resumen_total,                   None),
+        'mantenimiento':     (format_money(abono_mes),         None),
+        'extras':            (format_money(extras),            extras),
+        'detalle_productos': (detalle_productos,               len(prods)),
+        'saldo_anterior':    (format_money(saldo_anterior_visual), saldo_anterior_visual),
+        'pagado':            (format_money(pagos_en_este_dashboard), pagos_en_este_dashboard),
+    }
+    return renderizar_template(pt.get_template_individual(), variables)
 
 def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard, saldo_a_favor=0.0):
+    from app.models.plantilla_mensaje import PlantillaMensaje, renderizar_template
+    pt = PlantillaMensaje.get_activa()
+
     saludo = obtener_saludo_tiempo(grupo_nombre)
     total_final = total_grupo_mes + total_grupo_saldo_ant_visual - total_pagos_dashboard - saldo_a_favor
 
@@ -130,10 +130,11 @@ def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo_mes, total
     cant = len(casas_visibles)
 
     if total_final <= 0.01:
-        texto_wa = f"{saludo} Te paso el resumen de las {cant} propiedades.\n\n*-- CUENTAS AL DÍA --*\n\n"
+        resumen_total = "*-- CUENTAS AL DÍA --*"
     else:
-        texto_wa = f"{saludo} Te paso el resumen de las {cant} propiedades.\n\n*-- TOTAL A PAGAR: ${format_money(total_final)} --*\n\n"
+        resumen_total = f"*-- TOTAL A PAGAR: ${format_money(total_final)} --*"
 
+    lista_lines = []
     for c in casas_visibles:
         casa_obj = c['casa']
         nombre_casa = get_nombre_limpio(casa_obj)
@@ -141,25 +142,21 @@ def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo_mes, total
         extras = c['extras']
         saldo_ant = c.get('saldo_anterior', 0.0)
         total_c = abono + extras
-        a_pagar_casa = total_c + saldo_ant
         linea = f"• *{nombre_casa}:* Abono ${format_money(abono)} + Prod. ${format_money(extras)} = *${format_money(total_c)}*"
         if saldo_ant < -0.1:
             linea += f" _(saldo a favor: ${format_money(abs(saldo_ant))})_"
-        texto_wa += linea + "\n"
+        lista_lines.append(linea)
 
-    texto_wa += "\n"
-
-    if total_grupo_saldo_ant_visual > 0.1:
-        texto_wa += f"Saldo adeudado de meses anteriores: ${format_money(total_grupo_saldo_ant_visual)}\n"
-
-    if total_pagos_dashboard > 0.1:
-        texto_wa += f"Entregado este mes: *-${format_money(total_pagos_dashboard)}*\n"
-
-    if saldo_a_favor > 0.1:
-        texto_wa += f"_(*) El total ya incluye un descuento de ${format_money(saldo_a_favor)} por saldo a favor acumulado._\n"
-
-    texto_wa += "\nMuchas Gracias."
-    return texto_wa
+    variables = {
+        'saludo':          (saludo,                                str(cant)),
+        'cant':            (str(cant),                             None),
+        'resumen_total':   (resumen_total,                         None),
+        'lista_casas':     ('\n'.join(lista_lines),                None),
+        'saldo_anterior':  (format_money(total_grupo_saldo_ant_visual), total_grupo_saldo_ant_visual),
+        'pagado':          (format_money(total_pagos_dashboard),   total_pagos_dashboard),
+        'saldo_favor':     (format_money(saldo_a_favor),           saldo_a_favor),
+    }
+    return renderizar_template(pt.get_template_grupo(), variables)
 
 # ==========================================
 # LOGICA DE PAGOS Y CASCADA

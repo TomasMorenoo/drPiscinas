@@ -59,6 +59,37 @@ def migrar_base_de_datos():
             """))
             db.session.execute(text("ALTER TABLE pausas ADD COLUMN IF NOT EXISTS pausado_por VARCHAR(100);"))
 
+            print("⏳ 7/7 - Verificando tabla 'plantillas_mensaje'...")
+            db.session.execute(text("""
+                CREATE TABLE IF NOT EXISTS plantillas_mensaje (
+                    id SERIAL PRIMARY KEY,
+                    nombre VARCHAR(100) NOT NULL,
+                    activa BOOLEAN NOT NULL DEFAULT FALSE,
+                    creada_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    texto_intro_individual TEXT DEFAULT 'como te va, te recuerdo el abono de la pile',
+                    label_al_dia VARCHAR(200) DEFAULT 'CUENTA AL DÍA',
+                    label_total VARCHAR(200) DEFAULT 'TOTAL A PAGAR:',
+                    label_detalle VARCHAR(200) DEFAULT 'Detalle:',
+                    label_mantenimiento VARCHAR(200) DEFAULT 'Mes de mantenimiento:',
+                    label_productos VARCHAR(200) DEFAULT 'Productos Utilizados:',
+                    label_saldo_anterior VARCHAR(200) DEFAULT 'Saldo adeudado de meses anteriores:',
+                    label_entregado VARCHAR(200) DEFAULT 'Entregado este mes:',
+                    cierre VARCHAR(200) DEFAULT 'Muchas Gracias.',
+                    texto_intro_grupo TEXT DEFAULT 'Te paso el resumen de las {cant} propiedades.',
+                    label_saldo_favor TEXT DEFAULT 'El total ya incluye un descuento de ${monto} por saldo a favor acumulado.'
+                );
+            """))
+            # Columnas template libre (nuevas)
+            db.session.execute(text("ALTER TABLE plantillas_mensaje ADD COLUMN IF NOT EXISTS template_individual TEXT;"))
+            db.session.execute(text("ALTER TABLE plantillas_mensaje ADD COLUMN IF NOT EXISTS template_grupo TEXT;"))
+
+            # Insertar plantilla default si la tabla está vacía
+            db.session.execute(text("""
+                INSERT INTO plantillas_mensaje (nombre, activa)
+                SELECT 'Plantilla Default', TRUE
+                WHERE NOT EXISTS (SELECT 1 FROM plantillas_mensaje);
+            """))
+
             # Guardamos los cambios
             db.session.commit()
             print("✅ ¡Base de datos migrada con éxito!")
