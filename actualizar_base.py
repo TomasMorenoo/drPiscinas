@@ -90,7 +90,15 @@ def migrar_base_de_datos():
                 WHERE NOT EXISTS (SELECT 1 FROM plantillas_mensaje);
             """))
 
-            # Guardamos los cambios
+            print("⏳ Creando índices de performance...")
+            db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_abono_casa_mes_anio ON abonos_historicos (casa_id, mes, anio);"))
+            db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_casa_activo ON casas (activo);"))
+            db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_casa_grupo_id ON casas (grupo_id);"))
+            db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_visit_casa_id ON visits (casa_id);"))
+            db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_visit_fecha ON visits (fecha);"))
+
+            db.session.execute(text("ALTER TABLE auditoria_logs ADD COLUMN IF NOT EXISTS ip VARCHAR(45);"))
+
             db.session.commit()
             print("✅ ¡Base de datos migrada con éxito!")
 

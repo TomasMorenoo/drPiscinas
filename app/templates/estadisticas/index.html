@@ -217,7 +217,7 @@
     renderCountrySlider();
 
     // --- 2. GRÁFICOS ANUALES DE DINERO ---
-    const nombresMeses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const nombresMeses = {{ MESES_CORTO | tojson }};
     const datosAbonos = JSON.parse('{{ meses_abonos | safe }}');
     const datosProductos = JSON.parse('{{ meses_productos | safe }}');
 

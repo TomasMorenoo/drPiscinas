@@ -1,8 +1,9 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required
+from flask_login import login_required, current_user
 from app.decorators import admin_required
 from app import db
 from app.models.products import Product
+from app.utils import registrar_auditoria
 
 product_bp = Blueprint("products", __name__, url_prefix="/products")
 
@@ -29,6 +30,8 @@ def crear_product():
         nuevo = Product(nombre=nombre, precio=float(precio), unidad=unidad)
         db.session.add(nuevo)
         db.session.commit()
+        registrar_auditoria(current_user.username, 'CREAR_PRODUCTO', f"{nombre} — ${precio} / {unidad}")
+        db.session.commit()
         flash("Producto creado", "success")
         return redirect(url_for("products.listar_products"))
         
@@ -43,6 +46,8 @@ def editar_product(id):
         prod.nombre = request.form.get("nombre")
         prod.precio = float(request.form.get("precio"))
         prod.unidad = request.form.get("unidad")
+        db.session.commit()
+        registrar_auditoria(current_user.username, 'EDITAR_PRODUCTO', f"{prod.nombre} — ${prod.precio} / {prod.unidad}")
         db.session.commit()
         flash("Producto actualizado", "success")
         return redirect(url_for("products.listar_products"))
@@ -63,6 +68,8 @@ def toggle_product(id):
 def eliminar_product(id):
     prod = Product.query.get_or_404(id)
     try:
+        nombre_prod = prod.nombre
+        registrar_auditoria(current_user.username, 'ELIMINAR_PRODUCTO', nombre_prod)
         db.session.delete(prod)
         db.session.commit()
         flash("Producto eliminado correctamente.", "success")

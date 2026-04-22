@@ -6,7 +6,7 @@
     <div class="col-md-6 d-flex align-items-center">
         <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-calendar-check me-2"></i>Visitas</h1>
         <span class="badge bg-primary ms-3 fs-6 fw-normal shadow-sm">
-            <i class="bi bi-calendar-event me-1"></i> Viendo: {{ ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][mes_sel - 1] }} {{ anio_sel }}
+            <i class="bi bi-calendar-event me-1"></i> Viendo: {{ MESES_LARGO[mes_sel - 1] }} {{ anio_sel }}
         </span>
         {% if mes_congelado %}
         <span class="badge bg-warning text-dark ms-2 fs-6 shadow-sm" title="No se pueden editar ni agregar visitas">
@@ -30,7 +30,7 @@
                     <select name="mes" class="form-select form-select-sm">
                         {% for m in range(1, 13) %}
                         <option value="{{ m }}" {% if m == mes_sel %}selected{% endif %}>
-                            {{ ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][m-1] }}
+                            {{ MESES_LARGO[m-1] }}
                         </option>
                         {% endfor %}
                     </select>
@@ -215,7 +215,7 @@
 
         function renderDia() {
             const { dia, cnt } = vpd[idx];
-            const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+            const meses = {{ MESES_LARGO | tojson }};
             document.getElementById('vpd-fecha').textContent = dia.toString().padStart(2,'0') + ' de ' + meses[{{ mes_sel }} - 1];
             document.getElementById('vpd-cnt').textContent = cnt + (cnt === 1 ? ' visita' : ' visitas');
             document.getElementById('btn-prev').disabled = idx === 0;

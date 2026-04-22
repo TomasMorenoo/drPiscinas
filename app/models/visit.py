@@ -4,6 +4,11 @@ from datetime import datetime
 class Visit(db.Model):
     __tablename__ = "visits"
 
+    __table_args__ = (
+        db.Index('idx_visit_casa_id', 'casa_id'),
+        db.Index('idx_visit_fecha', 'fecha'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
 
     casa_id = db.Column(

@@ -334,7 +334,7 @@
 }
 </style>
 
-{% set nombres_meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] %}
+
 
 <div class="container-fluid py-3 px-3">
 
@@ -344,7 +344,7 @@
             <i class="bi bi-speedometer2 me-1 d-print-none"></i>Reporte
         </h1>
         <span class="badge bg-primary fs-6 fw-normal">
-            {{ nombres_meses[mes - 1] }} {{ anio }}
+            {{ MESES_LARGO[mes - 1] }} {{ anio }}
         </span>
         {% if mes_congelado %}
         <span class="badge bg-warning text-dark"><i class="bi bi-lock-fill me-1"></i>Cerrado</span>
@@ -361,7 +361,7 @@
                     <span class="fw-bold small text-muted"><i class="bi bi-calendar3"></i></span>
                     <select name="mes" class="form-select form-select-sm border-secondary fw-bold" style="width: auto;">
                         {% for m in range(1, 13) %}
-                        <option value="{{ m }}" {% if m == mes %}selected{% endif %}>{{ nombres_meses[m - 1] }}</option>
+                        <option value="{{ m }}" {% if m == mes %}selected{% endif %}>{{ MESES_LARGO[m - 1] }}</option>
                         {% endfor %}
                     </select>
                     <input type="number" name="anio" class="form-control form-control-sm border-secondary fw-bold" value="{{ anio }}" style="width: 72px;">
@@ -577,7 +577,8 @@
                                 {% endif %}
                             </td>
 
-                            {# MONTOS MOBILE (Oculto en PC) #}
+                            {# MONTOS MOBILE (Oculto en PC) — solo si hay algo más que el abono base #}
+                            {% if item.extras > 0 or item.saldo_anterior | abs > 0.1 %}
                             <td class="td-montos-grid-cell d-md-none">
                                 <div class="td-montos-grid">
                                     <div class="monto-item">
@@ -600,6 +601,9 @@
                                     </div>
                                 </div>
                             </td>
+                            {% else %}
+                            <td class="td-montos-grid-cell d-md-none"></td>
+                            {% endif %}
 
                             {# 5. TOTAL A PAGAR #}
                             <td class="td-total-acciones text-md-center font-monospace fw-bold text-dark align-middle">
@@ -629,8 +633,8 @@
                                                 <i class="bi {% if pagado_atrasado %}bi-clock-history{% else %}bi-check-circle-fill{% endif %}"></i>
                                             </button>
                                         {% else %}
-                                            {% if item.url_wa %}
-                                            <a href="{{ item.url_wa }}" onclick="marcarEnviado({{ item.id_historial }})" class="btn btn-sm btn-outline-success" title="WhatsApp">
+                                            {% if item.tiene_telefono %}
+                                            <a href="#" onclick="abrirWA(event, {{ item.id_historial }})" class="btn btn-sm btn-outline-success" title="WhatsApp">
                                                 <i class="bi bi-whatsapp"></i>
                                             </a>
                                             {% endif %}
@@ -678,7 +682,7 @@
                                                 style="border-style: dashed; height: 74px;" title="Clic para deshacer el pago">
                                             {% if pagado_atrasado %}
                                                 <i class="bi bi-clock-history fs-4 mb-1 text-secondary" id="icon-bloqueo-{{ item.id_historial }}"></i>
-                                                <small class="fw-bold text-secondary" style="font-size: 0.65rem; line-height: 1;">SALDADO<br>EN {{ nombres_meses[item.historial_obj.fecha_pago.month - 1] | upper }}</small>
+                                                <small class="fw-bold text-secondary" style="font-size: 0.65rem; line-height: 1;">SALDADO<br>EN {{ MESES_LARGO[item.historial_obj.fecha_pago.month - 1] | upper }}</small>
                                             {% else %}
                                                 <i class="bi bi-check-circle-fill fs-4 mb-1" id="icon-bloqueo-{{ item.id_historial }}"></i>
                                                 <small class="fw-bold" style="font-size: 0.7rem;">PAGADO</small>
@@ -715,8 +719,8 @@
                                         </div>
 
                                         <div class="d-flex gap-1">
-                                            {% if item.url_wa %}
-                                            <a href="{{ item.url_wa }}" onclick="marcarEnviado({{ item.id_historial }})" class="btn btn-sm btn-outline-success flex-grow-1 py-1 px-0" title="WhatsApp">
+                                            {% if item.tiene_telefono %}
+                                            <a href="#" onclick="abrirWA(event, {{ item.id_historial }})" class="btn btn-sm btn-outline-success flex-grow-1 py-1 px-0" title="WhatsApp">
                                                 <i class="bi bi-whatsapp"></i>
                                             </a>
                                             {% else %}
@@ -750,7 +754,7 @@
                                 "saldo_restante": {{ item.saldo_restante }},
                                 "pagado": {{ item.pagado | tojson }},
                                 "mensaje_enviado": {{ item.mensaje_enviado | tojson }},
-                                "url_wa": {{ item.url_wa | tojson }},
+                                "tiene_telefono": {{ item.tiene_telefono | tojson }},
                                 "mes_congelado": {{ mes_congelado | tojson }},
                                 "es_grupo": false
                             }
@@ -849,9 +853,9 @@
                         {# Botones de acción del grupo #}
                         <div class="grupo-acciones-btn-row d-print-none">
                             {% if mes_congelado %}
-                                {% if g.url_wa and not g.pagado %}
-                                <a href="{{ g.url_wa }}" target="_blank"
-                                   onclick="marcarEnviadoGrupo({{ g.grupo_id }}, {{ mes }}, {{ anio }})"
+                                {% if g.telefono and not g.pagado %}
+                                <a href="#"
+                                   onclick="abrirWAGrupo(event, {{ g.grupo_id }}, {{ mes }}, {{ anio }})"
                                    class="btn btn-outline-success btn-sm rounded-circle d-flex align-items-center justify-content-center shadow-sm"
                                    style="width: 38px; height: 38px;" title="WhatsApp del Grupo">
                                     <i class="bi bi-whatsapp"></i>
@@ -1036,7 +1040,7 @@
                                             {% if item.pagado %}
                                                 <button onclick="togglePagoSimple({{ item.id_historial }}, this)"
                                                         class="btn btn-sm shadow-sm py-1 px-2 {% if pagado_atrasado %}btn-secondary{% else %}btn-success{% endif %}"
-                                                        title="{% if pagado_atrasado %}Saldado en {{ nombres_meses[item.historial_obj.fecha_pago.month - 1] }}{% else %}Pagado a tiempo{% endif %} - Clic para deshacer">
+                                                        title="{% if pagado_atrasado %}Saldado en {{ MESES_LARGO[item.historial_obj.fecha_pago.month - 1] }}{% else %}Pagado a tiempo{% endif %} - Clic para deshacer">
                                                     {% if pagado_atrasado %}
                                                         <i class="bi bi-clock-history"></i>
                                                     {% else %}
@@ -1087,7 +1091,7 @@
                                     "saldo_restante": {{ item.saldo_restante }},
                                     "pagado": {{ item.pagado | tojson }},
                                     "mensaje_enviado": {{ item.mensaje_enviado | tojson }},
-                                    "url_wa": {{ item.url_wa | tojson }},
+                                    "tiene_telefono": {{ item.tiene_telefono | tojson }},
                                     "mes_congelado": {{ mes_congelado | tojson }},
                                     "es_grupo": true
                                 }
@@ -1105,6 +1109,11 @@
     {% endif %} {# fin reporte_grupos #}
 
     {% endif %} {# fin empty state #}
+
+    <div id="banner-ocultas" class="text-center py-3 text-muted small d-none d-print-none">
+        <span id="txt-ocultas"></span>
+        <a href="#" onclick="verTodos(); return false;" class="ms-2 fw-bold text-primary">Ver todas</a>
+    </div>
 
 </div>{# fin container #}
 
@@ -1413,6 +1422,7 @@ function marcarPagadoDirectoSimple(id, btn) {
 function filtrarDashboard() {
     let texto = document.getElementById('busquedaRealTime').value.toLowerCase();
     let estado = document.getElementById('filtroEstado').value;
+    let ocultas = 0;
     document.querySelectorAll('.fila-busqueda').forEach(fila => {
         let txt = fila.textContent.toLowerCase();
         let est = fila.getAttribute('data-estado');
@@ -1425,13 +1435,29 @@ function filtrarDashboard() {
             }
         }
         fila.style.display = visible ? '' : 'none';
+        if (!visible) ocultas++;
     });
+    const banner = document.getElementById('banner-ocultas');
+    if (banner) {
+        if (ocultas > 0) {
+            document.getElementById('txt-ocultas').textContent = ocultas + (ocultas === 1 ? ' casa oculta por el filtro.' : ' casas ocultas por el filtro.');
+            banner.classList.remove('d-none');
+        } else {
+            banner.classList.add('d-none');
+        }
+    }
+}
+
+function verTodos() {
+    document.getElementById('filtroEstado').value = 'todos';
+    filtrarDashboard();
 }
 
 const buscador = document.getElementById('busquedaRealTime');
 const filtroEstado = document.getElementById('filtroEstado');
 if(buscador) buscador.addEventListener('keyup', filtrarDashboard);
 if(filtroEstado) filtroEstado.addEventListener('change', filtrarDashboard);
+filtrarDashboard();
 
 /* ── Formato del input de monto (ARS: puntos / USD: dígitos limpios) ── */
 const montoInput = document.getElementById('monto_entregado');
@@ -1649,6 +1675,26 @@ function confirmarDeshacer(nombreCliente, callback) {
     _getModalDeshacer().show();
 }
 
+function abrirWA(event, historialId) {
+    event.preventDefault();
+    const a = event.currentTarget;
+    marcarEnviado(historialId);
+    if (a.dataset.url) { window.location.href = a.dataset.url; return; }
+    fetch(`/dashboard/api/wa-url/${historialId}`)
+        .then(r => r.json())
+        .then(data => { if (data.url) { a.dataset.url = data.url; window.location.href = data.url; } });
+}
+
+function abrirWAGrupo(event, grupoId, mes, anio) {
+    event.preventDefault();
+    const a = event.currentTarget;
+    marcarEnviadoGrupo(grupoId, mes, anio);
+    if (a.dataset.url) { window.location.href = a.dataset.url; return; }
+    fetch(`/dashboard/api/wa-url-grupo/${grupoId}?mes=${mes}&anio=${anio}`)
+        .then(r => r.json())
+        .then(data => { if (data.url) { a.dataset.url = data.url; window.location.href = data.url; } });
+}
+
 function marcarEnviadoGrupo(grupo_id, mes, anio) {
     fetch(`/dashboard/marcar-mensaje-grupo/${grupo_id}`, {
         method: 'POST',
@@ -1761,7 +1807,7 @@ document.getElementById('modalFiltroHoja').addEventListener('show.bs.modal', fun
                         <i class="bi bi-cone-striped text-warning fs-2 flex-shrink-0 mt-1"></i>
                         <div>
                             <p class="fw-bold text-dark mb-1 fs-6">
-                                <strong>{{ nombres_meses[mes - 1] }} {{ anio }}</strong> todavía está en curso.
+                                <strong>{{ MESES_LARGO[mes - 1] }} {{ anio }}</strong> todavía está en curso.
                             </p>
                             <p class="text-muted small mb-0">
                                 Cerrar un mes activo puede dejar pagos sin registrar.

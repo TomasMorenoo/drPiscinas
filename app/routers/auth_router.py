@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session
 from flask_login import login_user, logout_user, login_required, current_user
-from app import db, limiter 
+from app import db, limiter
 from app.models.user import User
+from app.utils import registrar_auditoria
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -25,12 +26,10 @@ def login():
 
         # Verificamos credenciales
         if user and user.check_password(password):
-            # remember=False asegura que la cookie muera al cerrar el navegador
             login_user(user, remember=False)
-            
-            # Marcamos la sesión como NO permanente para respetar el cierre de pestaña
-            session.permanent = False 
-            
+            session.permanent = False
+            registrar_auditoria(user.username, 'LOGIN', None)
+            db.session.commit()
             flash('¡Bienvenido de nuevo!', 'success')
             
             # Redirección inteligente
@@ -74,8 +73,9 @@ def acceso_root():
 @auth_bp.route('/logout')
 @login_required
 def logout():
+    registrar_auditoria(current_user.username, 'LOGOUT', None)
+    db.session.commit()
     logout_user()
-    # Limpiamos explícitamente la sesión por seguridad
     session.clear()
     flash('Sesión cerrada correctamente.', 'info')
     return redirect(url_for('auth.login'))

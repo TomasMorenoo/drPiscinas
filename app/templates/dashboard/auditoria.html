@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Auditoría{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4 mt-2 gap-3">
+    <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-shield-check me-2"></i>Auditoría</h1>
+    <span class="badge bg-secondary fs-6 fw-normal">{{ paginacion.total }} registros</span>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-3">
+        <form method="GET" action="{{ url_for('dashboard.auditoria') }}" class="row g-2 align-items-end">
+            <div class="col-sm-3">
+                <label class="form-label small fw-bold text-muted text-uppercase mb-1">Usuario</label>
+                <input type="text" name="usuario" class="form-control form-control-sm" value="{{ filtro_usuario }}" placeholder="Ej: admin">
+            </div>
+            <div class="col-sm-3">
+                <label class="form-label small fw-bold text-muted text-uppercase mb-1">Acción</label>
+                <select name="accion" class="form-select form-select-sm">
+                    <option value="">Todas</option>
+                    {% for a in acciones_disponibles %}
+                    <option value="{{ a }}" {% if a == filtro_accion %}selected{% endif %}>{{ a }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-2">
+                <label class="form-label small fw-bold text-muted text-uppercase mb-1">Desde</label>
+                <input type="date" name="fecha_desde" class="form-control form-control-sm" value="{{ filtro_fecha_desde }}">
+            </div>
+            <div class="col-sm-2">
+                <label class="form-label small fw-bold text-muted text-uppercase mb-1">Hasta</label>
+                <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="{{ filtro_fecha_hasta }}">
+            </div>
+            <div class="col-sm-2 d-flex gap-2">
+                <button type="submit" class="btn btn-dark btn-sm flex-grow-1">Filtrar</button>
+                {% if filtro_usuario or filtro_accion or filtro_fecha_desde or filtro_fecha_hasta %}
+                <a href="{{ url_for('dashboard.auditoria') }}" class="btn btn-outline-secondary btn-sm">✕</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 small">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="ps-4">Fecha</th>
+                        <th>Usuario</th>
+                        <th>Acción</th>
+                        <th>Detalle</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td class="ps-4 text-muted text-nowrap">{{ log.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td class="fw-bold">{{ log.usuario }}</td>
+                        <td>
+                            {% if log.accion == 'PAGO' %}
+                            <span class="badge bg-success">{{ log.accion }}</span>
+                            {% elif log.accion in ('CERRAR_MES',) %}
+                            <span class="badge bg-warning text-dark">{{ log.accion }}</span>
+                            {% elif log.accion in ('ABRIR_MES',) %}
+                            <span class="badge bg-info text-dark">{{ log.accion }}</span>
+                            {% elif log.accion == 'AUMENTO' %}
+                            <span class="badge bg-primary">{{ log.accion }}</span>
+                            {% elif 'DESHACER' in log.accion %}
+                            <span class="badge bg-danger">{{ log.accion }}</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ log.accion }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">{{ log.detalle or '—' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center py-5 text-muted fst-italic">No hay registros.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% if paginacion.pages > 1 %}
+<nav class="mt-3">
+    <ul class="pagination pagination-sm justify-content-center mb-0">
+        {% if paginacion.has_prev %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('dashboard.auditoria', page=paginacion.prev_num, usuario=filtro_usuario, accion=filtro_accion, fecha_desde=filtro_fecha_desde, fecha_hasta=filtro_fecha_hasta) }}">‹</a>
+        </li>
+        {% endif %}
+        {% for p in paginacion.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+            {% if p %}
+            <li class="page-item {% if p == paginacion.page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('dashboard.auditoria', page=p, usuario=filtro_usuario, accion=filtro_accion, fecha_desde=filtro_fecha_desde, fecha_hasta=filtro_fecha_hasta) }}">{{ p }}</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% endif %}
+        {% endfor %}
+        {% if paginacion.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('dashboard.auditoria', page=paginacion.next_num, usuario=filtro_usuario, accion=filtro_accion, fecha_desde=filtro_fecha_desde, fecha_hasta=filtro_fecha_hasta) }}">›</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% endblock %}

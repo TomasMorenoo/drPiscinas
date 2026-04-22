@@ -2,6 +2,11 @@ from app import db
 
 class AbonoHistorico(db.Model):
     __tablename__ = 'abonos_historicos'
+
+    __table_args__ = (
+        db.Index('idx_abono_casa_mes_anio', 'casa_id', 'mes', 'anio'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     casa_id = db.Column(db.Integer, db.ForeignKey('casas.id'), nullable=False)
     mes = db.Column(db.Integer, nullable=False)

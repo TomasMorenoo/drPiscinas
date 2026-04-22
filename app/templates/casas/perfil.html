@@ -71,10 +71,10 @@
                     </div>
 
                     {% if casa.fecha_creacion %}
-                    {% set meses_nombre = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'] %}
+                    
                     <div class="mb-3">
                         <small class="text-muted d-block text-uppercase fw-bold">Cliente desde</small>
-                        <span class="text-muted">{{ meses_nombre[casa.fecha_creacion.month - 1] }} {{ casa.fecha_creacion.year }}</span>
+                        <span class="text-muted">{{ MESES_LARGO[casa.fecha_creacion.month - 1] }} {{ casa.fecha_creacion.year }}</span>
                     </div>
                     {% endif %}
 
@@ -301,9 +301,9 @@
                         <div class="col-6">
                             <label class="form-label fw-bold text-uppercase small text-muted">A partir del Mes</label>
                             <select name="mes_desde" id="mesDesdeInd" class="form-select border-info" required>
-                                <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option>
-                                <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
-                                <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+                                {% for m in range(1, 13) %}<option value="{{ m }}">{{ MESES_LARGO[m-1] }}</option>{% endfor %}
+                                
+                                
                             </select>
                         </div>
                         <div class="col-6">
@@ -358,9 +358,9 @@
                         <div class="col-6">
                             <label class="form-label fw-bold">Mes</label>
                             <select name="mes" id="extraMes" class="form-select border-secondary">
-                                <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option>
-                                <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
-                                <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+                                {% for m in range(1, 13) %}<option value="{{ m }}">{{ MESES_LARGO[m-1] }}</option>{% endfor %}
+                                
+                                
                             </select>
                         </div>
                         <div class="col-6">

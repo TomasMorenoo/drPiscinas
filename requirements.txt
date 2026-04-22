@@ -4,5 +4,6 @@ psycopg2-binary
 python-dotenv
 flask-login
 flask-limiter
-flask-wtf 
+flask-wtf
 email_validator
+flask-caching

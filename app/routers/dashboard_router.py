@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from app.utils import nombre_mes, MESES_LARGO, registrar_auditoria
 from flask_login import login_required, current_user
 from app.decorators import admin_required
 from app import db
@@ -6,28 +7,16 @@ from app.models import Casa, Country, Barrio
 from app.models.abono_historico import AbonoHistorico
 from app.models.cierre_mes import CierreMes
 from app.models.visit import Visit
+from app.models.visit_product import VisitProduct
 from datetime import datetime, timedelta, timezone
 import re
 import urllib.parse
 from sqlalchemy.orm import joinedload, selectinload
-from sqlalchemy import func, extract, and_, or_
+from sqlalchemy import func, extract, and_, or_, text
 import calendar
 import uuid
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
-
-# ==========================================
-# AUDITORÍA
-# ==========================================
-
-def registrar_auditoria(usuario, accion, detalle):
-    """Guarda una entrada en el log de auditoría."""
-    from app.models.auditoria import AuditoriaLog
-    from datetime import datetime, timedelta, timezone
-    tz_ar = timezone(timedelta(hours=-3))
-    ahora_ar = datetime.now(tz_ar).replace(tzinfo=None)
-    log = AuditoriaLog(fecha=ahora_ar, usuario=usuario, accion=accion, detalle=detalle)
-    db.session.add(log)
 
 # ==========================================
 # UTILIDADES Y FORMATOS
@@ -92,9 +81,10 @@ def obtener_detalle_productos(casa, mes, anio):
         detalles.append(f"{cant_str}{p['unidad']} de {p['nombre']}")
     return detalles
 
-def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_visual, pagos_en_este_dashboard):
+def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_visual, pagos_en_este_dashboard, pt=None):
     from app.models.plantilla_mensaje import PlantillaMensaje, renderizar_template
-    pt = PlantillaMensaje.get_activa()
+    if pt is None:
+        pt = PlantillaMensaje.get_activa()
 
     nombre_wa = casa.nombre_cliente if casa.nombre_cliente else get_nombre_limpio(casa)
     saludo = obtener_saludo_tiempo(nombre_wa)
@@ -119,9 +109,10 @@ def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_vis
     }
     return renderizar_template(pt.get_template_individual(), variables)
 
-def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard, saldo_a_favor=0.0):
+def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard, saldo_a_favor=0.0, pt=None):
     from app.models.plantilla_mensaje import PlantillaMensaje, renderizar_template
-    pt = PlantillaMensaje.get_activa()
+    if pt is None:
+        pt = PlantillaMensaje.get_activa()
 
     saludo = obtener_saludo_tiempo(grupo_nombre)
     total_final = total_grupo_mes + total_grupo_saldo_ant_visual - total_pagos_dashboard - saldo_a_favor
@@ -302,6 +293,70 @@ def _saldo_grupo_para_mes(grupo, mes, anio):
     return 0.0
 
 # ==========================================
+# OPTIMIZACIÓN: SALDO ANTERIOR EN BATCH
+# ==========================================
+
+def calcular_saldos_anteriores_batch(mes, anio):
+    """
+    Calcula el saldo anterior de todas las casas en una sola query SQL.
+    Reemplaza 200 llamadas individuales a obtener_saldo_anterior() en index().
+    Limitación: no recalcula pausas añadidas retroactivamente a meses ya cerrados.
+    """
+    sql = text("""
+        SELECT
+            ah.casa_id,
+            SUM(
+                ah.monto
+                + COALESCE(prod_ext.extras, 0)
+                + COALESCE(promo_ext.extras, 0)
+                - COALESCE(ah.monto_pagado, 0)
+            ) AS saldo
+        FROM abonos_historicos ah
+        JOIN casas c ON c.id = ah.casa_id
+        LEFT JOIN (
+            SELECT v.casa_id,
+                   EXTRACT(YEAR  FROM v.fecha)::int AS anio,
+                   EXTRACT(MONTH FROM v.fecha)::int AS mes,
+                   SUM(vp.cantidad * COALESCE(vp.precio_unitario, p.precio)) AS extras
+            FROM visits v
+            JOIN visit_products vp ON vp.visit_id = v.id
+            JOIN products       p  ON p.id = vp.product_id
+            GROUP BY v.casa_id,
+                     EXTRACT(YEAR  FROM v.fecha),
+                     EXTRACT(MONTH FROM v.fecha)
+        ) prod_ext ON prod_ext.casa_id = ah.casa_id
+                  AND prod_ext.anio     = ah.anio
+                  AND prod_ext.mes      = ah.mes
+        LEFT JOIN (
+            SELECT v.casa_id,
+                   EXTRACT(YEAR  FROM v.fecha)::int AS anio,
+                   EXTRACT(MONTH FROM v.fecha)::int AS mes,
+                   SUM(pr.precio) AS extras
+            FROM visits v
+            JOIN promos pr ON pr.id = v.promo_id
+            GROUP BY v.casa_id,
+                     EXTRACT(YEAR  FROM v.fecha),
+                     EXTRACT(MONTH FROM v.fecha)
+        ) promo_ext ON promo_ext.casa_id = ah.casa_id
+                   AND promo_ext.anio     = ah.anio
+                   AND promo_ext.mes      = ah.mes
+        WHERE NOT (ah.pagado = TRUE AND COALESCE(ah.monto_pagado, 0) = 0)
+          AND (ah.anio < :anio OR (ah.anio = :anio AND ah.mes < :mes))
+          AND (
+              c.fecha_creacion IS NULL
+              OR ah.anio > EXTRACT(YEAR  FROM c.fecha_creacion)
+              OR (ah.anio  = EXTRACT(YEAR  FROM c.fecha_creacion)
+                  AND ah.mes >= EXTRACT(MONTH FROM c.fecha_creacion))
+          )
+        GROUP BY ah.casa_id
+    """)
+    try:
+        rows = db.session.execute(sql, {"mes": mes, "anio": anio})
+        return {row.casa_id: float(row.saldo or 0) for row in rows}
+    except Exception:
+        return {}
+
+# ==========================================
 # RUTAS DEL DASHBOARD
 # ==========================================
 
@@ -329,35 +384,37 @@ def index():
         joinedload(Casa.country),
         joinedload(Casa.barrio),
         joinedload(Casa.grupo),
-        selectinload(Casa.historial_abonos),
-        selectinload(Casa.visitas).selectinload(Visit.productos),
+        selectinload(Casa.historial_pausas),
+        selectinload(Casa.visitas).selectinload(Visit.productos).joinedload(VisitProduct.product),
         selectinload(Casa.visitas).joinedload(Visit.promo)
     )
 
     casas_raw = query_casas.all()
     historial_dict = {h.casa_id: h for h in AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()}
+    saldos_batch = calcular_saldos_anteriores_batch(mes, anio)
 
     casas = []
+    _cache_datos = {}
     for c in casas_raw:
         if c.fecha_creacion:
             if c.fecha_creacion.year > anio or (c.fecha_creacion.year == anio and c.fecha_creacion.month > mes):
                 continue
-                
-        datos_v = c.obtener_gastos_mensuales(mes, anio)
-        extras_v = float(datos_v.get("extras", 0))
-        
+
         hist_v = historial_dict.get(c.id)
+        datos_v = c.obtener_gastos_mensuales(mes, anio, hist=hist_v)
+        extras_v = float(datos_v.get("extras", 0))
+
         if hist_v:
             ab_v = float(hist_v.monto)
         else:
             ab_v = float(c.precio_base or 0) if (c.activo or extras_v > 0) else 0.0
-            
-        # obtener_saldo_anterior ya refleja correctamente todos los pagos en cascada
-        saldo_anterior_visual_v = c.obtener_saldo_anterior(mes, anio)
 
-        if not c.activo and (ab_v + extras_v + saldo_anterior_visual_v) <= 0.1:
+        saldo_anterior_v = saldos_batch.get(c.id, 0.0) if saldos_batch else c.obtener_saldo_anterior(mes, anio)
+
+        if not c.activo and (ab_v + extras_v + saldo_anterior_v) <= 0.1:
             continue
-            
+
+        _cache_datos[c.id] = {"datos": datos_v, "saldo_anterior": saldo_anterior_v}
         casas.append(c)
 
     casas.sort(key=natural_sort_key)
@@ -372,11 +429,12 @@ def index():
     hubo_cambios = False
 
     for casa in casas:
-        datos = casa.obtener_gastos_mensuales(mes, anio)
+        _cd = _cache_datos[casa.id]
+        datos = _cd["datos"]
         extras = float(datos.get("extras", 0))
-        saldo_anterior_real = casa.obtener_saldo_anterior(mes, anio)
+        saldo_anterior_real = _cd["saldo_anterior"]
         historial = historial_dict.get(casa.id)
-        
+
         pausado_mes = _casa_pausada_en_mes(casa, mes, anio, extras)
         if pausado_mes:
             abono_mes = 0.0
@@ -450,8 +508,8 @@ def index():
             "mensaje_enviado": mensaje_enviado,
             "pagos_en_este_dashboard": pagos_en_este_dashboard,
             "estado": estado_item,
-            "url_wa": "",
-            "pausado": _casa_pausada_en_mes(casa, mes, anio, extras)
+            "tiene_telefono": bool(casa.telefono),
+            "pausado": pausado_mes
         }
 
         if casa.grupo_id:
@@ -472,11 +530,6 @@ def index():
             g["saldo_restante"] += saldo_restante
             g["monto_pagado"] += pagos_en_este_dashboard
         else:
-            if casa.telefono:
-                num_tel = limpiar_telefono(casa.telefono)
-                texto_wa = generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_visual, pagos_en_este_dashboard)
-                item_casa["url_wa"] = f"whatsapp://send?phone={num_tel}&text={urllib.parse.quote(texto_wa)}"
-            
             reporte_sueltas.append(item_casa)
 
         total_clientes += 1
@@ -515,10 +568,7 @@ def index():
         else:
             g["estado"] = "pendiente"
 
-        if g["telefono"]:
-            num_tel = limpiar_telefono(g["telefono"])
-            texto_wa = generar_wa_grupo(g['nombre'], g["casas"], mes, anio, g['total_mes'], g['saldo_anterior'], g['monto_pagado'], g.get('saldo_a_favor', 0.0))
-            g["url_wa"] = f"whatsapp://send?phone={num_tel}&text={urllib.parse.quote(texto_wa)}"
+        pass  # url_wa generada on-demand via /api/wa-url-grupo/<grupo_id>
 
     if hubo_cambios:
         db.session.commit()
@@ -568,7 +618,7 @@ def toggle_pago(id):
     if action == 'undo' or (pagado and action != 'advance'):
         # --- AUDITORÍA: deshacer pago ---
         casa_undo = registro.casa
-        mes_nombre_undo = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][registro.mes - 1]
+        mes_nombre_undo = nombre_mes(registro.mes)
         registrar_auditoria(
             current_user.username,
             'DESHACER_PAGO',
@@ -615,7 +665,7 @@ def toggle_pago(id):
             total_a_pagar = float(registro.monto) + float(datos['extras']) + saldo_ant - float(registro.monto_pagado or 0)
 
             # --- AUDITORÍA: marcar pagado ---
-            mes_nombre_pago = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][registro.mes - 1]
+            mes_nombre_pago = nombre_mes(registro.mes)
             registrar_auditoria(
                 current_user.username,
                 'PAGO',
@@ -652,7 +702,7 @@ def marcar_pagado_directo(id):
     total_a_pagar = float(registro.monto) + float(datos['extras']) + saldo_ant - float(registro.monto_pagado or 0)
 
     # --- AUDITORÍA ---
-    mes_nombre_d = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][registro.mes - 1]
+    mes_nombre_d = nombre_mes(registro.mes)
     registrar_auditoria(
         current_user.username,
         'PAGO',
@@ -688,9 +738,17 @@ def sync_abonos():
     cierre = CierreMes.query.filter_by(mes=mes, anio=anio).first()
     if not cierre:
         db.session.add(CierreMes(mes=mes, anio=anio))
-    
-    for casa in Casa.query.all():
-        datos_v = casa.obtener_gastos_mensuales(mes, anio)
+
+    casas_sync = Casa.query.options(
+        selectinload(Casa.historial_pausas),
+        selectinload(Casa.visitas).selectinload(Visit.productos).joinedload(VisitProduct.product),
+        selectinload(Casa.visitas).joinedload(Visit.promo)
+    ).all()
+    hist_sync_dict = {h.casa_id: h for h in AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()}
+
+    for casa in casas_sync:
+        hist = hist_sync_dict.get(casa.id)
+        datos_v = casa.obtener_gastos_mensuales(mes, anio, hist=hist)
         extras_v = float(datos_v.get("extras", 0))
 
         if not casa.activo and extras_v <= 0:
@@ -700,15 +758,13 @@ def sync_abonos():
             abono_a_guardar = 0.0
         else:
             abono_a_guardar = float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0
-
-        hist = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
         if not hist:
             db.session.add(AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=abono_a_guardar))
         else:
             if not getattr(hist, 'pagado', False) and float(hist.monto_pagado or 0) == 0:
                 hist.monto = abono_a_guardar
 
-    mes_nombre_s = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mes - 1]
+    mes_nombre_s = nombre_mes(mes)
     registrar_auditoria(current_user.username, 'CERRAR_MES', f"{mes_nombre_s} {anio}")
     db.session.commit()
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
@@ -725,7 +781,7 @@ def unsync_abonos():
         for f in fantasmas:
             if (not f.monto_pagado or float(f.monto_pagado) <= 0.01) and not getattr(f, 'mensaje_enviado', False):
                 db.session.delete(f)
-        mes_nombre_u = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mes - 1]
+        mes_nombre_u = nombre_mes(mes)
         registrar_auditoria(current_user.username, 'ABRIR_MES', f"{mes_nombre_u} {anio}")
         db.session.commit()
     return redirect(url_for('dashboard.index', mes=mes, anio=anio))
@@ -757,7 +813,13 @@ def toggle_pago_grupo(grupo_id):
     anio = request.json.get("anio")
     action = request.json.get("action")
     
-    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).all()
+    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).options(
+        joinedload(Casa.grupo),
+        selectinload(Casa.historial_abonos),
+        selectinload(Casa.historial_pausas),
+        selectinload(Casa.visitas).selectinload(Visit.productos).joinedload(VisitProduct.product),
+        selectinload(Casa.visitas).joinedload(Visit.promo)
+    ).all()
     historiales = AbonoHistorico.query.filter(
         AbonoHistorico.casa_id.in_([c.id for c in casas_grupo]),
         AbonoHistorico.mes == mes,
@@ -780,7 +842,7 @@ def toggle_pago_grupo(grupo_id):
             grupo_undo.saldo_a_favor = 0.0
         if casas_grupo:
             grupo_obj_aud = casas_grupo[0].grupo
-            mes_nombre_gu = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mes - 1]
+            mes_nombre_gu = nombre_mes(mes)
             registrar_auditoria(
                 current_user.username,
                 'DESHACER_PAGO',
@@ -819,7 +881,7 @@ def toggle_pago_grupo(grupo_id):
             # ── NOTIFICADO → PAGADO ──────────────────────────────────
             if casas_grupo:
                 grupo_obj_p = casas_grupo[0].grupo
-                mes_nombre_gp = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mes - 1]
+                mes_nombre_gp = nombre_mes(mes)
                 registrar_auditoria(
                     current_user.username,
                     'PAGO',
@@ -894,7 +956,12 @@ def registrar_pago_grupo(grupo_id):
     cotizacion_usd = request.json.get("cotizacion_usd")
 
     from app.models.grupo import GrupoCliente
-    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).all()
+    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).options(
+        selectinload(Casa.historial_abonos),
+        selectinload(Casa.historial_pausas),
+        selectinload(Casa.visitas).selectinload(Visit.productos).joinedload(VisitProduct.product),
+        selectinload(Casa.visitas).joinedload(Visit.promo)
+    ).all()
     grupo_obj = GrupoCliente.query.get(grupo_id)
     historiales = AbonoHistorico.query.filter(
         AbonoHistorico.casa_id.in_([c.id for c in casas_grupo]),
@@ -904,7 +971,7 @@ def registrar_pago_grupo(grupo_id):
 
     # --- AUDITORÍA ---
     if casas_grupo and monto_ingresado > 0:
-        mes_nombre_rg = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mes - 1]
+        mes_nombre_rg = nombre_mes(mes)
         detalle_rg = f"Grupo {grupo_obj.nombre if grupo_obj else grupo_id} — {mes_nombre_rg} {anio} — ${format_money(monto_ingresado)}"
         if monto_usd and cotizacion_usd:
             detalle_rg += f" [USD {format_money(monto_usd)} @ ${format_money(cotizacion_usd)}]"
@@ -976,7 +1043,7 @@ def registrar_pago_especial(id_historial):
 
     if monto_ingresado > 0:
         # --- AUDITORÍA ---
-        mes_nombre_e = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][registro.mes - 1]
+        mes_nombre_e = nombre_mes(registro.mes)
         detalle_e = f"{registro.casa.nombre_formateado()} — {mes_nombre_e} {registro.anio} — ${format_money(monto_ingresado)}"
         if monto_usd and cotizacion_usd:
             detalle_e += f" [USD {format_money(monto_usd)} @ ${format_money(cotizacion_usd)}]"
@@ -998,8 +1065,16 @@ def planilla_impresion():
     registro_congelado = CierreMes.query.filter_by(mes=mes, anio=anio).first()
     mes_congelado = True if registro_congelado else False
 
-    casas_raw = Casa.query.all()
+    casas_raw = Casa.query.options(
+        joinedload(Casa.country),
+        joinedload(Casa.barrio),
+        joinedload(Casa.grupo),
+        selectinload(Casa.historial_pausas),
+        selectinload(Casa.visitas).selectinload(Visit.productos).joinedload(VisitProduct.product),
+        selectinload(Casa.visitas).joinedload(Visit.promo)
+    ).all()
     historial_dict = {h.casa_id: h for h in AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()}
+    saldos_batch = calcular_saldos_anteriores_batch(mes, anio)
 
     casas = []
     for c in casas_raw:
@@ -1007,28 +1082,27 @@ def planilla_impresion():
         if c.fecha_creacion:
             if (c.fecha_creacion.year, c.fecha_creacion.month) > (anio, mes):
                 continue
-        datos_v = c.obtener_gastos_mensuales(mes, anio)
+        datos_v = c.obtener_gastos_mensuales(mes, anio, hist=historial_dict.get(c.id))
         if not c.activo and float(datos_v.get("extras", 0)) <= 0:
             continue
         casas.append(c)
 
     casas.sort(key=natural_sort_key)
-    
+
     reporte_sueltas = []
     reporte_grupos = {}
-    
+
     for casa in casas:
         datos = casa.obtener_gastos_mensuales(mes, anio)
         producto = float(datos.get("extras", 0))
         historial = historial_dict.get(casa.id)
-        
+
         if historial:
             abono = float(historial.monto)
         else:
             abono = float(casa.precio_base or 0) if (casa.activo or producto > 0) else 0.0
-            
-        # obtener_saldo_anterior ya refleja correctamente todos los pagos en cascada
-        saldo_anterior_visual = casa.obtener_saldo_anterior(mes, anio)
+
+        saldo_anterior_visual = saldos_batch.get(casa.id, 0.0) if saldos_batch else casa.obtener_saldo_anterior(mes, anio)
 
         total_a_pagar = abono + producto + saldo_anterior_visual
 
@@ -1133,13 +1207,10 @@ def planilla_impresion():
         else:
             g["estado"] = "pendiente"
 
-    nombres_meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-    nombre_mes = nombres_meses[mes - 1]
-
     return render_template("dashboard/planilla.html",
                            reporte_sueltas=reporte_sueltas,
                            reporte_grupos=list(reporte_grupos.values()),
-                           mes_nombre=nombre_mes,
+                           mes_nombre=nombre_mes(mes, largo=True),
                            anio=anio,
                            filtro=filtro)
 
@@ -1151,25 +1222,27 @@ def api_totales():
     anio = int(request.args.get("anio", datetime.now().year))
     
     query_casas = Casa.query.options(
-        selectinload(Casa.historial_abonos),
-        selectinload(Casa.visitas).selectinload(Visit.productos)
+        selectinload(Casa.historial_pausas),
+        selectinload(Casa.visitas).selectinload(Visit.productos).joinedload(VisitProduct.product),
+        selectinload(Casa.visitas).joinedload(Visit.promo)
     )
     casas_raw = query_casas.all()
     historial_dict = {h.casa_id: h for h in AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()}
+    saldos_batch = calcular_saldos_anteriores_batch(mes, anio)
 
     total_abono = 0.0
     total_extras = 0.0
-    total_recaudado = 0.0 
-    total_deuda_anterior = 0.0 
+    total_recaudado = 0.0
+    total_deuda_anterior = 0.0
 
     for casa in casas_raw:
         datos = casa.obtener_gastos_mensuales(mes, anio)
         extras_v = float(datos.get("extras", 0))
-        
+
         if not casa.activo and extras_v <= 0:
             continue
-            
-        saldo_anterior_real = casa.obtener_saldo_anterior(mes, anio)
+
+        saldo_anterior_real = saldos_batch.get(casa.id, 0.0) if saldos_batch else casa.obtener_saldo_anterior(mes, anio)
         historial = historial_dict.get(casa.id)
         
         pausado_mes = _casa_pausada_en_mes(casa, mes, anio, extras_v)
@@ -1207,6 +1280,84 @@ def api_totales():
     })
 
 # ================================================
+# API: WA URL ON-DEMAND
+# ================================================
+
+@dashboard_bp.route("/api/wa-url/<int:id_historial>")
+@login_required
+@admin_required
+def api_wa_url(id_historial):
+    hist = AbonoHistorico.query.get_or_404(id_historial)
+    casa = Casa.query.options(
+        selectinload(Casa.historial_abonos),
+        selectinload(Casa.historial_pausas),
+        selectinload(Casa.visitas).selectinload(Visit.productos).joinedload(VisitProduct.product),
+        selectinload(Casa.visitas).joinedload(Visit.promo)
+    ).get(hist.casa_id)
+    if not casa or not casa.telefono:
+        return jsonify({"url": None})
+    mes, anio = hist.mes, hist.anio
+    from app.models.plantilla_mensaje import PlantillaMensaje
+    pt = PlantillaMensaje.get_activa()
+    datos = casa.obtener_gastos_mensuales(mes, anio, hist=hist)
+    extras = float(datos.get("extras", 0))
+    pausado = _casa_pausada_en_mes(casa, mes, anio, extras)
+    abono_mes = 0.0 if pausado else (float(hist.monto) if float(hist.monto) > 0 else float(casa.precio_base or 0))
+    saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
+    pagos = float(hist.monto_pagado or 0)
+    num_tel = limpiar_telefono(casa.telefono)
+    texto = generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior, pagos, pt=pt)
+    return jsonify({"url": f"whatsapp://send?phone={num_tel}&text={urllib.parse.quote(texto)}"})
+
+
+@dashboard_bp.route("/api/wa-url-grupo/<int:grupo_id>")
+@login_required
+@admin_required
+def api_wa_url_grupo(grupo_id):
+    mes = request.args.get("mes", type=int)
+    anio = request.args.get("anio", type=int)
+    if not mes or not anio:
+        return jsonify({"url": None})
+    from app.models.grupo import GrupoCliente
+    grupo = GrupoCliente.query.get_or_404(grupo_id)
+    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).options(
+        selectinload(Casa.historial_abonos),
+        selectinload(Casa.historial_pausas),
+        selectinload(Casa.visitas).selectinload(Visit.productos).joinedload(VisitProduct.product),
+        selectinload(Casa.visitas).joinedload(Visit.promo)
+    ).all()
+    telefono_repr = next((c.telefono for c in casas_grupo if c.telefono), None)
+    if not telefono_repr:
+        return jsonify({"url": None})
+    hist_dict = {h.casa_id: h for h in AbonoHistorico.query.filter(
+        AbonoHistorico.casa_id.in_([c.id for c in casas_grupo]),
+        AbonoHistorico.mes == mes, AbonoHistorico.anio == anio
+    ).all()}
+    casas_data = []
+    total_grupo_mes = total_grupo_saldo = total_pagos = 0.0
+    for c in casas_grupo:
+        h = hist_dict.get(c.id)
+        datos = c.obtener_gastos_mensuales(mes, anio, hist=h)
+        extras = float(datos.get("extras", 0))
+        pausado = _casa_pausada_en_mes(c, mes, anio, extras)
+        abono = 0.0 if pausado else (float(h.monto) if h and float(h.monto) > 0 else float(c.precio_base or 0))
+        saldo = c.obtener_saldo_anterior(mes, anio)
+        pagos = float(h.monto_pagado or 0) if h else 0.0
+        total_grupo_mes += abono + extras
+        total_grupo_saldo += saldo
+        total_pagos += pagos
+        casas_data.append({"casa": c, "abono": abono, "extras": extras, "saldo_anterior": saldo, "pausado": pausado})
+    from app.models.plantilla_mensaje import PlantillaMensaje
+    pt = PlantillaMensaje.get_activa()
+    saldo_a_favor = _saldo_grupo_para_mes(grupo, mes, anio)
+    texto = generar_wa_grupo(grupo.nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo, total_pagos, saldo_a_favor, pt=pt)
+    tel = re.sub(r'\D', '', telefono_repr)
+    if len(tel) == 10:
+        tel = "549" + tel
+    return jsonify({"url": f"whatsapp://send?phone={tel}&text={urllib.parse.quote(texto)}"})
+
+
+# ================================================
 # API: COTIZACIÓN DÓLAR
 # ================================================
 @dashboard_bp.route("/api/cotizacion-dolar")
@@ -1239,3 +1390,48 @@ def api_cotizacion_dolar():
         })
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 502
+
+
+@dashboard_bp.route("/auditoria")
+@login_required
+@admin_required
+def auditoria():
+    from app.models.auditoria import AuditoriaLog
+    page     = request.args.get("page", 1, type=int)
+    usuario  = request.args.get("usuario", "").strip()
+    accion   = request.args.get("accion", "").strip()
+    fecha_d  = request.args.get("fecha_desde", "").strip()
+    fecha_h  = request.args.get("fecha_hasta", "").strip()
+
+    q = AuditoriaLog.query.order_by(AuditoriaLog.fecha.desc())
+
+    if usuario:
+        q = q.filter(AuditoriaLog.usuario.ilike(f"%{usuario}%"))
+    if accion:
+        q = q.filter(AuditoriaLog.accion == accion)
+    if fecha_d:
+        from datetime import datetime as _dt
+        try:
+            q = q.filter(AuditoriaLog.fecha >= _dt.strptime(fecha_d, "%Y-%m-%d"))
+        except ValueError:
+            pass
+    if fecha_h:
+        from datetime import datetime as _dt, timedelta
+        try:
+            q = q.filter(AuditoriaLog.fecha < _dt.strptime(fecha_h, "%Y-%m-%d") + timedelta(days=1))
+        except ValueError:
+            pass
+
+    paginacion = q.paginate(page=page, per_page=50, error_out=False)
+    acciones_disponibles = [r[0] for r in db.session.query(AuditoriaLog.accion).distinct().order_by(AuditoriaLog.accion).all()]
+
+    return render_template(
+        "dashboard/auditoria.html",
+        logs=paginacion.items,
+        paginacion=paginacion,
+        acciones_disponibles=acciones_disponibles,
+        filtro_usuario=usuario,
+        filtro_accion=accion,
+        filtro_fecha_desde=fecha_d,
+        filtro_fecha_hasta=fecha_h,
+    )

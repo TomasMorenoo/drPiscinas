@@ -2,8 +2,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app import db
 from app.models.visit import Visit
-from app.models.auditoria import AuditoriaLog
 from app.models.visit_product import VisitProduct
+from app.utils import registrar_auditoria
 from app.models.casa import Casa
 from app.models.products import Product
 from app.models.promo import Promo
@@ -17,13 +17,6 @@ visit_bp = Blueprint(
     __name__,
     url_prefix="/visits"
 )
-
-# --- FUNCIÓN DE AYUDA PARA SABER SI EL MES ESTÁ CERRADO ---
-def registrar_auditoria_visita(usuario, accion, detalle):
-    from datetime import timedelta, timezone
-    tz_ar = timezone(timedelta(hours=-3))
-    ahora_ar = datetime.now(tz_ar).replace(tzinfo=None)
-    db.session.add(AuditoriaLog(fecha=ahora_ar, usuario=usuario, accion=accion, detalle=detalle))
 
 def is_mes_cerrado(mes, anio):
     # AHORA MIRA EL CANDADO NUEVO
@@ -141,7 +134,7 @@ def crear_visit():
                     )
                     db.session.add(vp)
         
-        registrar_auditoria_visita(
+        registrar_auditoria(
             current_user.username, 'CREAR_VISITA',
             f"{visit.casa.nombre_formateado()} — {fecha_obj.strftime('%d/%m/%Y')}"
         )
@@ -171,7 +164,7 @@ def eliminar_visit(id):
     detalle_elim = f"{visit.casa.nombre_formateado()} — {visit.fecha.strftime('%d/%m/%Y')}"
     VisitProduct.query.filter_by(visit_id=id).delete()
     db.session.delete(visit)
-    registrar_auditoria_visita(current_user.username, 'ELIMINAR_VISITA', detalle_elim)
+    registrar_auditoria(current_user.username, 'ELIMINAR_VISITA', detalle_elim)
     db.session.commit()
     flash("Visita eliminada", "success")
     return redirect(url_for("visits.listar_visits"))
@@ -220,7 +213,7 @@ def editar_visit(id):
                     vp = VisitProduct(visit_id=id, product_id=p_id, cantidad=float(cant), precio_unitario=prod.precio)
                     db.session.add(vp)
         
-        registrar_auditoria_visita(
+        registrar_auditoria(
             current_user.username, 'EDITAR_VISITA',
             f"{visit.casa.nombre_formateado()} — {nueva_fecha.strftime('%d/%m/%Y')}"
         )

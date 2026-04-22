@@ -9,6 +9,8 @@ from app.models.products import Product
 from app.models.abono_historico import AbonoHistorico
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_, and_
+from sqlalchemy.orm import joinedload, selectinload
+from app.utils import nombre_mes, registrar_auditoria
 import re
 import calendar
 from datetime import datetime
@@ -18,22 +20,8 @@ import os
 casa_bp = Blueprint("casas", __name__, url_prefix="/casas")
 
 # ==========================================
-# AUDITORÍA DB
-# ==========================================
-
-def registrar_auditoria(usuario, accion, detalle):
-    """Guarda una entrada en el log de auditoría."""
-    from app.models.auditoria import AuditoriaLog
-    from datetime import timedelta, timezone
-    tz_ar = timezone(timedelta(hours=-3))
-    ahora_ar = datetime.now(tz_ar).replace(tzinfo=None)
-    log = AuditoriaLog(fecha=ahora_ar, usuario=usuario, accion=accion, detalle=detalle)
-    db.session.add(log)
-
-# ==========================================
 # LOG EN TXT DE AUMENTOS (AUDITORÍA)
 # ==========================================
-NOMBRES_MESES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
 def format_money(value):
     """Formatea números a texto con puntos en los miles (ej: 15.000)"""
@@ -41,7 +29,7 @@ def format_money(value):
 
 def log_aumento_txt(cliente, p_i, aumento, p_f, mes_num):
     """Guarda el registro exacto del aumento en un archivo de texto"""
-    mes_nombre = NOMBRES_MESES[mes_num] if 1 <= mes_num <= 12 else str(mes_num)
+    mes_nombre = nombre_mes(mes_num, largo=True) if 1 <= mes_num <= 12 else str(mes_num)
     linea = f"{cliente} | {format_money(p_i)} | {format_money(aumento)} | {format_money(p_f)} | {mes_nombre}\n"
     
     # Se guarda en la raíz del proyecto (junto a docker-compose.yml)
@@ -255,16 +243,12 @@ def herramienta_aumento():
             log = HistorialAumento(fecha=datetime.now(), descripcion=desc, casas_afectadas=count, mes_desde=mes_desde, anio_desde=anio_desde)
             db.session.add(log)
 
-            # --- AUDITORÍA: aumento individual por cada casa ---
-            for casa in casas_afectadas:
-                precio_viejo = float(casa.precio_anterior) if casa.precio_anterior else 0.0
-                precio_nuevo = float(casa.precio_base)
-                diferencia_aud = precio_nuevo - precio_viejo
-                registrar_auditoria(
-                    current_user.username,
-                    'AUMENTO',
-                    f"{casa.nombre_formateado()} — Antes: ${format_money(precio_viejo)} → +${format_money(diferencia_aud)} → Nuevo: ${format_money(precio_nuevo)} (desde {mes_desde}/{anio_desde})"
-                )
+            # --- AUDITORÍA: un resumen por operación ---
+            registrar_auditoria(
+                current_user.username,
+                'AUMENTO',
+                f"{texto_valor} | {count} casas | {target} | desde {mes_desde}/{anio_desde}"
+            )
 
             db.session.commit()
 
@@ -379,23 +363,27 @@ def editar_casa(id):
             return redirect(url_for("casas.editar_casa", id=id))
 
         precio_actual_db = float(casa.precio_base) if casa.precio_base else 0.0
-        
+
         # --- EL BLINDAJE PARA LA EDICIÓN MANUAL ---
         if abs(precio_actual_db - nuevo_precio) > 0.01:
             casa.precio_anterior = precio_actual_db
-            
+
             ahora = datetime.now()
-            # Congelamos el historial usando la función suelta, pasándole el objeto 'casa'
             asegurar_historial_pasado(casa, precio_actual_db, ahora.month, ahora.year)
-            
+
             casa.precio_base = nuevo_precio
-            
-            # Actualizamos el mes actual si no está pagado
+
             hist_actual = AbonoHistorico.query.filter_by(
                 casa_id=casa.id, mes=ahora.month, anio=ahora.year, pagado=False
             ).first()
             if hist_actual:
                 hist_actual.monto = nuevo_precio
+
+            registrar_auditoria(
+                current_user.username,
+                'CAMBIO_PRECIO',
+                f"{casa.nombre_formateado()} — ${format_money(precio_actual_db)} → ${format_money(nuevo_precio)}"
+            )
 
         casa.numero = numero
         casa.country_id = country_id
@@ -569,16 +557,23 @@ def eliminar_extra(visit_id):
 @casa_bp.route("/perfil/<int:id>")
 @login_required
 def perfil(id):
-    casa = Casa.query.get_or_404(id)
-    
+    casa = Casa.query.options(
+        joinedload(Casa.country),
+        joinedload(Casa.barrio),
+        joinedload(Casa.grupo),
+        selectinload(Casa.historial_abonos),
+        selectinload(Casa.historial_pausas),
+        selectinload(Casa.visitas).selectinload(Visit.productos).joinedload(VisitProduct.product),
+        selectinload(Casa.visitas).joinedload(Visit.promo)
+    ).get_or_404(id)
+
     visitas = sorted(casa.visitas, key=lambda v: v.fecha, reverse=True)
-    historial_asc = AbonoHistorico.query.filter_by(casa_id=casa.id).order_by(AbonoHistorico.anio.asc(), AbonoHistorico.mes.asc()).all()
-    
+    historial_asc = sorted(casa.historial_abonos, key=lambda h: (h.anio, h.mes))
+
     productos = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
-    
+
     detalles_pagos = []
     saldo_acumulado = 0.0
-    nombres_meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
     # Filtrar meses anteriores a la fecha de alta del cliente en el sistema
     if casa.fecha_creacion:
@@ -586,7 +581,7 @@ def perfil(id):
         historial_asc = [h for h in historial_asc if (h.anio, h.mes) >= (_fc.year, _fc.month)]
 
     for h in historial_asc:
-        gastos = casa.obtener_gastos_mensuales(h.mes, h.anio)
+        gastos = casa.obtener_gastos_mensuales(h.mes, h.anio, hist=h)
         total_mes = gastos['total']
         pagado_real = float(getattr(h, 'monto_pagado', 0) or 0)
         
@@ -602,7 +597,7 @@ def perfil(id):
             dinero_mostrado = pagado_real
             
         detalles_pagos.append({
-            "periodo": f"{nombres_meses[h.mes - 1]} {h.anio}",
+            "periodo": f"{nombre_mes(h.mes)} {h.anio}",
             "saldo_anterior": saldo_anterior_iter,
             "costo_mes": total_mes,
             "pagado": dinero_mostrado,

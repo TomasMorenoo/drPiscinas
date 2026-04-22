@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required # <--- 1. IMPORTAR SEGURIDAD
-from app.decorators import admin_required # <--- 2. IMPORTAR EL PATOVICA
+from flask_login import login_required, current_user
+from app.decorators import admin_required
 from app import db
+from app.utils import registrar_auditoria
 from app.models.promo import Promo
 from app.models.products import Product
 from app.models.promo_product import PromoProduct
@@ -77,6 +78,7 @@ def crear_promo():
             flash("La promo debe tener al menos un producto con cantidad mayor a 0", "error")
             return redirect(url_for("promo.crear_promo"))
 
+        registrar_auditoria(current_user.username, 'CREAR_PROMO', f"{promo.nombre} — ${promo.precio}")
         db.session.commit()
         flash("Promoción creada correctamente", "success")
         return redirect(url_for("promo.listar_promos"))
@@ -131,6 +133,7 @@ def editar_promo(id):
             flash("La promo debe tener al menos un producto", "error")
             return redirect(url_for("promo.editar_promo", id=promo.id))
 
+        registrar_auditoria(current_user.username, 'EDITAR_PROMO', f"{promo.nombre} — ${promo.precio}")
         db.session.commit()
         flash("Promo actualizada correctamente", "success")
         return redirect(url_for("promo.listar_promos"))
