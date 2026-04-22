@@ -42,10 +42,18 @@ def listar_visits():
     visits = Visit.query.filter(
         extract('month', Visit.fecha) == mes_sel,
         extract('year', Visit.fecha) == anio_sel,
-        db.or_(Visit.observaciones != '[EXTRA_MANUAL]', Visit.observaciones.is_(None)) # <-- MAGIA ACÁ
-    ).order_by(Visit.fecha.desc()).all()
+        db.or_(Visit.observaciones != '[EXTRA_MANUAL]', Visit.observaciones.is_(None))
+    ).order_by(Visit.id.desc()).all()
 
     total_mes = sum(v.calcular_total() for v in visits)
+    total_visitas = len(visits)
+
+    from collections import defaultdict
+    _vpd = defaultdict(int)
+    for v in visits:
+        _vpd[v.fecha.day] += 1
+    visitas_por_dia = sorted(_vpd.items())
+    max_vpd = max(_vpd.values()) if _vpd else 1
 
     # --- 2. OCULTAMOS LOS EXTRAS DEL TOP PRODUCTOS ---
     top_productos = db.session.query(
@@ -62,13 +70,16 @@ def listar_visits():
      .limit(5).all()
 
     return render_template(
-        "visits/list.html", 
+        "visits/list.html",
         visits=visits,
         total_mes=total_mes,
+        total_visitas=total_visitas,
+        visitas_por_dia=visitas_por_dia,
+        max_vpd=max_vpd,
         top_productos=top_productos,
         mes_sel=mes_sel,
         anio_sel=anio_sel,
-        mes_congelado=mes_congelado 
+        mes_congelado=mes_congelado
     )
     
     
@@ -220,7 +231,7 @@ def editar_visit(id):
     casas = Casa.query.filter_by(activo=True).all()
     products = Product.query.filter_by(activo=True).all()
     promos = Promo.query.filter_by(activo=True).all()
-    return render_template("visits/create.html", visit=visit, casas=casas, products=products, promos=promos)
+    return render_template("visits/edit.html", visit=visit, casas=casas, products=products, promos=promos)
 
 @visit_bp.route("/detalle/<int:id>")
 @login_required

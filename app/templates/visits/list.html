@@ -42,7 +42,7 @@
                     <button type="submit" class="btn btn-dark btn-sm w-100 mt-1">Ver Mes</button>
                 </div>
             </form>
-            
+
             {% if mes_congelado %}
             <div class="alert alert-warning py-1 px-2 mt-3 mb-0 text-center small border-0">
                 <i class="bi bi-info-circle"></i> Mes facturado y protegido.
@@ -77,6 +77,44 @@
     </div>
 </div>
 
+<div class="row g-3 mb-4">
+    <div class="col-lg-3 col-6">
+        <div class="card border-0 shadow-sm bg-success text-white p-3 h-100 d-flex flex-column justify-content-center">
+            <h6 class="fw-bold small text-uppercase opacity-75 mb-1"><i class="bi bi-calendar-check me-1"></i>Visitas del Mes</h6>
+            <h2 class="mb-0 fw-bold">{{ total_visitas }}</h2>
+        </div>
+    </div>
+    <div class="col-lg-9 col-6">
+        <div class="card border-0 shadow-sm h-100" style="background:linear-gradient(135deg,#0d6efd 0%,#6610f2 100%);">
+            <div class="card-body d-flex align-items-center justify-content-between px-4 py-3">
+                {% if visitas_por_dia %}
+                <button onclick="cambiarDia(-1)" id="btn-prev"
+                        class="btn border-0 p-0 text-white opacity-75"
+                        style="font-size:1.4rem;line-height:1;background:none;">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                <div class="text-center text-white flex-grow-1">
+                    <h6 class="fw-bold small text-uppercase opacity-75 mb-1" style="position:relative;top:-8px;"><i class="bi bi-calendar-day me-1"></i>Visitas por Día</h6>
+                    <div class="d-flex align-items-center fw-bold" style="font-size:1.4rem;line-height:1;">
+                        <span id="vpd-fecha" class="text-end" style="flex:1;color:rgba(255,255,255,0.95);">—</span>
+                        <span class="text-center" style="flex:0 0 2rem;color:rgba(255,255,255,0.35);font-weight:300;">|</span>
+                        <span id="vpd-cnt" class="text-start" style="flex:1;color:rgba(255,255,255,0.7);font-size:1.1rem;">—</span>
+                    </div>
+
+                </div>
+                <button onclick="cambiarDia(1)" id="btn-next"
+                        class="btn border-0 p-0 text-white opacity-75"
+                        style="font-size:1.4rem;line-height:1;background:none;">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+                {% else %}
+                <small class="text-white opacity-75">Sin visitas este mes.</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card border-0 shadow-sm">
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -87,11 +125,11 @@
                         <th>Casa / Ubicación</th>
                         <th>Productos / Promo</th>
                         <th>Observaciones</th>
-                        
+
                         {% if current_user.is_admin() %}
                         <th class="text-center">Total</th>
                         {% endif %}
-                        
+
                         <th class="text-end pe-4">Acciones</th>
                     </tr>
                 </thead>
@@ -99,7 +137,7 @@
                     {% for visit in visits %}
                     <tr style="cursor: pointer;" onclick="window.location.href='{{ url_for('visits.detalle_visit', id=visit.id) }}';">
                         <td class="ps-4">{{ visit.fecha.strftime('%d/%m/%Y') }}</td>
-                        
+
                         <td class="fw-bold text-dark">
                             <a href="{{ url_for('casas.perfil', id=visit.casa.id) }}" class="text-reset text-decoration-none" onclick="event.stopPropagation();">
                                 {{ visit.casa.nombre_formateado() }}
@@ -107,10 +145,10 @@
                         </td>
 
                         <td>
-                            <div class="text-truncate small" style="max-width: 200px; cursor: help;" 
-                                 title="{% if visit.promo %}{{ visit.promo.nombre }}{% endif %}{% for vp in visit.productos %} • {{ vp.product.nombre }} ({% if vp.cantidad % 1 == 0 %}{{ vp.cantidad | int }}{% else %}{{ vp.cantidad }}{% endif %} {{ vp.product.unidad }}){% endfor %}" 
+                            <div class="text-truncate small" style="max-width: 200px; cursor: help;"
+                                 title="{% if visit.promo %}{{ visit.promo.nombre }}{% endif %}{% for vp in visit.productos %} • {{ vp.product.nombre }} ({% if vp.cantidad % 1 == 0 %}{{ vp.cantidad | int }}{% else %}{{ vp.cantidad }}{% endif %} {{ vp.product.unidad }}){% endfor %}"
                                  data-bs-toggle="tooltip">
-                                
+
                                 {% if visit.promo %}
                                 <span class="badge bg-info-subtle text-info border border-info me-1">{{ visit.promo.nombre }}</span>
                                 {% endif %}
@@ -123,7 +161,7 @@
                         </td>
 
                         <td>
-                            <div class="text-truncate text-muted small" style="max-width: 250px; cursor: help;" 
+                            <div class="text-truncate text-muted small" style="max-width: 250px; cursor: help;"
                                  title="{{ visit.observaciones }}" data-bs-toggle="tooltip">
                                 {{ visit.observaciones if visit.observaciones else '-' }}
                             </div>
@@ -169,9 +207,24 @@
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-        tooltipTriggerList.map(function (el) {
-            return new bootstrap.Tooltip(el)
-        })
+        tooltipTriggerList.map(function (el) { return new bootstrap.Tooltip(el) });
+
+        {% if visitas_por_dia %}
+        const vpd = [{% for dia, cnt in visitas_por_dia %}{ dia: {{ dia }}, cnt: {{ cnt }} }{% if not loop.last %},{% endif %}{% endfor %}];
+        let idx = vpd.length - 1;
+
+        function renderDia() {
+            const { dia, cnt } = vpd[idx];
+            const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+            document.getElementById('vpd-fecha').textContent = dia.toString().padStart(2,'0') + ' de ' + meses[{{ mes_sel }} - 1];
+            document.getElementById('vpd-cnt').textContent = cnt + (cnt === 1 ? ' visita' : ' visitas');
+            document.getElementById('btn-prev').disabled = idx === 0;
+            document.getElementById('btn-next').disabled = idx === vpd.length - 1;
+        }
+        renderDia();
+
+        window.cambiarDia = function(dir) { idx = Math.max(0, Math.min(vpd.length - 1, idx + dir)); renderDia(); };
+        {% endif %}
     });
 </script>
 {% endblock %}
