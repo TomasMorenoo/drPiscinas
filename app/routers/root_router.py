@@ -127,7 +127,8 @@ def _run_restore_bg(sql_path, cmd, env):
 @root_required
 def panel():
     # ── Estado del sistema ───────────────────────────────────────────────────
-    modo_mantenimiento = os.path.exists(FLAG_PATH)
+    from app.models.configuracion import Configuracion
+    modo_mantenimiento = os.path.exists(FLAG_PATH) or bool(Configuracion.get('mantenimiento', False))
 
     total_clientes = Casa.query.filter_by(activo=True).count()
     total_inactivos = Casa.query.filter_by(activo=False).count()
@@ -227,12 +228,17 @@ def set_tipo_dolar():
 @login_required
 @root_required
 def toggle_mantenimiento():
+    from app.models.configuracion import Configuracion
     if os.path.exists(FLAG_PATH):
         os.remove(FLAG_PATH)
+        Configuracion.set('mantenimiento', False)
+        db.session.commit()
         flash("✅ Modo mantenimiento desactivado. El sistema está en línea.", "success")
     else:
         with open(FLAG_PATH, 'w') as f:
             f.write(f"Mantenimiento activado por root el {datetime.now().strftime('%d/%m/%Y %H:%M')}\n")
+        Configuracion.set('mantenimiento', True)
+        db.session.commit()
         flash("🔧 Modo mantenimiento activado. Solo root puede navegar.", "warning")
     return redirect(url_for('root.panel'))
 

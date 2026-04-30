@@ -138,6 +138,16 @@ def create_app():
     # --- MODO MANTENIMIENTO ---
     _maint_cache = {"v": False, "t": 0.0}
 
+    def _check_maint_active():
+        """Verifica si el modo mantenimiento está activo: primero por archivo, luego por DB."""
+        if os.path.exists('mantenimiento.flag'):
+            return True
+        try:
+            from app.models.configuracion import Configuracion
+            return bool(Configuracion.get('mantenimiento', False))
+        except Exception:
+            return False
+
     @app.before_request
     def check_maintenance_mode():
         import time
@@ -146,27 +156,52 @@ def create_app():
 
         now = time.monotonic()
         if now - _maint_cache["t"] > 10:
-            _maint_cache["v"] = os.path.exists('mantenimiento.flag')
+            _maint_cache["v"] = _check_maint_active()
             _maint_cache["t"] = now
 
+        if not _maint_cache["v"]:
+            return None
+
+        if request.path.startswith('/static/'):
+            return None
+
+        PASS_PATHS = ('/acceso', '/root/icon/192', '/root/login-image')
+        if request.path in PASS_PATHS:
+            return None
+
+        try:
+            is_root = current_user.is_authenticated and current_user.username == 'root'
+        except Exception:
+            is_root = False
+
+        if is_root:
+            return None
+
+        return render_template('errors/mantenimiento.html'), 503
+
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        from werkzeug.exceptions import HTTPException
+        if isinstance(e, HTTPException):
+            return e
         if _maint_cache["v"]:
-            
-            # 1. Dejar cargar los archivos visuales (imágenes, CSS)
-            if request.path.startswith('/static/'):
-                return None
-            
-            # 2. Rutas que siempre deben pasar (acceso oculto + recursos visuales)
-            PASS_PATHS = ('/acceso', '/root/icon/192', '/root/login-image')
-            if request.path in PASS_PATHS:
-                return None
-            
-            # 3. Dejar pasar si el usuario está logueado y es 'root' 
-            # (Si tu usuario principal se llama distinto, cambialo acá)
-            if current_user.is_authenticated and current_user.username == 'root':
-                return None
-            
-            # 4. A todos los demás, bloquearlos y mostrar la pantalla de pausa
-            return render_template('errors/mantenimiento.html'), 503
+            try:
+                from flask_login import current_user
+                if current_user.is_authenticated and current_user.username == 'root':
+                    return render_template('errors/500.html'), 500
+            except Exception:
+                pass
+            try:
+                return render_template('errors/mantenimiento.html'), 503
+            except Exception:
+                return (
+                    '<html><body style="background:#1a1d20;color:#f8f9fa;'
+                    'display:flex;align-items:center;justify-content:center;'
+                    'min-height:100vh;font-family:sans-serif;text-align:center;">'
+                    '<div><h1>Estamos en mantenimiento</h1>'
+                    '<p>Volvemos a la brevedad.</p></div></body></html>'
+                ), 503
+        return render_template('errors/500.html'), 500
 
     return app
 

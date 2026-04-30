@@ -439,7 +439,7 @@ def index():
         if pausado_mes:
             abono_mes = 0.0
         elif historial:
-            abono_mes = float(historial.monto) if float(historial.monto) > 0 else float(casa.precio_base or 0) if (casa.activo or extras > 0) else 0.0
+            abono_mes = float(historial.monto)
         else:
             abono_mes = float(casa.precio_base or 0) if (casa.activo or extras > 0) else 0.0
 
@@ -1254,7 +1254,7 @@ def api_totales():
         if pausado_mes:
             abono_mes = 0.0
         elif historial:
-            abono_mes = float(historial.monto) if float(historial.monto) > 0 else float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0
+            abono_mes = float(historial.monto)
         else:
             abono_mes = float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0
 
