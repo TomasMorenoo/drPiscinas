@@ -1097,7 +1097,12 @@ def planilla_impresion():
         producto = float(datos.get("extras", 0))
         historial = historial_dict.get(casa.id)
 
-        if historial:
+        pausado_mes = _casa_pausada_en_mes(casa, mes, anio, producto)
+        if pausado_mes:
+            if producto == 0:
+                continue
+            abono = 0.0
+        elif historial:
             abono = float(historial.monto)
         else:
             abono = float(casa.precio_base or 0) if (casa.activo or producto > 0) else 0.0

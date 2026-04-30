@@ -155,7 +155,8 @@
         {
             id: "{{ casa.id }}",
             nombre: "{{ casa.nombre_formateado() | escape }}",
-            fechaInicio: "{{ casa.fecha_creacion.strftime('%Y-%m') if casa.fecha_creacion else '0000-01' }}"
+            fechaInicio: "{{ casa.fecha_creacion.strftime('%Y-%m') if casa.fecha_creacion else '0000-01' }}",
+            pausas: [{% for p in casa.historial_pausas %}{"desde":"{{ p.desde.strftime('%Y-%m-%d') }}","hasta":"{{ p.hasta.strftime('%Y-%m-%d') if p.hasta else '' }}"}{% if not loop.last %},{% endif %}{% endfor %}]
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
@@ -166,7 +167,14 @@
         const fechaVal = fechaInput.value;
         if (!fechaVal) { casasFiltradas = [...casasData]; return; }
         const mesSel = fechaVal.substring(0, 7);
-        casasFiltradas = casasData.filter(c => c.fechaInicio <= mesSel);
+        casasFiltradas = casasData.filter(c => {
+            if (c.fechaInicio > mesSel) return false;
+            for (const p of c.pausas) {
+                const hasta = p.hasta || '9999-12-31';
+                if (fechaVal >= p.desde && fechaVal <= hasta) return false;
+            }
+            return true;
+        });
         const idActual = hiddenInput.value;
         if (idActual && !casasFiltradas.find(c => c.id === idActual)) {
             searchInput.value = '';

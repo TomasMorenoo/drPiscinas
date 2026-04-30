@@ -764,10 +764,13 @@ def pausar_casa(id):
         flash("No se puede pausar un cliente dado de baja.", "danger")
         return redirect(url_for("casas.perfil", id=id))
     import calendar as cal
-    desde_str = request.form.get("desde")
-    hasta_str = request.form.get("hasta")
-    desde = datetime.strptime(desde_str, "%Y-%m-%d").date() if desde_str else date.today()
-    hasta = datetime.strptime(hasta_str, "%Y-%m-%d").date() if hasta_str else None
+    hoy = date.today()
+    desde_mes = request.form.get("desde_mes", type=int) or hoy.month
+    desde_anio = request.form.get("desde_anio", type=int) or hoy.year
+    desde = date(desde_anio, desde_mes, 1)
+    hasta_mes = request.form.get("hasta_mes", type=int)
+    hasta_anio = request.form.get("hasta_anio", type=int)
+    hasta = date(hasta_anio, hasta_mes, 1) if hasta_mes and hasta_anio else None
 
     # Si el mes de inicio ya tiene productos cargados, diferir al primer día del mes siguiente
     gastos_desde = casa.obtener_gastos_mensuales(desde.month, desde.year)
@@ -787,7 +790,7 @@ def pausar_casa(id):
     db.session.commit()
 
     if diferido:
-        flash(f"El mes actual tiene productos cargados. La pausa se aplicará desde {desde.strftime('%d/%m/%Y')}.", "info")
+        flash(f"El mes actual tiene productos cargados. La pausa se aplicará desde {desde.strftime('%m/%Y')}.", "info")
     else:
         flash("Servicio pausado.", "warning")
     return redirect(url_for("casas.perfil", id=id))
@@ -800,8 +803,10 @@ def reanudar_casa(id):
     from app.models.pausa import Pausa
     from datetime import date
     casa = Casa.query.get_or_404(id)
-    hasta_str = request.form.get("hasta")
-    hasta = datetime.strptime(hasta_str, "%Y-%m-%d").date() if hasta_str else date.today()
+    hoy = date.today()
+    hasta_mes = request.form.get("hasta_mes", type=int)
+    hasta_anio = request.form.get("hasta_anio", type=int)
+    hasta = date(hasta_anio, hasta_mes, 1) if hasta_mes and hasta_anio else date(hoy.year, hoy.month, 1)
     pausa = Pausa.query.filter_by(casa_id=casa.id, hasta=None).order_by(Pausa.desde.desc()).first()
     if pausa:
         pausa.hasta = hasta

@@ -80,9 +80,7 @@ class Casa(db.Model):
         if pausa_en_mes:
             abono_final = 0.0
         elif hist:
-            # Mes cerrado: usar monto registrado, pero si era 0 por pausa que ya no aplica
-            # (pausa deshecha retroactivamente), recalcular desde precio_base
-            abono_final = float(hist.monto) if float(hist.monto) > 0 else float(self.precio_base or 0)
+            abono_final = float(hist.monto)
         else:
             abono_final = float(self.precio_base or 0)
 
@@ -166,7 +164,7 @@ class Casa(db.Model):
         if pausa_en_mes:
             abono_final = 0.0
         elif hist:
-            abono_final = float(hist.monto) if float(hist.monto) > 0 else float(self.precio_base or 0)
+            abono_final = float(hist.monto)
         else:
             abono_final = float(self.precio_base or 0)
 
