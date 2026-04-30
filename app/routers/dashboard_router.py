@@ -761,7 +761,7 @@ def sync_abonos():
         if not hist:
             db.session.add(AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=abono_a_guardar))
         else:
-            if not getattr(hist, 'pagado', False) and float(hist.monto_pagado or 0) == 0:
+            if not getattr(hist, 'pagado', False) and float(hist.monto_pagado or 0) == 0 and float(hist.monto or 0) != 0:
                 hist.monto = abono_a_guardar
 
     mes_nombre_s = nombre_mes(mes)
