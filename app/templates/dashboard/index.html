@@ -529,17 +529,8 @@
                     <tbody>
                         {% for item in reporte_sueltas %}
                         
-                        {# CALCULAMOS ESTADO Y ATRASO #}
-                        {# "atrasado" = pagado con más de 1 mes de diferencia respecto al período (1 mes de diferencia es el ciclo normal) #}
                         {% set estado_clase = item.estado %}
-                        {% set pagado_atrasado = false %}
-                        {% if item.pagado and item.historial_obj and item.historial_obj.fecha_pago %}
-                            {% set fp = item.historial_obj.fecha_pago %}
-                            {% set meses_diff = (fp.year - anio) * 12 + (fp.month - mes) %}
-                            {% if meses_diff > 1 %}
-                                {% set pagado_atrasado = true %}
-                            {% endif %}
-                        {% endif %}
+                        {% set pagado_atrasado = item.pagado_atrasado %}
                         
                         <tr class="fila-busqueda {% if item.pausado %}table-secondary{% endif %}" data-estado="{{ estado_clase }}" data-pago-parcial="{{ 'true' if item.pagos_en_este_dashboard > 0 and not item.pagado else 'false' }}">
 
@@ -569,9 +560,9 @@
                             {# 4. DEBE #}
                             <td class="text-end pe-3 text-nowrap d-none d-md-table-cell d-print-table-cell">
                                 {% if item.saldo_anterior < -0.1 %}
-                                    <span class="text-success fw-bold font-monospace">+${{ item.saldo_anterior | abs | pesos }}</span>
+                                    <span class="text-success fw-bold font-monospace">-${{ item.saldo_anterior | abs | pesos }}</span>
                                 {% elif item.saldo_anterior > 0.1 %}
-                                    <span class="text-danger fw-bold font-monospace">-${{ item.saldo_anterior | pesos }}</span>
+                                    <span class="text-danger fw-bold font-monospace">+${{ item.saldo_anterior | pesos }}</span>
                                 {% else %}
                                     <span class="fw-bold text-muted">$0</span>
                                 {% endif %}
@@ -592,9 +583,9 @@
                                     <div class="monto-item">
                                         <span class="monto-label">Debe</span>
                                         {% if item.saldo_anterior < -0.1 %}
-                                            <span class="monto-valor text-success">+${{ item.saldo_anterior | abs | pesos }}</span>
+                                            <span class="monto-valor text-success">-${{ item.saldo_anterior | abs | pesos }}</span>
                                         {% elif item.saldo_anterior > 0.1 %}
-                                            <span class="monto-valor text-danger">-${{ item.saldo_anterior | pesos }}</span>
+                                            <span class="monto-valor text-danger">+${{ item.saldo_anterior | pesos }}</span>
                                         {% else %}
                                             <span class="monto-valor text-muted">$0</span>
                                         {% endif %}
@@ -622,7 +613,7 @@
 
                                 {# Acciones inline en mobile #}
                                 <div class="acciones-mobile-inline d-md-none d-print-none mt-1 justify-content-end">
-                                    {% if item.pausado %}
+                                    {% if item.pausado and item.total_mes <= 0 %}
                                         <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
                                                 class="btn btn-sm btn-secondary">
                                             <i class="bi bi-pause-circle-fill"></i>
@@ -668,7 +659,7 @@
 
                             {# 6. ACCIONES DESKTOP #}
                             <td class="p-1 align-middle d-none d-md-table-cell d-print-none" style="width: 140px;">
-                                {% if item.pausado %}
+                                {% if item.pausado and item.total_mes <= 0 %}
                                     <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
                                             class="btn btn-secondary btn-sm w-100 d-flex flex-column justify-content-center align-items-center shadow-sm fw-bold"
                                             style="height: 74px; border-style: dashed;">
@@ -815,9 +806,9 @@
                             <div class="grupo-monto-item">
                                 <span class="grupo-monto-label">Debe</span>
                                 {% if g.saldo_anterior < -0.1 %}
-                                    <span class="fw-bold text-success font-monospace">+${{ g.saldo_anterior | abs | pesos }}</span>
+                                    <span class="fw-bold text-success font-monospace">-${{ g.saldo_anterior | abs | pesos }}</span>
                                 {% elif g.saldo_anterior > 0.1 %}
-                                    <span class="fw-bold text-danger font-monospace">-${{ g.saldo_anterior | pesos }}</span>
+                                    <span class="fw-bold text-danger font-monospace">+${{ g.saldo_anterior | pesos }}</span>
                                 {% else %}
                                     <span class="fw-bold text-muted">$0</span>
                                 {% endif %}
@@ -910,14 +901,7 @@
 
                         <tbody>
                             {% for item in g.casas %}
-                                {% set pagado_atrasado = false %}
-                                {% if item.pagado and item.historial_obj and item.historial_obj.fecha_pago %}
-                                    {% set fp = item.historial_obj.fecha_pago %}
-                                    {% set meses_diff = (fp.year - anio) * 12 + (fp.month - mes) %}
-                                    {% if meses_diff > 1 %}
-                                        {% set pagado_atrasado = true %}
-                                    {% endif %}
-                                {% endif %}
+                                {% set pagado_atrasado = item.pagado_atrasado %}
                             <tr class="{% if item.pausado %}table-secondary{% endif %}">
 
                                 {# Nombre #}
@@ -939,9 +923,9 @@
                                 </td>
                                 <td class="text-end font-monospace d-none d-md-table-cell d-print-table-cell">
                                     {% if item.saldo_anterior < -0.1 %}
-                                        <span class="text-success fw-bold">+${{ item.saldo_anterior | abs | pesos }}</span>
+                                        <span class="text-success fw-bold">-${{ item.saldo_anterior | abs | pesos }}</span>
                                     {% elif item.saldo_anterior > 0.1 %}
-                                        <span class="text-danger fw-bold">-${{ item.saldo_anterior | pesos }}</span>
+                                        <span class="text-danger fw-bold">+${{ item.saldo_anterior | pesos }}</span>
                                     {% else %}
                                         <span class="text-muted">$0</span>
                                     {% endif %}
@@ -961,9 +945,9 @@
                                         <div class="monto-item">
                                             <span class="monto-label">Debe</span>
                                             {% if item.saldo_anterior < -0.1 %}
-                                                <span class="monto-valor text-success">+${{ item.saldo_anterior | abs | pesos }}</span>
+                                                <span class="monto-valor text-success">-${{ item.saldo_anterior | abs | pesos }}</span>
                                             {% elif item.saldo_anterior > 0.1 %}
-                                                <span class="monto-valor text-danger">-${{ item.saldo_anterior | pesos }}</span>
+                                                <span class="monto-valor text-danger">+${{ item.saldo_anterior | pesos }}</span>
                                             {% else %}
                                                 <span class="monto-valor text-muted">$0</span>
                                             {% endif %}
@@ -987,7 +971,7 @@
                                     {% endif %}
 
                                     <div class="acciones-mobile-inline d-md-none d-print-none mt-1 justify-content-end">
-                                        {% if item.pausado %}
+                                        {% if item.pausado and item.total_mes <= 0 %}
                                             <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
                                                     class="btn btn-sm btn-secondary">
                                                 <i class="bi bi-pause-circle-fill"></i>
@@ -1029,7 +1013,7 @@
 
                                 {# Estado desktop #}
                                 <td class="p-1 align-middle text-center pe-3 d-none d-md-table-cell d-print-none" style="width: 140px;">
-                                    {% if item.pausado %}
+                                    {% if item.pausado and item.total_mes <= 0 %}
                                         <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
                                                 class="btn btn-secondary btn-sm w-100 shadow-sm"
                                                 style="border-style: dashed;">

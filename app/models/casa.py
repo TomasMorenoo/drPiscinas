@@ -53,7 +53,7 @@ class Casa(db.Model):
                 if self.fecha_creacion:
                     _fv = visita.fecha.date() if isinstance(visita.fecha, datetime) else visita.fecha
                     _fa = self.fecha_creacion.date() if isinstance(self.fecha_creacion, datetime) else self.fecha_creacion
-                    if _fv < _fa:
+                    if (_fv.year, _fv.month) < (_fa.year, _fa.month):
                         continue
                 for vp in visita.productos:
                     if mes_cerrado and vp.precio_unitario:
@@ -71,9 +71,6 @@ class Casa(db.Model):
             inicio = (p.desde.year, p.desde.month)
             fin = (p.hasta.year, p.hasta.month) if p.hasta else None
             if inicio <= mes_actual and (fin is None or fin >= mes_actual):
-                # Si hay productos en el mes, la pausa no aplica ese mes
-                if total_extras > 0:
-                    continue
                 pausa_en_mes = True
                 break
 
@@ -140,7 +137,7 @@ class Casa(db.Model):
         for visita in visitas_mes:
             if _fa:
                 _fv = visita.fecha.date() if isinstance(visita.fecha, datetime) else visita.fecha
-                if _fv < _fa:
+                if (_fv.year, _fv.month) < (_fa.year, _fa.month):
                     continue
             for vp in visita.productos:
                 if mes_cerrado and vp.precio_unitario:
@@ -156,8 +153,6 @@ class Casa(db.Model):
             inicio = (p.desde.year, p.desde.month)
             fin = (p.hasta.year, p.hasta.month) if p.hasta else None
             if inicio <= mes_actual and (fin is None or fin >= mes_actual):
-                if total_extras > 0:
-                    continue
                 pausa_en_mes = True
                 break
 

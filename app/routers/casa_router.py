@@ -763,7 +763,6 @@ def pausar_casa(id):
     if not casa.activo:
         flash("No se puede pausar un cliente dado de baja.", "danger")
         return redirect(url_for("casas.perfil", id=id))
-    import calendar as cal
     hoy = date.today()
     desde_mes = request.form.get("desde_mes", type=int) or hoy.month
     desde_anio = request.form.get("desde_anio", type=int) or hoy.year
@@ -772,27 +771,13 @@ def pausar_casa(id):
     hasta_anio = request.form.get("hasta_anio", type=int)
     hasta = date(hasta_anio, hasta_mes, 1) if hasta_mes and hasta_anio else None
 
-    # Si el mes de inicio ya tiene productos cargados, diferir al primer día del mes siguiente
-    gastos_desde = casa.obtener_gastos_mensuales(desde.month, desde.year)
-    diferido = False
-    if gastos_desde['extras'] > 0:
-        ultimo_dia = cal.monthrange(desde.year, desde.month)[1]
-        if desde.month == 12:
-            desde = date(desde.year + 1, 1, 1)
-        else:
-            desde = date(desde.year, desde.month + 1, 1)
-        diferido = True
-
     casa.pausado = True
     db.session.add(Pausa(casa_id=casa.id, desde=desde, hasta=hasta, pausado_por=current_user.username))
     detalle_audit = f"{casa.nombre_formateado()} — desde {desde}" + (f" hasta {hasta}" if hasta else "")
     registrar_auditoria(current_user.username, "PAUSAR", detalle_audit)
     db.session.commit()
 
-    if diferido:
-        flash(f"El mes actual tiene productos cargados. La pausa se aplicará desde {desde.strftime('%m/%Y')}.", "info")
-    else:
-        flash("Servicio pausado.", "warning")
+    flash("Servicio pausado.", "warning")
     return redirect(url_for("casas.perfil", id=id))
 
 

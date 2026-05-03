@@ -136,6 +136,10 @@ def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo_mes, total
         linea = f"• *{nombre_casa}:* Abono ${format_money(abono)} + Prod. ${format_money(extras)} = *${format_money(total_c)}*"
         if saldo_ant < -0.1:
             linea += f" _(saldo a favor: ${format_money(abs(saldo_ant))})_"
+        if extras > 0:
+            prods = obtener_detalle_productos(casa_obj, mes, anio)
+            if prods:
+                linea += "\n  _(" + ", ".join(prods) + ")_"
         lista_lines.append(linea)
 
     variables = {
@@ -174,7 +178,7 @@ def revertir_transaccion(h, txn_id):
         h.transaccion_id = ultimo_txn
         
         datos = h.casa.obtener_gastos_mensuales(h.mes, h.anio)
-        total_mes = float(h.monto) + float(datos.get('extras', 0))
+        total_mes = float(datos['total'])
         
         if h.monto_pagado < (total_mes - 0.01):
             h.pagado = False
@@ -217,7 +221,7 @@ def aplicar_pago_en_cascada(casa, monto_ingresado, username, mes_contexto, anio_
             continue
         if not h.pagado:
             datos = casa.obtener_gastos_mensuales(h.mes, h.anio)
-            total_mes = float(h.monto) + float(datos['extras'])
+            total_mes = float(datos['total'])
             deuda = total_mes - float(h.monto_pagado or 0)
             
             monto_aplicado = 0.0
@@ -276,9 +280,6 @@ def _casa_pausada_en_mes(casa, mes, anio, extras=0.0):
         inicio = (p.desde.year, p.desde.month)
         fin = (p.hasta.year, p.hasta.month) if p.hasta else None
         if inicio <= mes_actual and (fin is None or fin >= mes_actual):
-            # Si hay productos en el mes, la pausa no aplica ese mes
-            if extras > 0:
-                continue
             return True
     return False
 
@@ -306,7 +307,12 @@ def calcular_saldos_anteriores_batch(mes, anio):
         SELECT
             ah.casa_id,
             SUM(
-                ah.monto
+                CASE WHEN EXISTS (
+                    SELECT 1 FROM pausas p
+                    WHERE p.casa_id = ah.casa_id
+                      AND p.desde <= make_date(ah.anio, ah.mes, 1)
+                      AND (p.hasta IS NULL OR p.hasta >= make_date(ah.anio, ah.mes, 1))
+                ) THEN 0 ELSE ah.monto END
                 + COALESCE(prod_ext.extras, 0)
                 + COALESCE(promo_ext.extras, 0)
                 - COALESCE(ah.monto_pagado, 0)
@@ -392,6 +398,16 @@ def index():
     casas_raw = query_casas.all()
     historial_dict = {h.casa_id: h for h in AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()}
     saldos_batch = calcular_saldos_anteriores_batch(mes, anio)
+
+    # Detecta pagos en cascada: txn_id del mes actual que también aparece en un mes POSTERIOR
+    _cascade_txns = set()
+    _txn_ids = {h.transaccion_id for h in historial_dict.values() if h and h.transaccion_id}
+    if _txn_ids:
+        _cascade_rows = AbonoHistorico.query.filter(
+            AbonoHistorico.transaccion_id.in_(_txn_ids),
+            or_(AbonoHistorico.anio > anio, and_(AbonoHistorico.anio == anio, AbonoHistorico.mes > mes))
+        ).with_entities(AbonoHistorico.casa_id, AbonoHistorico.transaccion_id).all()
+        _cascade_txns = {(r.casa_id, r.transaccion_id) for r in _cascade_rows}
 
     casas = []
     _cache_datos = {}
@@ -494,22 +510,25 @@ def index():
         else:
             estado_item = "pendiente"
 
+        _txn = historial.transaccion_id if historial else None
         item_casa = {
             "id_historial": historial.id if historial else None,
             "historial_obj": historial,
             "casa": casa,
             "abono": abono_mes,
             "extras": extras,
+            "detalle_productos": obtener_detalle_productos(casa, mes, anio) if extras > 0 else [],
             "total_mes": total_mes,
             "saldo_anterior": saldo_anterior_visual,
             "saldo_restante": saldo_restante,
-            "monto_pagado": pagos_en_este_dashboard, # Se lo pasamos al HTML como si fuera un solo monto
+            "monto_pagado": pagos_en_este_dashboard,
             "pagado": esta_pagado,
             "mensaje_enviado": mensaje_enviado,
             "pagos_en_este_dashboard": pagos_en_este_dashboard,
             "estado": estado_item,
             "tiene_telefono": bool(casa.telefono),
-            "pausado": pausado_mes
+            "pausado": pausado_mes,
+            "pagado_atrasado": bool(_txn and (casa.id, _txn) in _cascade_txns)
         }
 
         if casa.grupo_id:
@@ -662,7 +681,7 @@ def toggle_pago(id):
             casa = registro.casa
             datos = casa.obtener_gastos_mensuales(registro.mes, registro.anio)
             saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
-            total_a_pagar = float(registro.monto) + float(datos['extras']) + saldo_ant - float(registro.monto_pagado or 0)
+            total_a_pagar = float(datos['total']) + saldo_ant - float(registro.monto_pagado or 0)
 
             # --- AUDITORÍA: marcar pagado ---
             mes_nombre_pago = nombre_mes(registro.mes)
@@ -699,7 +718,7 @@ def marcar_pagado_directo(id):
     datos = casa.obtener_gastos_mensuales(registro.mes, registro.anio)
     saldo_ant = casa.obtener_saldo_anterior(registro.mes, registro.anio)
 
-    total_a_pagar = float(registro.monto) + float(datos['extras']) + saldo_ant - float(registro.monto_pagado or 0)
+    total_a_pagar = float(datos['total']) + saldo_ant - float(registro.monto_pagado or 0)
 
     # --- AUDITORÍA ---
     mes_nombre_d = nombre_mes(registro.mes)
@@ -893,7 +912,7 @@ def toggle_pago_grupo(grupo_id):
                 c = h.casa
                 datos = c.obtener_gastos_mensuales(mes, anio)
                 saldo_ant = c.obtener_saldo_anterior(mes, anio)
-                total_a_pagar = float(h.monto) + float(datos['extras']) + saldo_ant - float(h.monto_pagado or 0)
+                total_a_pagar = float(datos['total']) + saldo_ant - float(h.monto_pagado or 0)
 
                 if total_a_pagar > 0.01:
                     aplicar_pago_en_cascada(c, total_a_pagar, current_user.username, mes, anio)
@@ -982,7 +1001,7 @@ def registrar_pago_grupo(grupo_id):
 
     for h in historiales:
         c = h.casa
-        total_mes = float(h.monto) + float(c.obtener_gastos_mensuales(mes, anio)['extras'])
+        total_mes = float(c.obtener_gastos_mensuales(mes, anio)['total'])
         saldo_ant = c.obtener_saldo_anterior(mes, anio)
         deuda_total = total_mes + saldo_ant
         # Clamp a 0: si la casa tiene saldo a favor (deuda_restante < 0), no genera deuda
