@@ -88,6 +88,8 @@ def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_vis
 
     nombre_wa = casa.nombre_cliente if casa.nombre_cliente else get_nombre_limpio(casa)
     saludo = obtener_saludo_tiempo(nombre_wa)
+    saldo_favor = abs(saldo_anterior_visual) if saldo_anterior_visual < -0.01 else 0.0
+    saldo_deuda = saldo_anterior_visual if saldo_anterior_visual > 0.01 else 0.0
     total_final = abono_mes + extras + saldo_anterior_visual - pagos_en_este_dashboard
 
     if total_final <= 0.01:
@@ -104,7 +106,8 @@ def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_vis
         'mantenimiento':     (format_money(abono_mes),         None),
         'extras':            (format_money(extras),            extras),
         'detalle_productos': (detalle_productos,               len(prods)),
-        'saldo_anterior':    (format_money(saldo_anterior_visual), saldo_anterior_visual),
+        'saldo_anterior':    (format_money(saldo_deuda),       saldo_deuda),
+        'saldo_favor':       (format_money(saldo_favor),       saldo_favor),
         'pagado':            (format_money(pagos_en_este_dashboard), pagos_en_este_dashboard),
     }
     return renderizar_template(pt.get_template_individual(), variables)

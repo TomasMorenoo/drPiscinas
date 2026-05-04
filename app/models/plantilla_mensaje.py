@@ -11,6 +11,7 @@ Mes de mantenimiento: ${mantenimiento}
 Productos Utilizados: ${extras}
 {detalle_productos}
 Saldo adeudado de meses anteriores: ${saldo_anterior}
+Saldo a favor aplicado: -${saldo_favor}
 Entregado este mes: -${pagado}
 
 Muchas Gracias."""

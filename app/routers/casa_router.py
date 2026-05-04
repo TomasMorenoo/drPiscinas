@@ -340,7 +340,8 @@ def editar_casa(id):
             nueva_fecha_creacion = casa.fecha_creacion
 
         try:
-            nuevo_precio = float(request.form.get("precio_base", 0))
+            raw_precio = request.form.get("precio_base", "0").replace(".", "").replace(",", ".")
+            nuevo_precio = float(raw_precio)
         except ValueError:
             flash("El precio debe ser un número válido.", "error")
             return redirect(url_for("casas.editar_casa", id=id))
