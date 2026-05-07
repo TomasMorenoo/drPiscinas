@@ -585,25 +585,33 @@ def perfil(id):
         gastos = casa.obtener_gastos_mensuales(h.mes, h.anio, hist=h)
         total_mes = gastos['total']
         pagado_real = float(getattr(h, 'monto_pagado', 0) or 0)
-        
+
+        mes_actual = (h.anio, h.mes)
+        pausada = any(
+            (p.desde.year, p.desde.month) <= mes_actual and
+            ((p.hasta.year, p.hasta.month) >= mes_actual if p.hasta else True)
+            for p in casa.historial_pausas
+        )
+
         saldo_anterior_iter = saldo_acumulado
         saldo_acumulado += total_mes
         saldo_acumulado -= pagado_real
-        
+
         if getattr(h, 'pagado', False) and pagado_real == 0 and saldo_acumulado > 0.01:
-            pagado_simulado = saldo_acumulado 
+            pagado_simulado = saldo_acumulado
             saldo_acumulado = 0.0
             dinero_mostrado = pagado_simulado
         else:
             dinero_mostrado = pagado_real
-            
+
         detalles_pagos.append({
             "periodo": f"{nombre_mes(h.mes)} {h.anio}",
             "saldo_anterior": saldo_anterior_iter,
             "costo_mes": total_mes,
             "pagado": dinero_mostrado,
             "saldo": saldo_acumulado,
-            "historial": h
+            "historial": h,
+            "pausada": pausada,
         })
         
     detalles_pagos.reverse()

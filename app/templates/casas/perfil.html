@@ -242,11 +242,15 @@
                                                         {% endif %}>
                                                         A favor: ${{ d.saldo | abs | pesos }}
                                                     </span>
+                                                {% elif d.pausada %}
+                                                    <span class="badge bg-secondary fs-6 w-100 py-2 text-uppercase shadow-sm">
+                                                        <i class="bi bi-pause-circle me-1"></i>PAUSADA
+                                                    </span>
                                                 {% else %}
                                                     <span class="badge bg-success fs-6 w-100 py-2 text-uppercase shadow-sm"
                                                         style="cursor: help;"
-                                                        data-bs-toggle="tooltip" 
-                                                        data-bs-placement="top" 
+                                                        data-bs-toggle="tooltip"
+                                                        data-bs-placement="top"
                                                         {% if d.historial and d.historial.cobrado_por and d.historial.fecha_pago %}
                                                         title="Marcado por {{ d.historial.cobrado_por }} el {{ d.historial.fecha_pago.strftime('%d/%m/%Y a las %H:%M') }}"
                                                         {% else %}

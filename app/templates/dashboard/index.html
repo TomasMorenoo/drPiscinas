@@ -1334,7 +1334,10 @@ function togglePago(id, actionType) {
 
     fetch(`/dashboard/toggle-pago/${id}`, {
         method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType })
-    }).then(() => recargarPanel());
+    }).then(r => r.json()).then(data => {
+        if (data.wa_chat_url) { const f = document.createElement('iframe'); f.style.display = 'none'; f.src = data.wa_chat_url; document.body.appendChild(f); setTimeout(() => f.remove(), 1000); }
+        recargarPanel();
+    });
 }
 
 function marcarPagadoDirecto(id) {
@@ -1355,7 +1358,10 @@ function marcarPagadoDirecto(id) {
 
     fetch(`/dashboard/marcar-pagado-directo/${id}`, {
         method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
-    }).then(() => recargarPanel());
+    }).then(r => r.json()).then(data => {
+        if (data.wa_chat_url) { const f = document.createElement('iframe'); f.style.display = 'none'; f.src = data.wa_chat_url; document.body.appendChild(f); setTimeout(() => f.remove(), 1000); }
+        recargarPanel();
+    });
 }
 
 /* ---- CASAS DENTRO DE GRUPOS ---- */
@@ -1387,16 +1393,22 @@ function togglePagoSimple(id, btn) {
 
     fetch(`/dashboard/toggle-pago/${id}`, {
         method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType })
-    }).then(() => recargarPanel());
+    }).then(r => r.json()).then(data => {
+        if (data.wa_chat_url) { const f = document.createElement('iframe'); f.style.display = 'none'; f.src = data.wa_chat_url; document.body.appendChild(f); setTimeout(() => f.remove(), 1000); }
+        recargarPanel();
+    });
 }
 
 function marcarPagadoDirectoSimple(id, btn) {
     const parentDiv = btn.parentElement;
     parentDiv.innerHTML = `<button class="btn btn-sm shadow-sm py-1 px-2 btn-success"><i class="bi bi-check-circle-fill"></i></button>`;
-    
+
     fetch(`/dashboard/marcar-pagado-directo/${id}`, {
         method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
-    }).then(() => recargarPanel());
+    }).then(r => r.json()).then(data => {
+        if (data.wa_chat_url) { const f = document.createElement('iframe'); f.style.display = 'none'; f.src = data.wa_chat_url; document.body.appendChild(f); setTimeout(() => f.remove(), 1000); }
+        recargarPanel();
+    });
 }
 
 /* ============================================================
@@ -1556,6 +1568,7 @@ function enviarPagoParcial() {
     .then(function (r) { return r.json(); })
     .then(function (data) {
         if (data.success) {
+            if (data.wa_chat_url) { const f = document.createElement('iframe'); f.style.display = 'none'; f.src = data.wa_chat_url; document.body.appendChild(f); setTimeout(() => f.remove(), 1000); }
             bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
             setTimeout(function () { recargarPanel(); }, 150);
         }

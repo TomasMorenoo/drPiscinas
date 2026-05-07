@@ -37,6 +37,12 @@ def limpiar_telefono(tel):
     if len(num) == 10: num = "549" + num
     return num
 
+def generar_wa_chat_url(casa):
+    num = limpiar_telefono(casa.telefono)
+    if not num:
+        return None
+    return f"whatsapp://send?phone={num}"
+
 def obtener_marca_tiempo(mes_contexto=None, anio_contexto=None):
     """Siempre devuelve la fecha/hora real actual en zona horaria Argentina (UTC-3)."""
     tz_ar = timezone(timedelta(hours=-3))
@@ -635,7 +641,8 @@ def toggle_pago(id):
     registro = AbonoHistorico.query.get_or_404(id)
     pagado = getattr(registro, 'pagado', False)
     enviado = getattr(registro, 'mensaje_enviado', False)
-    url_wa = None 
+    url_wa = None
+    wa_chat_url = None
 
     if action == 'undo' or (pagado and action != 'advance'):
         # --- AUDITORÍA: deshacer pago ---
@@ -709,8 +716,10 @@ def toggle_pago(id):
                     actual = getattr(registro, 'detalle_pagos', None)
                     registro.detalle_pagos = f"{actual}|{detalle_str}" if actual else detalle_str
 
+            wa_chat_url = generar_wa_chat_url(casa)
+
     db.session.commit()
-    return jsonify({"success": True, "url_wa": url_wa})
+    return jsonify({"success": True, "url_wa": url_wa, "wa_chat_url": wa_chat_url})
 
 @dashboard_bp.route("/marcar-pagado-directo/<int:id>", methods=["POST"])
 @login_required
@@ -744,9 +753,9 @@ def marcar_pagado_directo(id):
             detalle_str = f"{txn_id}:{total_a_pagar}"
             actual = getattr(registro, 'detalle_pagos', None)
             registro.detalle_pagos = f"{actual}|{detalle_str}" if actual else detalle_str
-    
+
     db.session.commit()
-    return jsonify({"success": True})
+    return jsonify({"success": True, "wa_chat_url": generar_wa_chat_url(casa)})
 
 
 @dashboard_bp.route("/sync-abonos", methods=["POST"])
@@ -1051,7 +1060,8 @@ def registrar_pago_grupo(grupo_id):
                 plata_disponible = 0
 
     db.session.commit()
-    return jsonify({"success": True})
+    wa_chat_url = next((generar_wa_chat_url(c) for c in casas_grupo if c.telefono), None)
+    return jsonify({"success": True, "wa_chat_url": wa_chat_url})
 
 
 @dashboard_bp.route("/registrar-pago-especial/<int:id_historial>", methods=["POST"])
@@ -1073,7 +1083,7 @@ def registrar_pago_especial(id_historial):
         aplicar_pago_en_cascada(registro.casa, monto_ingresado, current_user.username, registro.mes, registro.anio)
 
     db.session.commit()
-    return jsonify({"success": True})
+    return jsonify({"success": True, "wa_chat_url": generar_wa_chat_url(registro.casa)})
 
 
 @dashboard_bp.route("/planilla-impresion")
