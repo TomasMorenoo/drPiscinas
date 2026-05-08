@@ -99,6 +99,21 @@ def migrar_base_de_datos():
 
             db.session.execute(text("ALTER TABLE auditoria_logs ADD COLUMN IF NOT EXISTS ip VARCHAR(45);"))
 
+            print("⏳ Stock - Agregando columna stock_actual a products y tabla movimientos_stock...")
+            db.session.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_actual NUMERIC(10,2) NOT NULL DEFAULT 0;"))
+            db.session.execute(text("""
+                CREATE TABLE IF NOT EXISTS movimientos_stock (
+                    id SERIAL PRIMARY KEY,
+                    product_id INTEGER NOT NULL REFERENCES products(id),
+                    tipo VARCHAR(20) NOT NULL,
+                    cantidad NUMERIC(10,2) NOT NULL,
+                    motivo VARCHAR(200),
+                    usuario VARCHAR(100),
+                    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    visit_id INTEGER REFERENCES visits(id)
+                );
+            """))
+
             db.session.commit()
             print("✅ ¡Base de datos migrada con éxito!")
 

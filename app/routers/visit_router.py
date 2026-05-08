@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from app import db
 from app.models.visit import Visit
 from app.models.visit_product import VisitProduct
-from app.utils import registrar_auditoria
+from app.utils import registrar_auditoria, mover_stock
 from app.models.casa import Casa
 from app.models.products import Product
 from app.models.promo import Promo
@@ -128,13 +128,14 @@ def crear_visit():
                 prod = Product.query.get(p_id)
                 if prod:
                     vp = VisitProduct(
-                        visit_id=visit.id, 
-                        product_id=p_id, 
+                        visit_id=visit.id,
+                        product_id=p_id,
                         cantidad=float(cant),
                         precio_unitario=prod.precio  # Congelamos el precio actual aquí
                     )
                     db.session.add(vp)
-        
+                    mover_stock(prod.id, -float(cant), 'visita', current_user.username, visit_id=visit.id)
+
         registrar_auditoria(
             current_user.username, 'CREAR_VISITA',
             f"{visit.casa.nombre_formateado()} — {fecha_obj.strftime('%d/%m/%Y')}"
@@ -150,7 +151,10 @@ def crear_visit():
         selectinload(Casa.historial_pausas)
     ).order_by(Casa.numero).all()
 
-    products = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
+    q = Product.query.filter_by(activo=True)
+    if current_user.username != 'root':
+        q = q.filter(db.func.lower(Product.nombre) != 'deuda')
+    products = q.order_by(Product.nombre).all()
     promos = Promo.query.filter_by(activo=True).order_by(Promo.nombre).all()
 
     return render_template("visits/create.html", casas=casas, products=products, promos=promos)
@@ -165,7 +169,10 @@ def eliminar_visit(id):
         return redirect(url_for("visits.listar_visits"))
 
     detalle_elim = f"{visit.casa.nombre_formateado()} — {visit.fecha.strftime('%d/%m/%Y')}"
-    VisitProduct.query.filter_by(visit_id=id).delete()
+    vps_elim = VisitProduct.query.filter_by(visit_id=id).all()
+    for vp in vps_elim:
+        mover_stock(vp.product_id, float(vp.cantidad), 'ajuste', current_user.username, motivo='visita eliminada')
+        db.session.delete(vp)
     db.session.delete(visit)
     registrar_auditoria(current_user.username, 'ELIMINAR_VISITA', detalle_elim)
     db.session.commit()
@@ -205,16 +212,21 @@ def editar_visit(id):
         visit.observaciones = request.form.get("observaciones", "").strip()
         visit.promo_id = request.form.get("promo_id") or None
         
-        VisitProduct.query.filter_by(visit_id=id).delete()
+        vps_old = VisitProduct.query.filter_by(visit_id=id).all()
+        for vp in vps_old:
+            mover_stock(vp.product_id, float(vp.cantidad), 'ajuste', current_user.username, motivo='edición visita')
+            db.session.delete(vp)
+
         product_ids = request.form.getlist("product_id[]")
         cantidades = request.form.getlist("cantidad[]")
-        
+
         for p_id, cant in zip(product_ids, cantidades):
             if p_id and cant:
                 prod = Product.query.get(p_id)
                 if prod:
                     vp = VisitProduct(visit_id=id, product_id=p_id, cantidad=float(cant), precio_unitario=prod.precio)
                     db.session.add(vp)
+                    mover_stock(prod.id, -float(cant), 'visita', current_user.username, visit_id=id)
         
         registrar_auditoria(
             current_user.username, 'EDITAR_VISITA',
@@ -225,7 +237,10 @@ def editar_visit(id):
         return redirect(url_for("visits.listar_visits"))
         
     casas = Casa.query.filter_by(activo=True).all()
-    products = Product.query.filter_by(activo=True).all()
+    q_edit = Product.query.filter_by(activo=True)
+    if current_user.username != 'root':
+        q_edit = q_edit.filter(db.func.lower(Product.nombre) != 'deuda')
+    products = q_edit.all()
     promos = Promo.query.filter_by(activo=True).all()
     return render_template("visits/edit.html", visit=visit, casas=casas, products=products, promos=promos)
 

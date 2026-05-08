@@ -8,6 +8,8 @@ class Product(db.Model):
     unidad = db.Column(db.String(50), nullable=False)
     precio = db.Column(db.Numeric(10, 2), nullable=False)
     activo = db.Column(db.Boolean, default=True)
+    stock_actual = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    stock_minimo = db.Column(db.Numeric(10, 2), nullable=True)
 
     def __repr__(self):
         return f"<Product {self.nombre}>"

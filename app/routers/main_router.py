@@ -6,7 +6,18 @@ main_bp = Blueprint("main", __name__)
 @main_bp.route("/")
 @login_required
 def home():
-    return render_template("home.html")
+    from app.models.products import Product
+    sin_stock = Product.query.filter(
+        Product.activo == True,
+        Product.stock_actual <= 0
+    ).order_by(Product.nombre).all()
+    stock_bajo = Product.query.filter(
+        Product.activo == True,
+        Product.stock_minimo != None,
+        Product.stock_actual > 0,
+        Product.stock_actual <= Product.stock_minimo
+    ).order_by(Product.nombre).all()
+    return render_template("home.html", sin_stock=sin_stock, stock_bajo=stock_bajo)
 
 # NUEVA RUTA PARA LA APP INSTALABLE
 @main_bp.route('/sw.js')

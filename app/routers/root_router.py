@@ -160,6 +160,7 @@ def panel():
         lineas_log.reverse()
 
     tipo_dolar = Configuracion.get('tipo_dolar', 'blue')
+    stock_activo_desde = Configuracion.get('stock_activo_desde', None)
 
     return render_template(
         "root/panel.html",
@@ -174,6 +175,7 @@ def panel():
         ultimos_aumentos=ultimos_aumentos,
         lineas_log=lineas_log,
         tipo_dolar=tipo_dolar,
+        config_stock_activo_desde=stock_activo_desde,
     )
 
 
@@ -217,6 +219,27 @@ def set_tipo_dolar():
         db.session.commit()
         labels = {"blue": "Dólar Blue", "mep": "Dólar MEP"}
         flash(f"Cotización cambiada a {labels[tipo]}.", "success")
+    return redirect(url_for("root.panel"))
+
+
+# ================================================
+# ACTIVAR STOCK OFICIAL
+# ================================================
+@root_bp.route("/activar-stock", methods=["POST"])
+@login_required
+@root_required
+def activar_stock():
+    from app.models.products import Product
+    ahora = datetime.now().strftime("%d/%m/%Y %H:%M")
+    negativos = Product.query.filter(Product.stock_actual < 0).all()
+    for p in negativos:
+        p.stock_actual = 0
+    Configuracion.set("stock_activo_desde", ahora)
+    db.session.commit()
+    msg = f"Stock activado desde {ahora}."
+    if negativos:
+        msg += f" Se resetearon {len(negativos)} producto(s) con stock negativo a 0."
+    flash(msg, "success")
     return redirect(url_for("root.panel"))
 
 

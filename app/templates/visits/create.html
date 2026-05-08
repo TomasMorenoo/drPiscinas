@@ -90,14 +90,19 @@
     <div class="producto-row border rounded p-3 mb-2 bg-light shadow-sm">
         <div class="row g-2 align-items-center">
             <div class="col-7">
-                <select name="product_id[]" class="form-select form-select-sm" required>
+                <select name="product_id[]" class="form-select form-select-sm product-select" required>
                     <option value="">-- Producto --</option>
                     {% for product in products %}
-                        <option value="{{ product.id }}">
+                        <option value="{{ product.id }}"
+                            data-stock="{{ product.stock_actual | float }}"
+                            data-minimo="{{ product.stock_minimo | float if product.stock_minimo is not none else '' }}">
                             {{ product.nombre }} ({{ product.unidad }})
                         </option>
                     {% endfor %}
                 </select>
+                <div class="stock-alerta alert py-1 px-2 mt-1 mb-0 small d-none">
+                    <span class="stock-alerta-icono me-1"></span><span class="stock-alerta-texto"></span>
+                </div>
             </div>
             <div class="col-3">
                 <input type="number" step="0.01" min="0" name="cantidad[]"
@@ -261,6 +266,34 @@
     fechaInput.addEventListener('change', function() {
         actualizarCasasFiltradas();
         verificarDuplicado();
+    });
+
+    document.getElementById('productos-container').addEventListener('change', function(e) {
+        if (!e.target.classList.contains('product-select')) return;
+        const sel = e.target;
+        const opt = sel.options[sel.selectedIndex];
+        const row = sel.closest('.producto-row');
+        const alerta = row.querySelector('.stock-alerta');
+        const icono = row.querySelector('.stock-alerta-icono');
+        const texto = row.querySelector('.stock-alerta-texto');
+        const stock = parseFloat(opt.dataset.stock);
+        const minimo = opt.dataset.minimo !== '' ? parseFloat(opt.dataset.minimo) : null;
+
+        if (!opt.value) { alerta.classList.add('d-none'); return; }
+
+        if (stock <= 0) {
+            alerta.className = 'stock-alerta alert alert-danger py-1 px-2 mt-1 mb-0 small';
+            icono.innerHTML = '<i class="bi bi-x-circle-fill"></i>';
+            texto.textContent = `Sin stock: ${stock} ${opt.text.match(/\(([^)]+)\)/)?.[1] || 'unidades'}`;
+            alerta.classList.remove('d-none');
+        } else if (minimo !== null && stock <= minimo) {
+            alerta.className = 'stock-alerta alert alert-warning py-1 px-2 mt-1 mb-0 small';
+            icono.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i>';
+            texto.textContent = `Stock bajo: quedan ${stock} (mínimo: ${minimo})`;
+            alerta.classList.remove('d-none');
+        } else {
+            alerta.classList.add('d-none');
+        }
     });
 </script>
 {% endblock %}

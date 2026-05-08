@@ -39,6 +39,72 @@
     </div>
 </div>
 
+{% if sin_stock or stock_bajo %}
+<div class="row mb-4">
+    <div class="col-12 d-flex flex-column gap-2">
+
+        {% if sin_stock %}
+        <div class="stock-ticker-wrap rounded-1 overflow-hidden" style="background:#f8d7da;border:1px solid #f5c2c7;">
+            <div class="d-flex align-items-center">
+                <div class="flex-shrink-0 px-3 py-2 fw-bold text-white" style="background:#dc3545;white-space:nowrap;">
+                    <i class="bi bi-x-circle-fill me-1"></i> SIN STOCK
+                </div>
+                <div class="overflow-hidden flex-grow-1 py-2" style="position:relative;height:2.2rem;">
+                    <div class="stock-ticker-inner d-flex align-items-center gap-4" style="position:absolute;white-space:nowrap;padding-left:1rem;">
+                        {% for p in sin_stock %}
+                        <span class="text-danger fw-bold">
+                            <i class="bi bi-box-seam me-1"></i>{{ p.nombre }}
+                        </span>
+                        <span class="text-muted">·</span>
+                        {% endfor %}
+                        {% for p in sin_stock %}
+                        <span class="text-danger fw-bold">
+                            <i class="bi bi-box-seam me-1"></i>{{ p.nombre }}
+                        </span>
+                        <span class="text-muted">·</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if stock_bajo %}
+        <div class="stock-ticker-wrap rounded-1 overflow-hidden" style="background:#fff3cd;border:1px solid #ffc107;">
+            <div class="d-flex align-items-center">
+                <div class="flex-shrink-0 px-3 py-2 fw-bold text-dark" style="background:#ffc107;white-space:nowrap;">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i> STOCK BAJO
+                </div>
+                <div class="overflow-hidden flex-grow-1 py-2" style="position:relative;height:2.2rem;">
+                    <div class="stock-ticker-inner d-flex align-items-center gap-4" style="position:absolute;white-space:nowrap;padding-left:1rem;">
+                        {% for p in stock_bajo %}
+                        {% set s = p.stock_actual | float %}
+                        {% set sv = (s | int) if (s - (s | int)) < 0.1 else s %}
+                        <span class="text-dark">
+                            <i class="bi bi-box-seam me-1 text-warning"></i>
+                            <strong>{{ p.nombre }}</strong>: {{ sv }} {{ p.unidad }}
+                        </span>
+                        <span class="text-muted">·</span>
+                        {% endfor %}
+                        {% for p in stock_bajo %}
+                        {% set s = p.stock_actual | float %}
+                        {% set sv = (s | int) if (s - (s | int)) < 0.1 else s %}
+                        <span class="text-dark">
+                            <i class="bi bi-box-seam me-1 text-warning"></i>
+                            <strong>{{ p.nombre }}</strong>: {{ sv }} {{ p.unidad }}
+                        </span>
+                        <span class="text-muted">·</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endif %}
+
 <div class="row g-4">
     
     {% if current_user.is_admin() %}
@@ -140,9 +206,30 @@
         box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
         border-color: #dee2e6 !important;
     }
+    @keyframes ticker-scroll {
+        0%   { transform: translateX(0); }
+        100% { transform: translateX(-50%); }
+    }
+    .stock-ticker-inner {
+        animation: ticker-scroll var(--ticker-duration, 8s) linear infinite;
+    }
+    .stock-ticker-wrap:hover .stock-ticker-inner {
+        animation-play-state: paused;
+    }
 </style>
 
 <script>
+    document.querySelectorAll('.stock-ticker-inner').forEach(el => {
+        const contentWidth = el.scrollWidth / 2;
+        const containerWidth = el.parentElement.offsetWidth;
+        if (contentWidth <= containerWidth) {
+            el.style.animation = 'none';
+        } else {
+            const dur = contentWidth / 90;
+            el.style.setProperty('--ticker-duration', dur.toFixed(2) + 's');
+        }
+    });
+
     const fecha = new Date();
     const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     document.getElementById('fecha-actual').textContent = fecha.toLocaleDateString('es-AR', opciones);

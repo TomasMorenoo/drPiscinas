@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Stock de Productos{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0"><i class="bi bi-boxes me-2"></i>Stock de Productos</h4>
+        {% if not stock_activo_desde %}
+        <span class="badge bg-secondary">En prueba</span>
+        {% endif %}
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+        <div class="alert alert-{{ 'danger' if cat == 'error' else cat }} alert-dismissible fade show" role="alert">
+            {{ msg }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    {% endwith %}
+
+    <div class="row g-4 mb-4">
+
+        <!-- Tabla de stock -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">Stock actual</div>
+                <div class="card-body p-0">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Unidad</th>
+                                <th class="text-end">Stock</th>
+                                <th class="text-center">Alerta mínimo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in products %}
+                            {% set s = p.stock_actual | float %}
+                            {% set m = p.stock_minimo | float if p.stock_minimo is not none else none %}
+                            {% if s <= 0 %}
+                                {% set row_class = "table-danger" %}
+                            {% elif m is not none and s <= m %}
+                                {% set row_class = "table-warning" %}
+                            {% else %}
+                                {% set row_class = "" %}
+                            {% endif %}
+                            <tr class="{{ row_class }}">
+                                <td>
+                                    {{ p.nombre }}
+                                    {% if s <= 0 %}
+                                        <span class="badge bg-danger ms-1"><i class="bi bi-x-circle-fill"></i> Sin stock</span>
+                                    {% elif m is not none and s <= m %}
+                                        <span class="badge bg-warning text-dark ms-1"><i class="bi bi-exclamation-triangle-fill"></i> Stock bajo</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted">{{ p.unidad }}</td>
+                                <td class="text-end fw-bold">
+                                    {% if s <= 0 %}
+                                        <span class="badge bg-danger">{{ s }}</span>
+                                    {% elif m is not none and s <= m %}
+                                        <span class="badge bg-warning text-dark">{{ s }}</span>
+                                    {% else %}
+                                        <span class="badge bg-success">{{ s }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <form method="POST" action="{{ url_for('stock.set_umbral', id=p.id) }}" class="d-inline-flex gap-1 align-items-center">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="number" name="stock_minimo" value="{{ p.stock_minimo if p.stock_minimo is not none else '' }}"
+                                               class="form-control form-control-sm" style="width:80px;" placeholder="—" min="0" step="0.01">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-floppy"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="text-center text-muted py-3">Sin productos activos</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formularios -->
+        <div class="col-lg-4">
+
+            <!-- Ingreso -->
+            <div class="card mb-3">
+                <div class="card-header text-success"><i class="bi bi-plus-circle me-1"></i>Ingreso de mercadería</div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('stock.ingreso') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-2">
+                            <select name="product_id" class="form-select form-select-sm" required>
+                                <option value="">— Producto —</option>
+                                {% for p in products %}
+                                <option value="{{ p.id }}">{{ p.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <input type="number" name="cantidad" class="form-control form-control-sm" placeholder="Cantidad" min="0.01" step="0.01" required>
+                        </div>
+                        <div class="mb-3">
+                            <input type="text" name="motivo" class="form-control form-control-sm" placeholder="Motivo (opcional)" maxlength="200">
+                        </div>
+                        <button type="submit" class="btn btn-success btn-sm w-100">Agregar stock</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Ajuste -->
+            <div class="card">
+                <div class="card-header text-warning"><i class="bi bi-pencil me-1"></i>Ajuste manual</div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('stock.ajuste') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-2">
+                            <select name="product_id" class="form-select form-select-sm" required>
+                                <option value="">— Producto —</option>
+                                {% for p in products %}
+                                <option value="{{ p.id }}">{{ p.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-1">
+                            <input type="number" name="cantidad" class="form-control form-control-sm" placeholder="Cantidad (+/-)" step="0.01" required>
+                        </div>
+                        <small class="text-muted d-block mb-2">Positivo suma, negativo resta.</small>
+                        <div class="mb-3">
+                            <input type="text" name="motivo" class="form-control form-control-sm" placeholder="Motivo (opcional)" maxlength="200">
+                        </div>
+                        <button type="submit" class="btn btn-warning btn-sm w-100">Aplicar ajuste</button>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Historial -->
+    <div class="card">
+        <div class="card-header">Últimos movimientos</div>
+        <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Producto</th>
+                        <th>Tipo</th>
+                        <th class="text-end">Cantidad</th>
+                        <th>Motivo</th>
+                        <th>Usuario</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in movimientos %}
+                    <tr>
+                        <td class="text-muted small">{{ m.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td>{{ m.product.nombre }}</td>
+                        <td>
+                            {% if m.tipo == 'ingreso' %}
+                                <span class="badge bg-success">ingreso</span>
+                            {% elif m.tipo == 'visita' %}
+                                <span class="badge bg-info text-dark">visita</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">ajuste</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end fw-bold {% if m.cantidad | float < 0 %}text-danger{% else %}text-success{% endif %}">
+                            {{ '%+g' | format(m.cantidad | float) }}
+                        </td>
+                        <td class="text-muted small">{{ m.motivo or '—' }}</td>
+                        <td class="text-muted small">{{ m.usuario or '—' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="text-center text-muted py-3">Sin movimientos</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -10,7 +10,7 @@ from app.models.abono_historico import AbonoHistorico
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_, and_
 from sqlalchemy.orm import joinedload, selectinload
-from app.utils import nombre_mes, registrar_auditoria
+from app.utils import nombre_mes, registrar_auditoria, mover_stock
 import re
 import calendar
 from datetime import datetime
@@ -524,10 +524,12 @@ def agregar_extra(id):
             precio_unitario=producto.precio
         )
         db.session.add(nuevo_vp)
-        
+
         historial = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
         if historial:
             historial.monto += float(cantidad) * float(producto.precio)
+
+        mover_stock(producto.id, -float(cantidad), 'visita', current_user.username, visit_id=nueva_visita.id, motivo='extra manual')
 
         db.session.commit()
         flash("Producto extra cargado exitosamente.", "success")
@@ -542,9 +544,10 @@ def eliminar_extra(visit_id):
     casa_id = visita.casa_id
     if visita.observaciones == "[EXTRA_MANUAL]":
         historial = AbonoHistorico.query.filter_by(casa_id=casa_id, mes=visita.fecha.month, anio=visita.fecha.year).first()
-        if historial:
-            for vp in visita.productos:
+        for vp in visita.productos:
+            if historial:
                 historial.monto -= float(vp.cantidad) * float(vp.precio_unitario or vp.product.precio)
+            mover_stock(vp.product_id, float(vp.cantidad), 'ajuste', current_user.username, motivo='extra eliminado')
 
         VisitProduct.query.filter_by(visit_id=visita.id).delete()
         db.session.delete(visita)
@@ -571,7 +574,10 @@ def perfil(id):
     visitas = sorted(casa.visitas, key=lambda v: v.fecha, reverse=True)
     historial_asc = sorted(casa.historial_abonos, key=lambda h: (h.anio, h.mes))
 
-    productos = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
+    q_prod = Product.query.filter_by(activo=True)
+    if current_user.username != 'root':
+        q_prod = q_prod.filter(db.func.lower(Product.nombre) != 'deuda')
+    productos = q_prod.order_by(Product.nombre).all()
 
     detalles_pagos = []
     saldo_acumulado = 0.0
