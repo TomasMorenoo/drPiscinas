@@ -11,7 +11,7 @@ product_bp = Blueprint("products", __name__, url_prefix="/products")
 @login_required
 @admin_required
 def listar_products():
-    products = Product.query.order_by(Product.nombre).all()
+    products = Product.query.filter(db.func.lower(Product.nombre) != 'deuda').order_by(Product.nombre).all()
     return render_template("products/list.html", products=products)
 
 @product_bp.route("/create", methods=["GET", "POST"])

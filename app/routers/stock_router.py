@@ -13,7 +13,7 @@ stock_bp = Blueprint("stock", __name__, url_prefix="/stock")
 @admin_required
 def index():
     from app.models.configuracion import Configuracion
-    products = Product.query.filter_by(activo=True).order_by(Product.nombre).all()
+    products = Product.query.filter_by(activo=True).filter(db.func.lower(Product.nombre) != 'deuda').order_by(Product.nombre).all()
     movimientos = MovimientoStock.query.order_by(MovimientoStock.fecha.desc()).limit(30).all()
     stock_activo_desde = Configuracion.get("stock_activo_desde", None)
     return render_template("stock/index.html", products=products, movimientos=movimientos, stock_activo_desde=stock_activo_desde)

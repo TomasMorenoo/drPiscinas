@@ -204,15 +204,18 @@ def create_app():
 
     @app.errorhandler(Exception)
     def handle_exception(e):
+        import traceback as _tb
         from werkzeug.exceptions import HTTPException
         from flask import render_template
         if isinstance(e, HTTPException):
             return e
+        _trace = _tb.format_exc()
+        app.logger.error("Unhandled exception: %s", _trace)
         if _maint_cache["v"]:
             try:
                 from flask_login import current_user
                 if current_user.is_authenticated and current_user.username == 'root':
-                    return render_template('errors/500.html'), 500
+                    return render_template('errors/500.html', error_detail=_trace), 500
             except Exception:
                 pass
             try:
@@ -225,6 +228,12 @@ def create_app():
                     '<div><h1>Estamos en mantenimiento</h1>'
                     '<p>Volvemos a la brevedad.</p></div></body></html>'
                 ), 503
+        try:
+            from flask_login import current_user
+            if current_user.is_authenticated and current_user.username == 'root':
+                return render_template('errors/500.html', error_detail=_trace), 500
+        except Exception:
+            pass
         try:
             from flask import request as _req
             error_path = _req.path
