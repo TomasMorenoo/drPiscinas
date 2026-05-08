@@ -114,6 +114,8 @@ def create_app():
                 app_description = Configuracion.get('app_description', 'Sistema de gestión de piletas')
                 footer_texto    = Configuracion.get('footer_texto', '')
                 footer_contacto = Configuracion.get('footer_contacto', '')
+                wa_numero_error = Configuracion.get('wa_numero_error', '')
+                wa_nombre_error = Configuracion.get('wa_nombre_error', '')
             except Exception:
                 app_icon_192    = False
                 login_image     = False
@@ -121,6 +123,8 @@ def create_app():
                 app_description = 'Sistema de gestión de piletas'
                 footer_texto    = ''
                 footer_contacto = ''
+                wa_numero_error = ''
+                wa_nombre_error = ''
 
             cfg_data = dict(
                 app_name=app_name,
@@ -129,6 +133,8 @@ def create_app():
                 login_image=login_image,
                 footer_texto=footer_texto,
                 footer_contacto=footer_contacto,
+                wa_numero_error=wa_numero_error,
+                wa_nombre_error=wa_nombre_error,
             )
             cache.set("_cfg_data", cfg_data, timeout=300)
 
@@ -179,9 +185,25 @@ def create_app():
 
         return render_template('errors/mantenimiento.html'), 503
 
+    @app.errorhandler(404)
+    def error_404(e):
+        from flask import render_template
+        return render_template('errors/404.html'), 404
+
+    @app.errorhandler(403)
+    def error_403(e):
+        from flask import render_template
+        return render_template('errors/403.html'), 403
+
+    @app.errorhandler(429)
+    def error_429(e):
+        from flask import render_template
+        return render_template('errors/429.html'), 429
+
     @app.errorhandler(Exception)
     def handle_exception(e):
         from werkzeug.exceptions import HTTPException
+        from flask import render_template
         if isinstance(e, HTTPException):
             return e
         if _maint_cache["v"]:
@@ -201,7 +223,12 @@ def create_app():
                     '<div><h1>Estamos en mantenimiento</h1>'
                     '<p>Volvemos a la brevedad.</p></div></body></html>'
                 ), 503
-        return render_template('errors/500.html'), 500
+        try:
+            from flask import request as _req
+            error_path = _req.path
+        except Exception:
+            error_path = '?'
+        return render_template('errors/500.html', error_path=error_path), 500
 
     return app
 

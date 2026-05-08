@@ -1640,6 +1640,7 @@ function _ejecutarToggleGrupo(grupo_id, mes, anio, btn, action) {
             btn.disabled = false;
             alert(data.message || 'No hay historiales para este período. Cerrá el mes primero.');
         } else {
+            if (data.wa_chat_url) { const f = document.createElement('iframe'); f.style.display = 'none'; f.src = data.wa_chat_url; document.body.appendChild(f); setTimeout(() => f.remove(), 1000); }
             recargarPanel();
         }
     })

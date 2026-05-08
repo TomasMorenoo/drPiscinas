@@ -864,6 +864,7 @@ def toggle_pago_grupo(grupo_id):
     all_pagado  = len(historiales) > 0 and all(h.pagado for h in historiales)
     all_enviado = len(historiales) > 0 and all(h.mensaje_enviado for h in historiales)
     url_wa = None
+    wa_chat_url = None
 
     if action == 'undo':
         # ── DESHACER PAGO ────────────────────────────────────────────
@@ -939,6 +940,8 @@ def toggle_pago_grupo(grupo_id):
                         actual = getattr(h, 'detalle_pagos', None)
                         h.detalle_pagos = f"{actual}|{detalle_str}" if actual else detalle_str
 
+            wa_chat_url = next((generar_wa_chat_url(c) for c in casas_grupo if c.telefono), None)
+
         else:
             # ── PENDIENTE → NOTIFICADO ───────────────────────────────
             for h in historiales:
@@ -974,7 +977,7 @@ def toggle_pago_grupo(grupo_id):
                 url_wa = f"whatsapp://send?phone={tel}&text={urllib.parse.quote(texto_wa)}"
 
     db.session.commit()
-    return jsonify({"success": True, "url_wa": url_wa})
+    return jsonify({"success": True, "url_wa": url_wa, "wa_chat_url": wa_chat_url})
 
 @dashboard_bp.route("/registrar-pago-grupo/<int:grupo_id>", methods=["POST"])
 @login_required
@@ -1003,9 +1006,10 @@ def registrar_pago_grupo(grupo_id):
     # --- AUDITORÍA ---
     if casas_grupo and monto_ingresado > 0:
         mes_nombre_rg = nombre_mes(mes)
-        detalle_rg = f"Grupo {grupo_obj.nombre if grupo_obj else grupo_id} — {mes_nombre_rg} {anio} — ${format_money(monto_ingresado)}"
         if monto_usd and cotizacion_usd:
-            detalle_rg += f" [USD {format_money(monto_usd)} @ ${format_money(cotizacion_usd)}]"
+            detalle_rg = f"Grupo {grupo_obj.nombre if grupo_obj else grupo_id} — {mes_nombre_rg} {anio} — {format_money(float(monto_usd))} USD X ${format_money(float(cotizacion_usd))} = ${format_money(monto_ingresado)}"
+        else:
+            detalle_rg = f"Grupo {grupo_obj.nombre if grupo_obj else grupo_id} — {mes_nombre_rg} {anio} — ${format_money(monto_ingresado)}"
         registrar_auditoria(current_user.username, 'PAGO_PARCIAL', detalle_rg)
 
     deudas = []
@@ -1076,9 +1080,10 @@ def registrar_pago_especial(id_historial):
     if monto_ingresado > 0:
         # --- AUDITORÍA ---
         mes_nombre_e = nombre_mes(registro.mes)
-        detalle_e = f"{registro.casa.nombre_formateado()} — {mes_nombre_e} {registro.anio} — ${format_money(monto_ingresado)}"
         if monto_usd and cotizacion_usd:
-            detalle_e += f" [USD {format_money(monto_usd)} @ ${format_money(cotizacion_usd)}]"
+            detalle_e = f"{registro.casa.nombre_formateado()} — {mes_nombre_e} {registro.anio} — {format_money(float(monto_usd))} USD X ${format_money(float(cotizacion_usd))} = ${format_money(monto_ingresado)}"
+        else:
+            detalle_e = f"{registro.casa.nombre_formateado()} — {mes_nombre_e} {registro.anio} — ${format_money(monto_ingresado)}"
         registrar_auditoria(current_user.username, 'PAGO_PARCIAL', detalle_e)
         aplicar_pago_en_cascada(registro.casa, monto_ingresado, current_user.username, registro.mes, registro.anio)
 
@@ -1216,6 +1221,7 @@ def planilla_impresion():
                     "nombre_display": casa.grupo.nombre_display,
                     "filas": [],
                     "total_grupo": 0.0,
+                    "saldo_a_favor": _saldo_grupo_para_mes(casa.grupo, mes, anio),
                     "grupo_pagado": True,
                     "grupo_notificado": False,
                     "grupo_tiene_saldo": False,
@@ -1431,31 +1437,36 @@ def api_cotizacion_dolar():
 
 @dashboard_bp.route("/auditoria")
 @login_required
-@admin_required
 def auditoria():
     from app.models.auditoria import AuditoriaLog
-    page     = request.args.get("page", 1, type=int)
-    usuario  = request.args.get("usuario", "").strip()
-    accion   = request.args.get("accion", "").strip()
-    fecha_d  = request.args.get("fecha_desde", "").strip()
-    fecha_h  = request.args.get("fecha_hasta", "").strip()
+    from datetime import datetime as _dt, timedelta as _td
+    if not (current_user.is_admin() or current_user.username == 'root'):
+        flash("No tenés permisos para ver esta sección.", "error")
+        return redirect(url_for('main.home'))
+
+    page    = request.args.get("page", 1, type=int)
+    usuario = request.args.get("usuario", "").strip()
+    accion  = request.args.get("accion", "").strip()
+    fecha_d = request.args.get("fecha_desde", "").strip()
+    fecha_h = request.args.get("fecha_hasta", "").strip()
 
     q = AuditoriaLog.query.order_by(AuditoriaLog.fecha.desc())
+
+    if current_user.username != 'root':
+        q = q.filter(AuditoriaLog.usuario != 'root')
 
     if usuario:
         q = q.filter(AuditoriaLog.usuario.ilike(f"%{usuario}%"))
     if accion:
         q = q.filter(AuditoriaLog.accion == accion)
     if fecha_d:
-        from datetime import datetime as _dt
         try:
             q = q.filter(AuditoriaLog.fecha >= _dt.strptime(fecha_d, "%Y-%m-%d"))
         except ValueError:
             pass
     if fecha_h:
-        from datetime import datetime as _dt, timedelta
         try:
-            q = q.filter(AuditoriaLog.fecha < _dt.strptime(fecha_h, "%Y-%m-%d") + timedelta(days=1))
+            q = q.filter(AuditoriaLog.fecha < _dt.strptime(fecha_h, "%Y-%m-%d") + _td(days=1))
         except ValueError:
             pass
 
@@ -1472,3 +1483,10 @@ def auditoria():
         filtro_fecha_desde=fecha_d,
         filtro_fecha_hasta=fecha_h,
     )
+
+
+@dashboard_bp.route("/test-forzar-error")
+@login_required
+@admin_required
+def test_forzar_error():
+    raise Exception("Error de prueba forzado manualmente")

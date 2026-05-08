@@ -34,7 +34,7 @@
         }
 
         .col-total { font-weight: bold; font-size: 12px; }
-        .a-favor { color: #555; font-style: italic; font-size: 10px;}
+        .a-favor { font-weight: bold; }
         .deuda { font-weight: bold; }
 
         .detalle-prod { font-size: 9px; color: #333; line-height: 1.2; }
@@ -129,9 +129,9 @@
 
                 <td class="text-right">
                     {% if f.saldo_anterior < -0.1 %}
-                        <span class="a-favor">${{ f.saldo_anterior | abs | pesos }} (A favor)</span>
+                        <span class="a-favor">- ${{ f.saldo_anterior | abs | pesos }}</span>
                     {% elif f.saldo_anterior > 0.1 %}
-                        <span class="deuda">Debe ${{ f.saldo_anterior | pesos }}</span>
+                        <span class="deuda">+ ${{ f.saldo_anterior | pesos }}</span>
                     {% else %} $0 {% endif %}
                 </td>
 
@@ -162,9 +162,14 @@
             <tr class="fila-grupo-header fila-planilla {% if g.grupo_pagado %}fila-pagada{% endif %}"
                 data-estado="{{ g.estado }}" data-grupo="{{ grupo_idx }}">
                 <td class="text-center"><span class="linea-fecha"></span> / <span class="linea-fecha"></span></td>
-                <td colspan="5"><strong>GRUPO: {{ g.nombre_display|upper }}</strong></td>
+                <td colspan="4"><strong>GRUPO: {{ g.nombre_display|upper }}</strong></td>
+                <td class="text-right">
+                    {% if g.saldo_a_favor > 0.1 %}
+                        <span class="a-favor">- ${{ g.saldo_a_favor | pesos }}</span>
+                    {% else %} - {% endif %}
+                </td>
                 <td class="text-right col-total" style="font-size: 14px;">
-                    ${{ g.total_grupo | pesos }}
+                    ${{ [g.total_grupo - g.saldo_a_favor, 0] | max | pesos }}
                 </td>
                 <td class="text-center">
                     {% if g.grupo_pagado %}
@@ -195,9 +200,9 @@
 
                 <td class="text-right">
                     {% if f.saldo_anterior < -0.1 %}
-                        <span class="a-favor">${{ f.saldo_anterior | abs | pesos }} (A favor)</span>
+                        <span class="a-favor">- ${{ f.saldo_anterior | abs | pesos }}</span>
                     {% elif f.saldo_anterior > 0.1 %}
-                        <span class="deuda">Debe ${{ f.saldo_anterior | pesos }}</span>
+                        <span class="deuda">+ ${{ f.saldo_anterior | pesos }}</span>
                     {% else %} $0 {% endif %}
                 </td>
 

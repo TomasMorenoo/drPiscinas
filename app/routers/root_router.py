@@ -10,8 +10,7 @@ from app.models.user import User
 from app.models.casa import Casa, HistorialAumento
 from app.models.abono_historico import AbonoHistorico
 from app.models.configuracion import Configuracion
-from app.models.auditoria import AuditoriaLog
-from app import db
+from app import db, cache
 from datetime import datetime
 
 ALLOWED_IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.webp'}
@@ -129,6 +128,7 @@ def panel():
     # ── Estado del sistema ───────────────────────────────────────────────────
     from app.models.configuracion import Configuracion
     modo_mantenimiento = os.path.exists(FLAG_PATH) or bool(Configuracion.get('mantenimiento', False))
+    editar_countries = bool(Configuracion.get('editar_countries', False))
 
     total_clientes = Casa.query.filter_by(activo=True).count()
     total_inactivos = Casa.query.filter_by(activo=False).count()
@@ -161,28 +161,10 @@ def panel():
 
     tipo_dolar = Configuracion.get('tipo_dolar', 'blue')
 
-    # ── Log de auditoría DB ──────────────────────────────────────────────────
-    filtro_accion = request.args.get("filtro_accion", "")
-    filtro_usuario = request.args.get("filtro_usuario", "")
-    pagina = request.args.get("pagina", 1, type=int)
-    por_pagina = 50
-
-    audit_query = AuditoriaLog.query
-    if filtro_accion:
-        audit_query = audit_query.filter(AuditoriaLog.accion == filtro_accion)
-    if filtro_usuario:
-        audit_query = audit_query.filter(AuditoriaLog.usuario.ilike(f"%{filtro_usuario}%"))
-
-    total_audit = audit_query.count()
-    audit_logs = audit_query.order_by(AuditoriaLog.fecha.desc()).offset((pagina - 1) * por_pagina).limit(por_pagina).all()
-    total_paginas = (total_audit + por_pagina - 1) // por_pagina
-
-    acciones_disponibles = [r[0] for r in db.session.query(AuditoriaLog.accion).distinct().order_by(AuditoriaLog.accion).all()]
-    usuarios_disponibles = [r[0] for r in db.session.query(AuditoriaLog.usuario).distinct().order_by(AuditoriaLog.usuario).all()]
-
     return render_template(
         "root/panel.html",
         modo_mantenimiento=modo_mantenimiento,
+        editar_countries=editar_countries,
         login_image_exists=login_image_exists,
         total_clientes=total_clientes,
         total_inactivos=total_inactivos,
@@ -192,15 +174,32 @@ def panel():
         ultimos_aumentos=ultimos_aumentos,
         lineas_log=lineas_log,
         tipo_dolar=tipo_dolar,
-        audit_logs=audit_logs,
-        total_audit=total_audit,
-        total_paginas=total_paginas,
-        pagina_actual=pagina,
-        filtro_accion=filtro_accion,
-        filtro_usuario=filtro_usuario,
-        acciones_disponibles=acciones_disponibles,
-        usuarios_disponibles=usuarios_disponibles,
     )
+
+
+# ================================================
+# PREVISUALIZAR PÁGINA DE ERROR 500
+# ================================================
+@root_bp.route("/test-error-500")
+@login_required
+@root_required
+def test_error_500():
+    from flask import render_template as _rt
+    return _rt('errors/500.html'), 500
+
+
+# ================================================
+# TOGGLE EDICIÓN DE COUNTRIES
+# ================================================
+@root_bp.route("/toggle-edicion-countries", methods=["POST"])
+@login_required
+@root_required
+def toggle_edicion_countries():
+    actual = bool(Configuracion.get('editar_countries', False))
+    Configuracion.set('editar_countries', not actual)
+    db.session.commit()
+    flash(f"{'✅ Edición de countries activada.' if not actual else '🔒 Edición de countries desactivada.'}", "success" if not actual else "warning")
+    return redirect(url_for('root.panel'))
 
 
 # ================================================
@@ -501,9 +500,32 @@ def restore_db():
 @root_required
 def restore_status():
     """Devuelve el estado actual del restore en JSON para polling desde el frontend."""
+    global _restore_state
     with _restore_lock:
         state = dict(_restore_state)
+        if state["status"] in ("ok", "error"):
+            _restore_state = {"status": "idle", "message": ""}
     return jsonify(state)
+
+
+# ================================================
+# GUARDAR NÚMERO WA NOTIFICACIÓN ERRORES
+# ================================================
+@root_bp.route("/wa-error", methods=["POST"])
+@login_required
+@root_required
+def set_wa_error():
+    import re
+    numero = request.form.get("wa_numero_error", "").strip()
+    numero = re.sub(r'\D', '', numero)
+    numero = numero.lstrip('549') if numero.startswith('549') else numero
+    nombre = request.form.get("wa_nombre_error", "").strip()
+    Configuracion.set("wa_numero_error", numero)
+    Configuracion.set("wa_nombre_error", nombre)
+    db.session.commit()
+    cache.delete("_cfg_data")
+    flash("✅ Configuración de WhatsApp actualizada.", "success")
+    return redirect(url_for("root.panel"))
 
 
 # ================================================

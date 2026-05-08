@@ -1,30 +1,30 @@
 {% extends "base.html" %}
-{% block title %}Página no encontrada{% endblock %}
+{% block title %}Demasiadas solicitudes{% endblock %}
 
 {% block content %}
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-md-5">
             <div class="card border-0 shadow-sm overflow-hidden">
-                <div style="background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); padding: 2.5rem 2rem 2rem; text-align:center;">
+                <div style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); padding: 2.5rem 2rem 2rem; text-align:center;">
                     <div style="display:flex; justify-content:center; gap:0.5rem; margin-bottom:1rem;">
-                        <i class="bi bi-droplet-slash text-white" style="font-size:3rem;"></i>
+                        <i class="bi bi-speedometer2 text-white" style="font-size:3rem;"></i>
                     </div>
-                    <span class="badge bg-white text-info fw-bold px-3 py-2" style="font-size:0.8rem; letter-spacing:0.05em;">ERROR 404</span>
+                    <span class="badge bg-white text-purple fw-bold px-3 py-2" style="font-size:0.8rem; letter-spacing:0.05em; color:#7c3aed;">ERROR 429</span>
                 </div>
                 <div class="card-body p-4 p-md-5 text-center">
-                    <h1 class="fw-bold mb-3" style="font-size:1.5rem; color:#164e63;">
-                        ¡Piscina vacía!
+                    <h1 class="fw-bold mb-3" style="font-size:1.5rem; color:#4c1d95;">
+                        La bomba de agua se recalentó
                     </h1>
                     <p class="text-muted mb-1">
-                        La página que buscás no existe o fue movida.
+                        Estás haciendo demasiadas solicitudes en muy poco tiempo.
                     </p>
                     <p class="text-muted mb-4">
-                        Revisá la dirección o volvé al inicio.
+                        Esperá unos segundos y volvé a intentarlo.
                     </p>
                     <hr class="my-4">
                     <a href="{{ url_for('main.home') }}" class="btn btn-primary fw-bold">
-                        <i class="bi bi-house-door me-2"></i>Volver al inicio
+                        <i class="bi bi-arrow-clockwise me-2"></i>Intentar de nuevo
                     </a>
                 </div>
             </div>

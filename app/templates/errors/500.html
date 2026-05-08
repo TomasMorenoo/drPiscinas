@@ -1,18 +1,56 @@
 {% extends "base.html" %}
-{% block title %}500 - Error de Sistema{% endblock %}
+{% block title %}Se nos rebalsó la pileta{% endblock %}
 
 {% block content %}
-<div class="container text-center py-5">
+<div class="container py-5">
     <div class="row justify-content-center">
-        <div class="col-md-6 card shadow-sm p-5 border-0">
-            <i class="bi bi-exclamation-octagon-fill text-danger display-1 mb-4"></i>
-            <h1 class="fw-bold text-dark">500</h1>
-            <h2 class="h4 mb-4">Falla en los filtros</h2>
-            <p class="text-muted mb-4">Algo salió mal internamente. Ya estamos revisando el motor de la base de datos para arreglarlo.</p>
-            <hr class="my-4">
-            <a href="{{ url_for('main.home') }}" class="btn btn-outline-dark">
-                Intentar de nuevo
-            </a>
+        <div class="col-md-5">
+            <div class="card border-0 shadow-sm overflow-hidden">
+
+                {# Franja superior azul agua #}
+                <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); padding: 2.5rem 2rem 2rem; text-align:center;">
+                    <div style="display:flex; justify-content:center; gap:0.5rem; margin-bottom:1rem;">
+                        <i class="bi bi-droplet-fill text-white" style="font-size:2.2rem; opacity:0.6;"></i>
+                        <i class="bi bi-droplet-fill text-white" style="font-size:3rem;"></i>
+                        <i class="bi bi-droplet-fill text-white" style="font-size:2.2rem; opacity:0.6;"></i>
+                    </div>
+                    <span class="badge bg-white text-primary fw-bold px-3 py-2" style="font-size:0.8rem; letter-spacing:0.05em;">ERROR 500</span>
+                </div>
+
+                <div class="card-body p-4 p-md-5 text-center">
+                    <h1 class="fw-bold mb-3" style="font-size:1.5rem; color:#0c4a6e;">
+                        Se nos rebalsó la pileta
+                    </h1>
+                    <p class="text-muted mb-1">
+                        Alguien dejó el llenado prendido y el sistema se inundó todo.
+                    </p>
+                    <p class="text-muted mb-4">
+                        Ya está el equipo de Dr. Piscinas tratando de solucionarlo.
+                    </p>
+
+                    <hr class="my-4">
+
+                    <div class="d-flex flex-column gap-2">
+                        <a href="{{ url_for('main.home') }}" class="btn btn-primary fw-bold">
+                            <i class="bi bi-arrow-clockwise me-2"></i>Intentar de nuevo
+                        </a>
+
+                        {% if cfg.wa_numero_error %}
+                        {% set wa_nombre = cfg.wa_nombre_error or 'admin' %}
+                        {% set wa_msg = 'Hola ' + wa_nombre + ', falló la página en ' + (error_path or '?') %}
+                        <a href="whatsapp://send?phone=549{{ cfg.wa_numero_error }}&text={{ wa_msg | urlencode }}"
+                           class="btn btn-success fw-bold">
+                            <i class="bi bi-whatsapp me-2"></i>Notificar error
+                        </a>
+                        {% endif %}
+
+                        <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-box-arrow-right me-1"></i>Cambiar de usuario
+                        </a>
+                    </div>
+                </div>
+
+            </div>
         </div>
     </div>
 </div>
