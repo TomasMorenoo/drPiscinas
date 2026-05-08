@@ -22,7 +22,7 @@
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="{% if current_user.is_admin() %}col-lg-4{% else %}col-lg-6{% endif %}">
+    <div class="{% if current_user.is_admin() %}col-md-6 col-lg-4{% else %}col-md-6 col-lg-6{% endif %}">
         <div class="card border-0 shadow-sm p-3 h-100 {% if mes_congelado %}border-start border-4 border-warning{% endif %}">
             <h6 class="fw-bold mb-3 small text-uppercase text-muted"><i class="bi bi-filter"></i> Período</h6>
             <form method="GET" action="{{ url_for('visits.listar_visits') }}" class="row g-2">
@@ -52,7 +52,7 @@
     </div>
 
     {% if current_user.is_admin() %}
-    <div class="col-lg-4">
+    <div class="col-md-6 col-lg-4">
         <div class="card border-0 shadow-sm bg-primary text-white p-3 h-100 d-flex flex-column justify-content-center">
             <h6 class="fw-bold small text-uppercase opacity-75">Facturación Extras del Mes</h6>
             <h2 class="mb-0 fw-bold">$ {{ total_mes | pesos }}</h2>
@@ -60,7 +60,7 @@
     </div>
     {% endif %}
 
-    <div class="{% if current_user.is_admin() %}col-lg-4{% else %}col-lg-6{% endif %}">
+    <div class="{% if current_user.is_admin() %}col-md-6 col-lg-4{% else %}col-md-6 col-lg-6{% endif %}">
         <div class="card border-0 shadow-sm p-3 h-100">
             <h6 class="fw-bold mb-2 small text-uppercase text-muted">Consumo del Mes</h6>
             {% for nombre, unidad, total in top_productos %}
@@ -118,13 +118,13 @@
 <div class="card border-0 shadow-sm">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0" style="min-width: 1100px;">
+            <table class="table table-hover align-middle mb-0" style="min-width: 600px;">
                 <thead class="table-dark text-nowrap">
                     <tr>
                         <th class="ps-4">Fecha</th>
                         <th>Casa / Ubicación</th>
                         <th>Productos / Promo</th>
-                        <th>Observaciones</th>
+                        <th class="d-none d-md-table-cell">Observaciones</th>
 
                         {% if current_user.is_admin() %}
                         <th class="text-center">Total</th>
@@ -160,7 +160,7 @@
                             </div>
                         </td>
 
-                        <td>
+                        <td class="d-none d-md-table-cell">
                             <div class="text-truncate text-muted small" style="max-width: 250px; cursor: help;"
                                  title="{{ visit.observaciones }}" data-bs-toggle="tooltip">
                                 {{ visit.observaciones if visit.observaciones else '-' }}

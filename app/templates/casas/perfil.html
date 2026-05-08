@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <h1 class="h3 mb-0 text-gray-800 fw-bold">
             <i class="bi bi-house-door me-2"></i>{{ casa.nombre_formateado() }}
         </h1>
@@ -55,7 +55,7 @@
                         <small class="text-muted d-block text-uppercase fw-bold">Email</small>
                         {% if casa.email %}
                             <div class="d-flex justify-content-between align-items-center">
-                                <span class="fs-5 text-truncate" style="max-width: 200px;" title="{{ casa.email }}"><i class="bi bi-envelope text-primary me-1"></i> {{ casa.email }}</span>
+                                <span class="fs-5 text-truncate" style="max-width: min(200px, 100%)" title="{{ casa.email }}"><i class="bi bi-envelope text-primary me-1"></i> {{ casa.email }}</span>
                                 <a href="mailto:{{ casa.email }}?subject=Facturación%20Mantenimiento%20-%20Dr.%20Piscinas" class="btn btn-sm btn-outline-primary shadow-sm" title="Enviar correo">
                                     <i class="bi bi-send-fill"></i> Enviar
                                 </a>

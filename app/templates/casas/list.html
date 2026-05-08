@@ -4,7 +4,7 @@
 
 {# --- BARRA DE HERRAMIENTAS --- #}
 <div class="card mb-4 border-0 shadow-sm">
-    <div class="card-body d-flex justify-content-between align-items-center py-3">
+    <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-2 py-3">
         
         <div class="d-flex align-items-center flex-wrap gap-3">
             <span class="text-uppercase small fw-bold text-muted">
@@ -43,7 +43,7 @@
     <div class="card-body">
         <form method="GET" action="{{ url_for('casas.listar_casas') }}" class="row g-3 align-items-end">
             
-            <div class="col-md-2">
+            <div class="col-12 col-md-2">
                 <label class="form-label fw-bold text-secondary small text-uppercase">Buscar Lote</label>
                 <div class="input-group shadow-sm">
                     <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-search"></i></span>
@@ -51,7 +51,7 @@
                 </div>
             </div>
 
-            <div class="col-md-2">
+            <div class="col-6 col-md-2">
                 <label class="form-label fw-bold text-secondary small text-uppercase">Estado</label>
                 <select name="estado" class="form-select border-0 shadow-sm">
                     <option value="todo" {% if estado_actual == 'todo' %}selected{% endif %}>Todos</option>
@@ -61,7 +61,7 @@
                 </select>
             </div>
 
-            <div class="col-md-3">
+            <div class="col-6 col-md-3">
                 <label class="form-label fw-bold text-secondary small text-uppercase">Country</label>
                 <select name="country_id" id="filtroCountry" class="form-select border-0 shadow-sm">
                     <option value="">Todos los Countries</option>
@@ -71,7 +71,7 @@
                 </select>
             </div>
 
-            <div class="col-md-3">
+            <div class="col-6 col-md-3">
                 <label class="form-label fw-bold text-secondary small text-uppercase">Barrio</label>
                 <select name="barrio_id" id="filtroBarrio" class="form-select border-0 shadow-sm" {% if not country_actual %}disabled{% endif %}>
                     <option value="">Todos los Barrios</option>
@@ -81,7 +81,7 @@
                 </select>
             </div>
 
-            <div class="col-md-2 d-grid gap-2 d-md-flex justify-content-md-end">
+            <div class="col-6 col-md-2 d-grid gap-2 d-md-flex justify-content-md-end">
                 <a href="{{ url_for('casas.listar_casas') }}" class="btn btn-outline-secondary shadow-sm" title="Limpiar Filtros">
                     <i class="bi bi-eraser"></i>
                 </a>
