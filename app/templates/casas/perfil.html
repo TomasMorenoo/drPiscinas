@@ -144,10 +144,10 @@
                                             <td class="font-monospace">{{ vp.cantidad | num }} {{ vp.product.unidad }}</td>
                                             <td class="font-monospace text-success fw-bold">${{ (vp.cantidad * (vp.precio_unitario or vp.product.precio)) | pesos }}</td>
                                             <td class="text-end pe-4">
-                                                <form action="{{ url_for('casas.eliminar_extra', visit_id=v.id) }}" method="POST" onsubmit="return confirm('¿Eliminar este cargo manual?');">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                                                </form>
+                                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                                    onclick="confirmarEliminarExtra('{{ url_for('casas.eliminar_extra', visit_id=v.id) }}', '{{ vp.product.nombre }}', '{{ v.fecha.strftime('%m/%Y') }}')">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
                                             </td>
                                         </tr>
                                         {% endfor %}
@@ -576,6 +576,37 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modalConfirmarEliminarExtra" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-danger border-2">
+            <div class="modal-header bg-danger text-white border-0">
+                <h6 class="modal-title fw-bold"><i class="bi bi-trash me-2"></i>Eliminar cargo</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center py-3">
+                <p class="mb-1">¿Eliminar <strong id="extraNombreConfirm"></strong>?</p>
+                <p class="text-muted small mb-0" id="extraMesConfirm"></p>
+            </div>
+            <div class="modal-footer border-0 gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-bs-dismiss="modal">Cancelar</button>
+                <form id="formEliminarExtra" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-danger btn-sm fw-bold">Eliminar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmarEliminarExtra(url, nombre, mes) {
+    document.getElementById('extraNombreConfirm').textContent = nombre;
+    document.getElementById('extraMesConfirm').textContent = mes;
+    document.getElementById('formEliminarExtra').action = url;
+    new bootstrap.Modal(document.getElementById('modalConfirmarEliminarExtra')).show();
+}
+</script>
 
 <script>
 document.getElementById('toggleFechaReanudar').addEventListener('change', function() {
