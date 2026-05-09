@@ -92,6 +92,15 @@ def create_app():
         except (ValueError, TypeError):
             return value
 
+    # --- FILTRO JINJA2: número sin decimales innecesarios (1.0 → 1, 1.5 → 1.5) ---
+    @app.template_filter('num')
+    def smart_num(value):
+        try:
+            f = float(value)
+            return str(int(f)) if f == int(f) else '{:g}'.format(f)
+        except (ValueError, TypeError):
+            return value
+
     # --- CONTEXT PROCESSOR: cfg global (disponible en todos los templates) ---
     @app.context_processor
     def inject_cfg():
@@ -211,6 +220,10 @@ def create_app():
             return e
         _trace = _tb.format_exc()
         app.logger.error("Unhandled exception: %s", _trace)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
         if _maint_cache["v"]:
             try:
                 from flask_login import current_user

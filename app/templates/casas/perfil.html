@@ -141,7 +141,7 @@
                                         <tr>
                                             <td class="ps-4 fw-bold text-muted">{{ v.fecha.strftime('%m/%Y') }}</td>
                                             <td class="fw-bold text-dark">{{ vp.product.nombre }}</td>
-                                            <td class="font-monospace">{{ vp.cantidad }} {{ vp.product.unidad }}</td>
+                                            <td class="font-monospace">{{ vp.cantidad | num }} {{ vp.product.unidad }}</td>
                                             <td class="font-monospace text-success fw-bold">${{ (vp.cantidad * (vp.precio_unitario or vp.product.precio)) | pesos }}</td>
                                             <td class="text-end pe-4">
                                                 <form action="{{ url_for('casas.eliminar_extra', visit_id=v.id) }}" method="POST" onsubmit="return confirm('¿Eliminar este cargo manual?');">
@@ -186,7 +186,7 @@
                                             <div>
                                                 <h6 class="mb-0 fw-bold">{{ visit.fecha.strftime('%d/%m/%Y') }}</h6>
                                                 <small class="text-muted">
-                                                    {% for vp in visit.productos %}{{ vp.product.nombre }} ({{ vp.cantidad }}) {% endfor %}
+                                                    {% for vp in visit.productos %}{{ vp.product.nombre }} ({{ vp.cantidad | num }}) {% endfor %}
                                                 </small>
                                             </div>
                                             <span class="badge bg-primary rounded-pill fs-6">${{ visit.calcular_total() | pesos }}</span>

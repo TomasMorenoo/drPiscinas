@@ -35,7 +35,7 @@
                                         <li>
                                             <i class="bi bi-check2 text-muted me-1"></i>
                                             {{ pp.product.nombre }} 
-                                            <span class="text-muted">({{ pp.cantidad }} {{ pp.product.unidad }})</span>
+                                            <span class="text-muted">({{ pp.cantidad | num }} {{ pp.product.unidad }})</span>
                                         </li>
                                     {% endfor %}
                                 </ul>

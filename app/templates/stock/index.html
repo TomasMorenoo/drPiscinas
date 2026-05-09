@@ -32,7 +32,7 @@
                         <thead>
                             <tr>
                                 <th>Producto</th>
-                                <th>Unidad</th>
+                                <th>Estado</th>
                                 <th class="text-end">Stock</th>
                                 <th class="text-center">Alerta mínimo</th>
                             </tr>
@@ -49,29 +49,32 @@
                                 {% set row_class = "" %}
                             {% endif %}
                             <tr class="{{ row_class }}">
+                                <td>{{ p.nombre }}</td>
                                 <td>
-                                    {{ p.nombre }}
                                     {% if s <= 0 %}
-                                        <span class="badge bg-danger ms-1"><i class="bi bi-x-circle-fill"></i> Sin stock</span>
+                                        <span class="badge bg-danger"><i class="bi bi-x-circle-fill"></i> Sin stock</span>
                                     {% elif m is not none and s <= m %}
-                                        <span class="badge bg-warning text-dark ms-1"><i class="bi bi-exclamation-triangle-fill"></i> Stock bajo</span>
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle-fill"></i> Stock bajo</span>
+                                    {% else %}
+                                        <span class="text-muted small">—</span>
                                     {% endif %}
                                 </td>
-                                <td class="text-muted">{{ p.unidad }}</td>
                                 <td class="text-end fw-bold">
+                                    {% set u = p.unidad | lower %}
+                                    {% set u_label = 'U' if u in ('unidad', 'unidades') else ('L' if u in ('litro', 'litros') else p.unidad) %}
                                     {% if s <= 0 %}
-                                        <span class="badge bg-danger">{{ s }}</span>
+                                        <span class="badge bg-danger">{{ s | num }} {{ u_label }}</span>
                                     {% elif m is not none and s <= m %}
-                                        <span class="badge bg-warning text-dark">{{ s }}</span>
+                                        <span class="badge bg-warning text-dark">{{ s | num }} {{ u_label }}</span>
                                     {% else %}
-                                        <span class="badge bg-success">{{ s }}</span>
+                                        <span class="badge bg-success">{{ s | num }} {{ u_label }}</span>
                                     {% endif %}
                                 </td>
                                 <td class="text-center">
                                     <form method="POST" action="{{ url_for('stock.set_umbral', id=p.id) }}" class="d-inline-flex gap-1 align-items-center">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <input type="number" name="stock_minimo" value="{{ p.stock_minimo if p.stock_minimo is not none else '' }}"
-                                               class="form-control form-control-sm" style="width:80px;" placeholder="—" min="0" step="0.01">
+                                        <input type="number" name="stock_minimo" value="{{ p.stock_minimo | num if p.stock_minimo is not none else '' }}"
+                                               class="form-control form-control-sm" style="width:80px;" placeholder="—" min="0" step="1">
                                         <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-floppy"></i></button>
                                     </form>
                                 </td>

@@ -40,7 +40,7 @@
                             {% for vp in visit.productos %}
                             <div class="list-group-item d-flex justify-content-between align-items-center py-2 bg-light">
                                 <span><i class="bi bi-box-seam me-2 text-secondary"></i>{{ vp.product.nombre }}</span>
-                                <span class="badge bg-secondary rounded-pill fs-6">{{ vp.cantidad }} {{ vp.product.unidad }}</span>
+                                <span class="badge bg-secondary rounded-pill fs-6">{{ vp.cantidad | num }} {{ vp.product.unidad }}</span>
                             </div>
                             {% endfor %}
                         </ul>

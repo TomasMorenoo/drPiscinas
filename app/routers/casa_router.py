@@ -525,10 +525,6 @@ def agregar_extra(id):
         )
         db.session.add(nuevo_vp)
 
-        historial = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=mes, anio=anio).first()
-        if historial:
-            historial.monto += float(cantidad) * float(producto.precio)
-
         mover_stock(producto.id, -float(cantidad), 'visita', current_user.username, visit_id=nueva_visita.id, motivo='extra manual')
 
         db.session.commit()
@@ -543,12 +539,11 @@ def eliminar_extra(visit_id):
     visita = Visit.query.get_or_404(visit_id)
     casa_id = visita.casa_id
     if visita.observaciones == "[EXTRA_MANUAL]":
-        historial = AbonoHistorico.query.filter_by(casa_id=casa_id, mes=visita.fecha.month, anio=visita.fecha.year).first()
         for vp in visita.productos:
-            if historial:
-                historial.monto -= float(vp.cantidad) * float(vp.precio_unitario or vp.product.precio)
             mover_stock(vp.product_id, float(vp.cantidad), 'ajuste', current_user.username, motivo='extra eliminado')
 
+        from app.models.movimiento_stock import MovimientoStock
+        MovimientoStock.query.filter_by(visit_id=visita.id).update({'visit_id': None})
         VisitProduct.query.filter_by(visit_id=visita.id).delete()
         db.session.delete(visita)
         db.session.commit()

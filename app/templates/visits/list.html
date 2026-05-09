@@ -146,7 +146,7 @@
 
                         <td>
                             <div class="text-truncate small" style="max-width: 200px; cursor: help;"
-                                 title="{% if visit.promo %}{{ visit.promo.nombre }}{% endif %}{% for vp in visit.productos %} • {{ vp.product.nombre }} ({% if vp.cantidad % 1 == 0 %}{{ vp.cantidad | int }}{% else %}{{ vp.cantidad }}{% endif %} {{ vp.product.unidad }}){% endfor %}"
+                                 title="{% if visit.promo %}{{ visit.promo.nombre }}{% endif %}{% for vp in visit.productos %} • {{ vp.product.nombre }} ({{ vp.cantidad | num }} {{ vp.product.unidad }}){% endfor %}"
                                  data-bs-toggle="tooltip">
 
                                 {% if visit.promo %}
@@ -154,7 +154,7 @@
                                 {% endif %}
                                 {% for vp in visit.productos %}
                                 <span class="badge bg-light text-muted border fw-normal">
-                                    {{ vp.product.nombre }} ({% if vp.cantidad % 1 == 0 %}{{ vp.cantidad | int }}{% else %}{{ vp.cantidad }}{% endif %} {{ vp.product.unidad }})
+                                    {{ vp.product.nombre }} ({{ vp.cantidad | num }} {{ vp.product.unidad }})
                                 </span>
                                 {% endfor %}
                             </div>
