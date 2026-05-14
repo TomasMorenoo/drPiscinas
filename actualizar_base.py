@@ -119,6 +119,11 @@ def migrar_base_de_datos():
             );
         """)
 
+        print("Saldo previo en grupos_clientes...")
+        _run("ALTER TABLE grupos_clientes ADD COLUMN IF NOT EXISTS saldo_a_favor_previo NUMERIC(10,2);")
+        _run("ALTER TABLE grupos_clientes ADD COLUMN IF NOT EXISTS saldo_desde_mes_previo INTEGER;")
+        _run("ALTER TABLE grupos_clientes ADD COLUMN IF NOT EXISTS saldo_desde_anio_previo INTEGER;")
+
         print("Listo.")
 
 if __name__ == "__main__":

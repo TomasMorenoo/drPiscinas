@@ -9,6 +9,9 @@ class GrupoCliente(db.Model):
     saldo_a_favor = db.Column(db.Numeric(10, 2), nullable=False, default=0.0)
     saldo_desde_mes = db.Column(db.Integer, nullable=True)   # Mes en que se generó el saldo (aplica desde el SIGUIENTE)
     saldo_desde_anio = db.Column(db.Integer, nullable=True)
+    saldo_a_favor_previo = db.Column(db.Numeric(10, 2), nullable=True)
+    saldo_desde_mes_previo = db.Column(db.Integer, nullable=True)
+    saldo_desde_anio_previo = db.Column(db.Integer, nullable=True)
 
     @property
     def nombre_display(self):

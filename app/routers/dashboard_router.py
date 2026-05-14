@@ -994,7 +994,12 @@ def toggle_pago_grupo(grupo_id):
         from app.models.grupo import GrupoCliente
         grupo_undo = GrupoCliente.query.get(grupo_id)
         if grupo_undo:
-            grupo_undo.saldo_a_favor = 0.0
+            grupo_undo.saldo_a_favor = grupo_undo.saldo_a_favor_previo or 0.0
+            grupo_undo.saldo_desde_mes = grupo_undo.saldo_desde_mes_previo
+            grupo_undo.saldo_desde_anio = grupo_undo.saldo_desde_anio_previo
+            grupo_undo.saldo_a_favor_previo = None
+            grupo_undo.saldo_desde_mes_previo = None
+            grupo_undo.saldo_desde_anio_previo = None
         if casas_grupo:
             grupo_obj_aud = casas_grupo[0].grupo
             mes_nombre_gu = nombre_mes(mes)
@@ -1164,12 +1169,18 @@ def registrar_pago_grupo(grupo_id):
                 aplicar_pago_en_cascada(d["hist"].casa, d["restante"], current_user.username, mes, anio)
         # El sobrante queda a favor del grupo, registrado desde este mes
         if grupo_obj is not None:
+            grupo_obj.saldo_a_favor_previo = grupo_obj.saldo_a_favor
+            grupo_obj.saldo_desde_mes_previo = grupo_obj.saldo_desde_mes
+            grupo_obj.saldo_desde_anio_previo = grupo_obj.saldo_desde_anio
             grupo_obj.saldo_a_favor = disponible_total - total_deuda_grupo
             grupo_obj.saldo_desde_mes = mes
             grupo_obj.saldo_desde_anio = anio
     else:
         # Pago parcial: aplica en cascada hasta agotar el disponible (incluyendo saldo del grupo)
         if grupo_obj is not None:
+            grupo_obj.saldo_a_favor_previo = grupo_obj.saldo_a_favor
+            grupo_obj.saldo_desde_mes_previo = grupo_obj.saldo_desde_mes
+            grupo_obj.saldo_desde_anio_previo = grupo_obj.saldo_desde_anio
             grupo_obj.saldo_a_favor = 0.0
             grupo_obj.saldo_desde_mes = None
             grupo_obj.saldo_desde_anio = None
