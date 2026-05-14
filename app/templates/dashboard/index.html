@@ -843,7 +843,7 @@
                             {% if g.saldo_a_favor > 0.01 %}
                             <div class="grupo-monto-item">
                                 <span class="grupo-monto-label">Saldo a Favor</span>
-                                <span class="fw-bold text-success font-monospace">+${{ g.saldo_a_favor | pesos }}</span>
+                                <span class="fw-bold text-success font-monospace">-${{ g.saldo_a_favor | pesos }}</span>
                             </div>
                             {% endif %}
 
