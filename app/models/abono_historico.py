@@ -15,6 +15,7 @@ class AbonoHistorico(db.Model):
     
     pagado = db.Column(db.Boolean, default=False)
     mensaje_enviado = db.Column(db.Boolean, default=False)
+    doble_instancia_enviada = db.Column(db.Boolean, default=False)
     
     monto_pagado = db.Column(db.Float, default=0.0)
     

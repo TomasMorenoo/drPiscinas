@@ -99,6 +99,10 @@ def migrar_base_de_datos():
 
             db.session.execute(text("ALTER TABLE auditoria_logs ADD COLUMN IF NOT EXISTS ip VARCHAR(45);"))
 
+            print("⏳ Doble instancia - Agregando columnas...")
+            db.session.execute(text("ALTER TABLE abonos_historicos ADD COLUMN IF NOT EXISTS doble_instancia_enviada BOOLEAN NOT NULL DEFAULT FALSE;"))
+            db.session.execute(text("ALTER TABLE plantillas_mensaje ADD COLUMN IF NOT EXISTS template_recordatorio TEXT;"))
+
             print("⏳ Stock - Agregando columna stock_actual a products y tabla movimientos_stock...")
             db.session.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_actual NUMERIC(10,2) NOT NULL DEFAULT 0;"))
             db.session.execute(text("""

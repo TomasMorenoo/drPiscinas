@@ -197,9 +197,11 @@ def revertir_transaccion(h, txn_id):
             h.fecha_pago = None
             h.cobrado_por = None
             h.mensaje_enviado = False
+            h.doble_instancia_enviada = False
     else:
         h.pagado = False
         h.mensaje_enviado = False
+        h.doble_instancia_enviada = False
         h.monto_pagado = 0.0
         h.cobrado_por = None
         h.fecha_pago = None
@@ -490,6 +492,7 @@ def index():
         
         esta_pagado = getattr(historial, 'pagado', False) if historial else False
         mensaje_enviado = getattr(historial, 'mensaje_enviado', False) if historial else False
+        doble_instancia_enviada = getattr(historial, 'doble_instancia_enviada', False) if historial else False
 
         if saldo_anterior_visual > 0:
             total_deuda_anterior += saldo_anterior_visual
@@ -533,6 +536,7 @@ def index():
             "monto_pagado": pagos_en_este_dashboard,
             "pagado": esta_pagado,
             "mensaje_enviado": mensaje_enviado,
+            "doble_instancia_enviada": doble_instancia_enviada,
             "pagos_en_este_dashboard": pagos_en_este_dashboard,
             "estado": estado_item,
             "tiene_telefono": bool(casa.telefono),
@@ -571,6 +575,7 @@ def index():
         if mes_congelado and g["saldo_restante"] <= 0.01:
             g["pagado"] = True
             g["mensaje_enviado"] = True
+            g["doble_instancia_enviada"] = False
             for c in g["casas"]:
                 c["pagado"] = True; c["mensaje_enviado"] = True
                 hist_obj = c["historial_obj"]
@@ -585,6 +590,7 @@ def index():
         else:
             g["pagado"] = all(c["pagado"] for c in g["casas"])
             g["mensaje_enviado"] = all(c["mensaje_enviado"] for c in g["casas"])
+            g["doble_instancia_enviada"] = all(c.get("doble_instancia_enviada", False) for c in g["casas"])
 
         # Estado del grupo para filtros
         if g["pagado"]:
@@ -629,6 +635,123 @@ def marcar_mensaje(id):
     registro.mensaje_enviado = True
     db.session.commit()
     return jsonify({"success": True})
+
+
+@dashboard_bp.route("/marcar-doble-instancia/<int:id>", methods=["POST"])
+@login_required
+@admin_required
+def marcar_doble_instancia(id):
+    registro = AbonoHistorico.query.get_or_404(id)
+    registro.doble_instancia_enviada = True
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+@dashboard_bp.route("/marcar-doble-instancia-grupo/<int:grupo_id>", methods=["POST"])
+@login_required
+@admin_required
+def marcar_doble_instancia_grupo(grupo_id):
+    data = request.get_json(silent=True) or {}
+    mes = data.get("mes")
+    anio = data.get("anio")
+    historiales = AbonoHistorico.query.filter(
+        AbonoHistorico.casa_id.in_(
+            db.session.query(Casa.id).filter_by(grupo_id=grupo_id)
+        ),
+        AbonoHistorico.mes == mes,
+        AbonoHistorico.anio == anio
+    ).all()
+    for h in historiales:
+        h.doble_instancia_enviada = True
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+@dashboard_bp.route("/api/wa-url-recordatorio-grupo/<int:grupo_id>")
+@login_required
+@admin_required
+def api_wa_url_recordatorio_grupo(grupo_id):
+    mes = request.args.get("mes", type=int)
+    anio = request.args.get("anio", type=int)
+    if not mes or not anio:
+        return jsonify({"url": None})
+    from app.models.grupo import GrupoCliente
+    grupo = GrupoCliente.query.get_or_404(grupo_id)
+    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).options(
+        selectinload(Casa.historial_abonos),
+        selectinload(Casa.historial_pausas),
+        selectinload(Casa.visitas).selectinload(Visit.productos).joinedload(VisitProduct.product),
+        selectinload(Casa.visitas).joinedload(Visit.promo)
+    ).all()
+    telefono_repr = next((c.telefono for c in casas_grupo if c.telefono), None)
+    if not telefono_repr:
+        return jsonify({"url": None})
+    hist_dict = {h.casa_id: h for h in AbonoHistorico.query.filter(
+        AbonoHistorico.casa_id.in_([c.id for c in casas_grupo]),
+        AbonoHistorico.mes == mes, AbonoHistorico.anio == anio
+    ).all()}
+    total_deuda = 0.0
+    for c in casas_grupo:
+        h = hist_dict.get(c.id)
+        datos = c.obtener_gastos_mensuales(mes, anio, hist=h)
+        extras = float(datos.get("extras", 0))
+        pausado = _casa_pausada_en_mes(c, mes, anio, extras)
+        abono = 0.0 if pausado else (float(h.monto) if h and float(h.monto) > 0 else float(c.precio_base or 0))
+        saldo = c.obtener_saldo_anterior(mes, anio)
+        pagos = float(h.monto_pagado or 0) if h else 0.0
+        total_deuda += abono + extras + saldo - pagos
+    saldo_a_favor = _saldo_grupo_para_mes(grupo, mes, anio)
+    total_deuda = max(0.0, total_deuda - saldo_a_favor)
+    saludo = obtener_saludo_tiempo(grupo.nombre)
+    from app.models.plantilla_mensaje import PlantillaMensaje, renderizar_template
+    pt = PlantillaMensaje.get_activa()
+    variables = {
+        'saludo': (saludo, None),
+        'deuda':  (format_money(total_deuda), None),
+        'mes':    (MESES_LARGO[mes - 1], None),
+        'anio':   (str(anio), None),
+    }
+    texto = renderizar_template(pt.get_template_recordatorio(), variables)
+    tel = re.sub(r'\D', '', telefono_repr)
+    if len(tel) == 10:
+        tel = "549" + tel
+    return jsonify({"url": f"whatsapp://send?phone={tel}&text={urllib.parse.quote(texto)}"})
+
+
+@dashboard_bp.route("/api/wa-url-recordatorio/<int:id_historial>")
+@login_required
+@admin_required
+def api_wa_url_recordatorio(id_historial):
+    hist = AbonoHistorico.query.get_or_404(id_historial)
+    casa = Casa.query.options(
+        selectinload(Casa.historial_abonos),
+        selectinload(Casa.historial_pausas),
+        selectinload(Casa.visitas).selectinload(Visit.productos).joinedload(VisitProduct.product),
+        selectinload(Casa.visitas).joinedload(Visit.promo)
+    ).get(hist.casa_id)
+    if not casa or not casa.telefono:
+        return jsonify({"url": None})
+    mes, anio = hist.mes, hist.anio
+    saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
+    datos = casa.obtener_gastos_mensuales(mes, anio, hist=hist)
+    extras = float(datos.get("extras", 0))
+    pausado = _casa_pausada_en_mes(casa, mes, anio, extras)
+    abono_mes = 0.0 if pausado else (float(hist.monto) if float(hist.monto) > 0 else float(casa.precio_base or 0))
+    pagos = float(hist.monto_pagado or 0)
+    deuda = abono_mes + extras + saldo_anterior - pagos
+    nombre_wa = casa.nombre_cliente if casa.nombre_cliente else get_nombre_limpio(casa)
+    saludo = obtener_saludo_tiempo(nombre_wa)
+    from app.models.plantilla_mensaje import PlantillaMensaje, renderizar_template
+    pt = PlantillaMensaje.get_activa()
+    variables = {
+        'saludo': (saludo, None),
+        'deuda':  (format_money(deuda), None),
+        'mes':    (MESES_LARGO[mes - 1], None),
+        'anio':   (str(anio), None),
+    }
+    texto = renderizar_template(pt.get_template_recordatorio(), variables)
+    num_tel = limpiar_telefono(casa.telefono)
+    return jsonify({"url": f"whatsapp://send?phone={num_tel}&text={urllib.parse.quote(texto)}"})
 
 
 @dashboard_bp.route("/toggle-pago/<int:id>", methods=["POST"])

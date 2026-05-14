@@ -265,6 +265,68 @@
     </div>
 </div>
 
+{# ══════════════════════════════ RECORDATORIO (2° INSTANCIA) ══════════════════════════════ #}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header fw-bold">
+        <i class="bi bi-bell-fill text-warning me-1"></i> Mensaje de 2° instancia (recordatorio)
+    </div>
+    <div class="card-body">
+
+        {# Chips #}
+        <div class="mb-3">
+            <div class="chip-label">
+                <span class="d-none d-lg-inline">Arrastrá al texto o hacé click para insertar</span>
+                <span class="d-lg-none">Tocá para insertar en el editor</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2" id="chips-rec">
+                <span class="chip chip-always" draggable="true" data-var="{saludo}"  title="Buenas Tardes / Días + nombre del cliente"><i class="bi bi-hand-wave"></i> {saludo}</span>
+                <span class="chip chip-always" draggable="true" data-var="${deuda}"  title="Monto total adeudado"><i class="bi bi-cash-coin"></i> ${deuda}</span>
+                <span class="chip chip-always" draggable="true" data-var="{mes}"     title="Nombre del mes"><i class="bi bi-calendar3"></i> {mes}</span>
+                <span class="chip chip-always" draggable="true" data-var="{anio}"    title="Año"><i class="bi bi-calendar3"></i> {anio}</span>
+            </div>
+            <div class="chip-desc">
+                Todas las variables siempre aparecen (no se ocultan).
+            </div>
+        </div>
+
+        {# Tabs mobile #}
+        <ul class="nav nav-tabs editor-tabs mb-3 mobile-tabs" id="tabs-rec" style="display:none;">
+            <li class="nav-item">
+                <button type="button" class="nav-link active" onclick="switchTab('rec','editor',this)">Editar</button>
+            </li>
+            <li class="nav-item">
+                <button type="button" class="nav-link" onclick="switchTab('rec','preview',this)">Vista previa</button>
+            </li>
+        </ul>
+
+        {# Editor + Preview #}
+        <div class="row g-3" id="panel-rec">
+            <div class="col-lg-6 editor-col">
+                <div class="drop-zone" id="drop-rec">
+                    <div class="editor-wrapper">
+                        <div class="editor-overlay" id="overlay-rec"></div>
+                        <textarea id="ta-rec" name="template_recordatorio" class="msg-area" rows="7"
+                                  placeholder="Escribí el mensaje acá...">{{ plantilla.template_recordatorio or default_recordatorio }}</textarea>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-2"
+                        onclick="resetTemplate('ta-rec', defaultRecordatorio)">
+                    <i class="bi bi-arrow-counterclockwise"></i> Restaurar default
+                </button>
+            </div>
+            <div class="col-lg-6 preview-col">
+                <div class="chip-label mb-2 d-none d-lg-block">Vista previa</div>
+                <div class="wa-preview-screen">
+                    <div style="width:100%">
+                        <div class="wa-bubble" id="preview-rec"></div>
+                        <div class="wa-time">12:34 ✓✓</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="d-flex gap-2 pb-4">
     <button type="submit" class="btn btn-success fw-bold shadow-sm px-4">
         <i class="bi bi-floppy-fill me-1"></i>
@@ -275,8 +337,9 @@
 </form>
 
 <script>
-const defaultIndividual = {{ default_individual | tojson }};
-const defaultGrupo      = {{ default_grupo | tojson }};
+const defaultIndividual    = {{ default_individual | tojson }};
+const defaultGrupo         = {{ default_grupo | tojson }};
+const defaultRecordatorio  = {{ default_recordatorio | tojson }};
 
 // ── Datos de ejemplo ──
 const SAMPLE_IND = {
@@ -380,11 +443,20 @@ function updatePreview(taId, previewId, condDefs, getSample) {
     preview.innerHTML = waMarkdown(rendered);
 }
 
+const SAMPLE_REC = {
+    saludo: 'Buenas Tardes Juan García',
+    deuda:  '55.000',
+    mes:    'Mayo',
+    anio:   '2026',
+};
+
 // ── Live update al escribir ──
 document.getElementById('ta-ind').addEventListener('input', () =>
     updatePreview('ta-ind','preview-ind', COND_IND, () => SAMPLE_IND.deuda));
 document.getElementById('ta-grp').addEventListener('input', () =>
     updatePreview('ta-grp','preview-grp', COND_GRP, () => SAMPLE_GRP.deuda));
+document.getElementById('ta-rec').addEventListener('input', () =>
+    updatePreview('ta-rec','preview-rec', {}, () => SAMPLE_REC));
 
 // ── Highlight overlay ──
 function highlightVars(text) {
@@ -403,6 +475,7 @@ function syncOverlay(ta, overlay) {
 const pares = [
     ['ta-ind', 'overlay-ind'],
     ['ta-grp', 'overlay-grp'],
+    ['ta-rec', 'overlay-rec'],
 ];
 pares.forEach(([taId, ovId]) => {
     const ta = document.getElementById(taId);
@@ -426,7 +499,18 @@ function insertarEnCursor(ta, texto) {
     ta.dispatchEvent(new Event('input'));
 }
 
-document.querySelectorAll('.chip').forEach(chip => {
+// Chips del recordatorio apuntan siempre a ta-rec
+document.querySelectorAll('#chips-rec .chip').forEach(chip => {
+    chip.addEventListener('click', () => insertarEnCursor(document.getElementById('ta-rec'), chip.dataset.var));
+    chip.addEventListener('dragstart', function(e) {
+        this.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', this.dataset.var);
+        e.dataTransfer.effectAllowed = 'copy';
+    });
+    chip.addEventListener('dragend', function() { this.classList.remove('dragging'); });
+});
+
+document.querySelectorAll(':not(#chips-rec) > .chip').forEach(chip => {
     chip.addEventListener('click', () => insertarEnCursor(lastTA, chip.dataset.var));
     chip.addEventListener('dragstart', function(e) {
         this.classList.add('dragging');
@@ -483,6 +567,7 @@ function switchTab(panel, tab, btn) {
 // ── Init previews ──
 updatePreview('ta-ind','preview-ind', COND_IND, () => SAMPLE_IND.deuda);
 updatePreview('ta-grp','preview-grp', COND_GRP, () => SAMPLE_GRP.deuda);
+updatePreview('ta-rec','preview-rec', {}, () => SAMPLE_REC);
 
 // ── Borrado atómico de variables {xxx} ──
 // Detecta si el cursor está dentro o pegado a una variable y devuelve {start, end}

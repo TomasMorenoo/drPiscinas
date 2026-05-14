@@ -628,6 +628,12 @@
                                             <a href="#" onclick="abrirWA(event, {{ item.id_historial }})" class="btn btn-sm btn-outline-success" title="WhatsApp">
                                                 <i class="bi bi-whatsapp"></i>
                                             </a>
+                                            <a href="#" id="bell-btn-m-{{ item.id_historial }}"
+                                               onclick="{% if item.mensaje_enviado %}abrirWARecordatorio(event, {{ item.id_historial }}){% else %}event.preventDefault(){% endif %}"
+                                               class="btn btn-sm {% if item.mensaje_enviado %}btn-warning{% else %}btn-outline-secondary opacity-25 disabled{% endif %}"
+                                               title="2° aviso">
+                                                <i class="bi bi-bell{% if item.mensaje_enviado %}-fill{% endif %}"></i>
+                                            </a>
                                             {% endif %}
                                             
                                             {% if item.monto_pagado > 0 or item.pagos_en_este_dashboard > 0 %}
@@ -638,8 +644,9 @@
                                                     <i class="bi bi-arrow-counterclockwise"></i>
                                                 </button>
                                             {% else %}
-                                                <button onclick="togglePago({{ item.id_historial }}, 'advance')" class="btn btn-sm {% if item.mensaje_enviado %}btn-primary{% else %}btn-outline-secondary{% endif %}" title="Avanzar estado">
-                                                    {% if item.mensaje_enviado %}<i class="bi bi-send-check-fill text-white"></i>
+                                                <button id="btn-estado-m-{{ item.id_historial }}" onclick="togglePago({{ item.id_historial }}, 'advance')" class="btn btn-sm {% if item.doble_instancia_enviada %}btn-warning{% elif item.mensaje_enviado %}btn-primary{% else %}btn-outline-secondary{% endif %}" title="Avanzar estado">
+                                                    {% if item.doble_instancia_enviada %}<i class="bi bi-send-check-fill text-dark"></i>
+                                                    {% elif item.mensaje_enviado %}<i class="bi bi-send-check-fill text-white"></i>
                                                     {% else %}<i class="bi bi-clock text-muted"></i>{% endif %}
                                                 </button>
                                                 <button onclick="marcarPagadoDirecto({{ item.id_historial }})" class="btn btn-sm btn-success" title="Marcar pagado">
@@ -695,9 +702,10 @@
                                             {% else %}
                                                 <button id="btn-estado-{{ item.id_historial }}"
                                                         onclick="togglePago({{ item.id_historial }}, 'advance')"
-                                                        class="btn btn-sm border shadow-sm py-2 flex-grow-1 {% if item.mensaje_enviado %}btn-primary{% else %}btn-light{% endif %}"
-                                                        title="Avanzar estado">
-                                                    {% if item.mensaje_enviado %}<i class="bi bi-send-check-fill fs-5 text-white"></i>
+                                                        class="btn btn-sm border shadow-sm py-2 flex-grow-1 {% if item.doble_instancia_enviada %}btn-warning{% elif item.mensaje_enviado %}btn-primary{% else %}btn-light{% endif %}"
+                                                        title="Avanzar estado{% if item.doble_instancia_enviada %} (2° aviso enviado){% endif %}">
+                                                    {% if item.doble_instancia_enviada %}<i class="bi bi-send-check-fill fs-5 text-dark"></i>
+                                                    {% elif item.mensaje_enviado %}<i class="bi bi-send-check-fill fs-5 text-white"></i>
                                                     {% else %}<i class="bi bi-clock-fill fs-5 text-danger"></i>{% endif %}
                                                 </button>
                                                 <button id="btn-directo-{{ item.id_historial }}"
@@ -717,6 +725,18 @@
                                             {% else %}
                                             <button class="btn btn-sm btn-outline-secondary opacity-25 flex-grow-1 py-1 px-0" disabled>
                                                 <i class="bi bi-whatsapp"></i>
+                                            </button>
+                                            {% endif %}
+                                            {% if item.tiene_telefono %}
+                                            <a href="#" id="bell-btn-{{ item.id_historial }}"
+                                               onclick="{% if item.mensaje_enviado %}abrirWARecordatorio(event, {{ item.id_historial }}){% else %}event.preventDefault(){% endif %}"
+                                               class="btn btn-sm {% if item.mensaje_enviado %}btn-warning{% else %}btn-outline-secondary opacity-25 disabled{% endif %} flex-grow-1 py-1 px-0"
+                                               title="2° aviso — recordatorio de pago">
+                                                <i class="bi bi-bell{% if item.mensaje_enviado %}-fill{% endif %}"></i>
+                                            </a>
+                                            {% else %}
+                                            <button class="btn btn-sm btn-outline-secondary opacity-25 flex-grow-1 py-1 px-0" disabled title="Sin teléfono">
+                                                <i class="bi bi-bell"></i>
                                             </button>
                                             {% endif %}
                                             <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-secondary flex-grow-1 py-1 px-0" title="Pago parcial">
@@ -745,6 +765,7 @@
                                 "saldo_restante": {{ item.saldo_restante }},
                                 "pagado": {{ item.pagado | tojson }},
                                 "mensaje_enviado": {{ item.mensaje_enviado | tojson }},
+                                "doble_instancia_enviada": {{ item.doble_instancia_enviada | tojson }},
                                 "tiene_telefono": {{ item.tiene_telefono | tojson }},
                                 "mes_congelado": {{ mes_congelado | tojson }},
                                 "es_grupo": false
@@ -851,6 +872,13 @@
                                    style="width: 38px; height: 38px;" title="WhatsApp del Grupo">
                                     <i class="bi bi-whatsapp"></i>
                                 </a>
+                                <a href="#"
+                                   id="bell-grp-{{ g.grupo_id }}"
+                                   onclick="{% if g.mensaje_enviado %}abrirWARecordatorioGrupo(event, {{ g.grupo_id }}, {{ mes }}, {{ anio }}){% else %}event.preventDefault(){% endif %}"
+                                   class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center shadow-sm {% if g.mensaje_enviado %}btn-warning{% else %}btn-outline-secondary opacity-25 disabled{% endif %}"
+                                   style="width: 38px; height: 38px;" title="2° aviso del Grupo">
+                                    <i class="bi bi-bell{% if g.mensaje_enviado %}-fill{% endif %}"></i>
+                                </a>
                                 {% endif %}
 
                                 {% if not g.pagado %}
@@ -861,12 +889,15 @@
                                 </button>
                                 {% endif %}
 
-                                <button onclick="togglePagoGrupo({{ g.grupo_id }}, {{ mes }}, {{ anio }}, this)"
-                                        class="btn {% if g.pagado %}btn-success{% elif g.mensaje_enviado %}btn-primary{% else %}btn-outline-danger{% endif %} btn-sm rounded-circle d-flex align-items-center justify-content-center shadow-sm"
+                                <button id="btn-pago-grp-{{ g.grupo_id }}"
+                                        onclick="togglePagoGrupo({{ g.grupo_id }}, {{ mes }}, {{ anio }}, this)"
+                                        class="btn {% if g.pagado %}btn-success{% elif g.doble_instancia_enviada %}btn-warning{% elif g.mensaje_enviado %}btn-primary{% else %}btn-outline-danger{% endif %} btn-sm rounded-circle d-flex align-items-center justify-content-center shadow-sm"
                                         style="width: 38px; height: 38px;"
                                         title="{% if g.pagado %}Deshacer Pago Total{% else %}Marcar Grupo como Pagado{% endif %}">
                                     {% if g.pagado %}
                                         <i class="bi bi-check-circle-fill"></i>
+                                    {% elif g.doble_instancia_enviada %}
+                                        <i class="bi bi-send-check-fill text-dark"></i>
                                     {% elif g.mensaje_enviado %}
                                         <i class="bi bi-send-check-fill text-white"></i>
                                     {% else %}
@@ -993,10 +1024,18 @@
                                                         <i class="bi bi-arrow-counterclockwise"></i>
                                                     </button>
                                                 {% else %}
-                                                    <button onclick="togglePagoSimple({{ item.id_historial }}, this)" class="btn btn-sm {% if item.mensaje_enviado %}btn-primary{% else %}btn-outline-secondary{% endif %}" title="Avanzar estado">
-                                                        {% if item.mensaje_enviado %}<i class="bi bi-send-check-fill text-white"></i>
+                                                    <button id="btn-estado-gm-{{ item.id_historial }}" onclick="togglePagoSimple({{ item.id_historial }}, this)" class="btn btn-sm {% if item.doble_instancia_enviada %}btn-warning{% elif item.mensaje_enviado %}btn-primary{% else %}btn-outline-secondary{% endif %}" title="Avanzar estado">
+                                                        {% if item.doble_instancia_enviada %}<i class="bi bi-send-check-fill text-dark"></i>
+                                                        {% elif item.mensaje_enviado %}<i class="bi bi-send-check-fill text-white"></i>
                                                         {% else %}<i class="bi bi-clock text-muted"></i>{% endif %}
                                                     </button>
+                                                    {% if item.tiene_telefono %}
+                                                    <a href="#" id="bell-grp-m-{{ item.id_historial }}"
+                                                       onclick="{% if item.mensaje_enviado %}abrirWARecordatorio(event, {{ item.id_historial }}){% else %}event.preventDefault(){% endif %}"
+                                                       class="btn btn-sm {% if item.mensaje_enviado %}btn-warning{% else %}btn-outline-secondary opacity-25 disabled{% endif %}" title="2° aviso">
+                                                        <i class="bi bi-bell{% if item.mensaje_enviado %}-fill{% endif %}"></i>
+                                                    </a>
+                                                    {% endif %}
                                                     <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-dark" title="Pago parcial">
                                                         <i class="bi bi-cash-stack"></i>
                                                     </button>
@@ -1043,10 +1082,18 @@
                                                         <i class="bi bi-arrow-counterclockwise"></i>
                                                     </button>
                                                 {% else %}
-                                                    <button onclick="togglePagoSimple({{ item.id_historial }}, this)" class="btn btn-sm shadow-sm py-1 px-2 {% if item.mensaje_enviado %}btn-primary{% else %}btn-light border text-danger{% endif %}" title="Avanzar Estado">
-                                                        {% if item.mensaje_enviado %}<i class="bi bi-send-check-fill text-white"></i>
+                                                    <button id="btn-estado-gd-{{ item.id_historial }}" onclick="togglePagoSimple({{ item.id_historial }}, this)" class="btn btn-sm shadow-sm py-1 px-2 {% if item.doble_instancia_enviada %}btn-warning{% elif item.mensaje_enviado %}btn-primary{% else %}btn-light border text-danger{% endif %}" title="Avanzar Estado">
+                                                        {% if item.doble_instancia_enviada %}<i class="bi bi-send-check-fill text-dark"></i>
+                                                        {% elif item.mensaje_enviado %}<i class="bi bi-send-check-fill text-white"></i>
                                                         {% else %}<i class="bi bi-clock-fill"></i>{% endif %}
                                                     </button>
+                                                    {% if item.tiene_telefono %}
+                                                    <a href="#" id="bell-grp-d-{{ item.id_historial }}"
+                                                       onclick="{% if item.mensaje_enviado %}abrirWARecordatorio(event, {{ item.id_historial }}){% else %}event.preventDefault(){% endif %}"
+                                                       class="btn btn-sm shadow-sm py-1 px-2 {% if item.mensaje_enviado %}btn-warning{% else %}btn-outline-secondary opacity-25 disabled{% endif %}" title="2° aviso">
+                                                        <i class="bi bi-bell{% if item.mensaje_enviado %}-fill{% endif %}"></i>
+                                                    </a>
+                                                    {% endif %}
                                                     <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ item.total_mes + item.saldo_anterior - item.monto_pagado }})" class="btn btn-sm btn-outline-dark shadow-sm py-1 px-2" title="Pago parcial">
                                                         <i class="bi bi-cash-stack"></i>
                                                     </button>
@@ -1075,6 +1122,7 @@
                                     "saldo_restante": {{ item.saldo_restante }},
                                     "pagado": {{ item.pagado | tojson }},
                                     "mensaje_enviado": {{ item.mensaje_enviado | tojson }},
+                                    "doble_instancia_enviada": {{ item.doble_instancia_enviada | tojson }},
                                     "tiene_telefono": {{ item.tiene_telefono | tojson }},
                                     "mes_congelado": {{ mes_congelado | tojson }},
                                     "es_grupo": true
@@ -1303,6 +1351,9 @@ function togglePago(id, actionType) {
             // Pendiente -> Notificado: Microsegundos
             btnEstado.className = "btn btn-sm border shadow-sm py-2 flex-grow-1 btn-primary";
             btnEstado.innerHTML = '<i class="bi bi-send-check-fill fs-5 text-white"></i>';
+            _activarBell(id);
+            const btnM = document.getElementById(`btn-estado-m-${id}`);
+            if (btnM) { btnM.className = btnM.className.replace('btn-outline-secondary','btn-primary'); btnM.querySelector('i').className = 'bi bi-send-check-fill text-white'; }
             fetch(`/dashboard/toggle-pago/${id}`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType }) });
             return;
         } else {
@@ -1374,6 +1425,15 @@ function togglePagoSimple(id, btn) {
             // Pendiente -> Notificado: Microsegundos
             btn.className = "btn btn-sm shadow-sm py-1 px-2 btn-primary";
             btn.innerHTML = '<i class="bi bi-send-check-fill text-white"></i>';
+            // Activar bells de grupo para esta casa
+            [`bell-grp-m-${id}`, `bell-grp-d-${id}`].forEach(eid => {
+                const el = document.getElementById(eid);
+                if (!el) return;
+                el.classList.remove('btn-outline-secondary', 'opacity-25', 'disabled');
+                el.classList.add('btn-warning');
+                el.querySelector('i').className = 'bi bi-bell-fill';
+                el.onclick = (e) => abrirWARecordatorio(e, id);
+            });
             fetch(`/dashboard/toggle-pago/${id}`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType }) });
             return;
         } else {
@@ -1673,24 +1733,106 @@ function confirmarDeshacer(nombreCliente, callback) {
     _getModalDeshacer().show();
 }
 
+function _activarBell(id) {
+    [`bell-btn-${id}`, `bell-btn-m-${id}`, `bell-grp-m-${id}`, `bell-grp-d-${id}`].forEach(eid => {
+        const el = document.getElementById(eid);
+        if (!el) return;
+        el.classList.remove('btn-outline-secondary', 'opacity-25', 'disabled');
+        el.classList.add('btn-warning');
+        el.querySelector('i').className = 'bi bi-bell-fill';
+        el.onclick = (e) => abrirWARecordatorio(e, id);
+    });
+}
+
+function _activarEstadoNotificado(id) {
+    [`btn-estado-${id}`, `btn-estado-m-${id}`, `btn-estado-gm-${id}`, `btn-estado-gd-${id}`].forEach(eid => {
+        const el = document.getElementById(eid);
+        if (!el || !el.innerHTML.includes('clock')) return;
+        el.classList.remove('btn-light', 'btn-outline-secondary');
+        el.classList.add('btn-primary');
+        const i = el.querySelector('i');
+        if (i) i.className = i.className.replace(/bi-clock[\w-]*/,'bi-send-check-fill') + ' text-white'.replace('text-danger','');
+        if (i) i.className = 'bi bi-send-check-fill text-white';
+    });
+}
+
+function _activarEstadoDoble(id) {
+    [`btn-estado-${id}`, `btn-estado-m-${id}`, `btn-estado-gm-${id}`, `btn-estado-gd-${id}`].forEach(eid => {
+        const el = document.getElementById(eid);
+        if (!el) return;
+        el.classList.remove('btn-primary', 'btn-light', 'btn-outline-secondary');
+        el.classList.add('btn-warning');
+        const i = el.querySelector('i');
+        if (i) i.className = 'bi bi-send-check-fill text-dark';
+    });
+}
+
 function abrirWA(event, historialId) {
     event.preventDefault();
     const a = event.currentTarget;
     marcarEnviado(historialId);
+    _activarEstadoNotificado(historialId);
+    _activarBell(historialId);
     if (a.dataset.url) { window.location.href = a.dataset.url; return; }
     fetch(`/dashboard/api/wa-url/${historialId}`)
         .then(r => r.json())
         .then(data => { if (data.url) { a.dataset.url = data.url; window.location.href = data.url; } });
 }
 
+function abrirWARecordatorio(event, historialId) {
+    event.preventDefault();
+    const a = event.currentTarget;
+    fetch(`/dashboard/marcar-doble-instancia/${historialId}`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
+    });
+    _activarEstadoDoble(historialId);
+    fetch(`/dashboard/api/wa-url-recordatorio/${historialId}`)
+        .then(r => r.json())
+        .then(data => { if (data.url) window.location.href = data.url; });
+}
+
 function abrirWAGrupo(event, grupoId, mes, anio) {
     event.preventDefault();
     const a = event.currentTarget;
     marcarEnviadoGrupo(grupoId, mes, anio);
+    // Activar bell de grupo y estado
+    const bellGrp = document.getElementById(`bell-grp-${grupoId}`);
+    if (bellGrp) {
+        bellGrp.classList.remove('btn-outline-secondary', 'opacity-25', 'disabled');
+        bellGrp.classList.add('btn-warning');
+        bellGrp.querySelector('i').className = 'bi bi-bell-fill';
+        bellGrp.onclick = (e) => abrirWARecordatorioGrupo(e, grupoId, mes, anio);
+    }
+    const btnGrp = document.getElementById(`btn-pago-grp-${grupoId}`);
+    if (btnGrp && !btnGrp.classList.contains('btn-success') && btnGrp.querySelector('i')?.className.includes('check-lg')) {
+        btnGrp.classList.remove('btn-outline-danger');
+        btnGrp.classList.add('btn-primary');
+        btnGrp.querySelector('i').className = 'bi bi-send-check-fill text-white';
+    }
     if (a.dataset.url) { window.location.href = a.dataset.url; return; }
     fetch(`/dashboard/api/wa-url-grupo/${grupoId}?mes=${mes}&anio=${anio}`)
         .then(r => r.json())
         .then(data => { if (data.url) { a.dataset.url = data.url; window.location.href = data.url; } });
+}
+
+function abrirWARecordatorioGrupo(event, grupoId, mes, anio) {
+    event.preventDefault();
+    fetch(`/dashboard/marcar-doble-instancia-grupo/${grupoId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+        body: JSON.stringify({ mes: mes, anio: anio })
+    });
+    const btnGrp = document.getElementById(`btn-pago-grp-${grupoId}`);
+    if (btnGrp && !btnGrp.classList.contains('btn-success')) {
+        btnGrp.classList.remove('btn-primary', 'btn-outline-danger');
+        btnGrp.classList.add('btn-warning');
+        const i = btnGrp.querySelector('i');
+        if (i) i.className = 'bi bi-send-check-fill text-dark';
+    }
+    fetch(`/dashboard/api/wa-url-recordatorio-grupo/${grupoId}?mes=${mes}&anio=${anio}`)
+        .then(r => r.json())
+        .then(data => { if (data.url) window.location.href = data.url; });
 }
 
 function marcarEnviadoGrupo(grupo_id, mes, anio) {

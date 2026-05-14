@@ -16,6 +16,10 @@ Entregado este mes: -${pagado}
 
 Muchas Gracias."""
 
+DEFAULT_TEMPLATE_RECORDATORIO = """{saludo}, le recordamos que aún tiene pendiente el pago de *${deuda}* correspondiente a {mes} {anio}.
+Por favor regularice a la brevedad.
+Muchas Gracias."""
+
 DEFAULT_TEMPLATE_GRUPO = """{saludo} Te paso el resumen de las {cant} propiedades.
 
 {resumen_total}
@@ -84,6 +88,7 @@ class PlantillaMensaje(db.Model):
     # Nuevas columnas: templates libres
     template_individual     = db.Column(db.Text)
     template_grupo          = db.Column(db.Text)
+    template_recordatorio   = db.Column(db.Text)
 
     @classmethod
     def get_activa(cls):
@@ -95,6 +100,9 @@ class PlantillaMensaje(db.Model):
 
     def get_template_grupo(self):
         return self.template_grupo or DEFAULT_TEMPLATE_GRUPO
+
+    def get_template_recordatorio(self):
+        return self.template_recordatorio or DEFAULT_TEMPLATE_RECORDATORIO
 
     def activar(self):
         PlantillaMensaje.query.update({"activa": False})
