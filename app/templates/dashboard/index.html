@@ -826,10 +826,11 @@
                         <div class="grupo-montos-row flex-grow-1">
                             <div class="grupo-monto-item">
                                 <span class="grupo-monto-label">Debe</span>
-                                {% if g.saldo_anterior < -0.1 %}
-                                    <span class="fw-bold text-success font-monospace">-${{ g.saldo_anterior | abs | pesos }}</span>
-                                {% elif g.saldo_anterior > 0.1 %}
-                                    <span class="fw-bold text-danger font-monospace">+${{ g.saldo_anterior | pesos }}</span>
+                                {% set debe_neto = g.saldo_anterior - g.saldo_a_favor %}
+                                {% if debe_neto < -0.1 %}
+                                    <span class="fw-bold text-success font-monospace">-${{ debe_neto | abs | pesos }}</span>
+                                {% elif debe_neto > 0.1 %}
+                                    <span class="fw-bold text-danger font-monospace">+${{ debe_neto | pesos }}</span>
                                 {% else %}
                                     <span class="fw-bold text-muted">$0</span>
                                 {% endif %}
@@ -839,13 +840,6 @@
                                 <span class="grupo-monto-label">Total a Pagar</span>
                                 <span class="fw-bold text-dark font-monospace">${{ [g.total_mes + g.saldo_anterior - g.saldo_a_favor, 0] | max | pesos }}</span>
                             </div>
-
-                            {% if g.saldo_a_favor > 0.01 %}
-                            <div class="grupo-monto-item">
-                                <span class="grupo-monto-label">Saldo a Favor</span>
-                                <span class="fw-bold text-success font-monospace">-${{ g.saldo_a_favor | pesos }}</span>
-                            </div>
-                            {% endif %}
 
                             <div class="grupo-monto-item">
                                 <span class="grupo-monto-label">Estado</span>
