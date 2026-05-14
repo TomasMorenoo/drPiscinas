@@ -1049,22 +1049,17 @@ def toggle_pago_grupo(grupo_id):
                     'PAGO',
                     f"Grupo {grupo_obj_p.nombre if grupo_obj_p else grupo_id} — {mes_nombre_gp} {anio}"
                 )
-                # Snapshot + saldo aplicable
-                saldo_aplicable = _saldo_grupo_para_mes(grupo_obj_p, mes, anio)
+                # Snapshot (no consumimos saldo — el toggle marca pagado al precio bruto)
                 grupo_obj_p.saldo_a_favor_previo = grupo_obj_p.saldo_a_favor
                 grupo_obj_p.saldo_desde_mes_previo = grupo_obj_p.saldo_desde_mes
                 grupo_obj_p.saldo_desde_anio_previo = grupo_obj_p.saldo_desde_anio
-            else:
-                saldo_aplicable = 0.0
 
-            total_deuda_grupo = 0.0
             txn_id = f"TXN-{uuid.uuid4().hex[:8].upper()}"
             for h in historiales:
                 c = h.casa
                 datos = c.obtener_gastos_mensuales(mes, anio)
                 saldo_ant = c.obtener_saldo_anterior(mes, anio)
                 total_a_pagar = float(datos['total']) + saldo_ant - float(h.monto_pagado or 0)
-                total_deuda_grupo += max(0.0, total_a_pagar)
 
                 if total_a_pagar > 0.01:
                     aplicar_pago_en_cascada(c, total_a_pagar, current_user.username, mes, anio)
@@ -1078,13 +1073,6 @@ def toggle_pago_grupo(grupo_id):
                         detalle_str = f"{txn_id}:{total_a_pagar}"
                         actual = getattr(h, 'detalle_pagos', None)
                         h.detalle_pagos = f"{actual}|{detalle_str}" if actual else detalle_str
-
-            # Consumir saldo del grupo
-            if grupo_obj_p:
-                nuevo_saldo = max(0.0, saldo_aplicable - total_deuda_grupo)
-                grupo_obj_p.saldo_a_favor = nuevo_saldo
-                grupo_obj_p.saldo_desde_mes = mes
-                grupo_obj_p.saldo_desde_anio = anio
 
             wa_chat_url = next((generar_wa_chat_url(c) for c in casas_grupo if c.telefono), None)
 
