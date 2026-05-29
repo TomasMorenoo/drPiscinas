@@ -7,6 +7,11 @@ from app.utils import registrar_auditoria
 
 product_bp = Blueprint("products", __name__, url_prefix="/products")
 
+def _parse_precio(value):
+    if not value:
+        return 0.0
+    return float(value.replace('.', '').replace(',', '.'))
+
 @product_bp.route("/")
 @login_required
 @admin_required
@@ -27,7 +32,7 @@ def crear_product():
             flash("Todos los campos son obligatorios", "error")
             return redirect(url_for("products.crear_product"))
 
-        nuevo = Product(nombre=nombre, precio=float(precio), unidad=unidad)
+        nuevo = Product(nombre=nombre, precio=_parse_precio(precio), unidad=unidad)
         db.session.add(nuevo)
         db.session.commit()
         registrar_auditoria(current_user.username, 'CREAR_PRODUCTO', f"{nombre} — ${precio} / {unidad}")
@@ -44,7 +49,7 @@ def editar_product(id):
     prod = Product.query.get_or_404(id)
     if request.method == "POST":
         prod.nombre = request.form.get("nombre")
-        prod.precio = float(request.form.get("precio"))
+        prod.precio = _parse_precio(request.form.get("precio"))
         prod.unidad = request.form.get("unidad")
         db.session.commit()
         registrar_auditoria(current_user.username, 'EDITAR_PRODUCTO', f"{prod.nombre} — ${prod.precio} / {prod.unidad}")

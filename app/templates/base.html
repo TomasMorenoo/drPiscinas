@@ -234,23 +234,53 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Seleccionamos todos los inputs que tengan la clase 'formato-miles'
     const inputsNumericos = document.querySelectorAll('.formato-miles');
 
+    function formatearMiles(input) {
+        let raw = input.value;
+        // Permitir solo dígitos y una coma
+        raw = raw.replace(/[^0-9,]/g, '');
+        const partes = raw.split(',');
+        const entera = partes[0];
+        const decimal = partes.length > 1 ? partes[1].slice(0, 2) : null;
+
+        let enteroFormateado = '';
+        if (entera !== '') {
+            enteroFormateado = parseInt(entera, 10).toLocaleString('es-AR');
+        }
+
+        input.value = decimal !== null ? enteroFormateado + ',' + decimal : enteroFormateado;
+    }
+
     inputsNumericos.forEach(input => {
-        // 2. Función para darle formato mientras el usuario escribe
-        input.addEventListener('input', function(e) {
-            // Quitamos todo lo que no sea número
-            let valor = this.value.replace(/\D/g, "");
-            
-            if (valor === "") {
-                this.value = "";
-                return;
-            }
-            
-            // Lo convertimos a número y le damos formato argentino (puntos en los miles)
-            this.value = new Intl.NumberFormat('es-AR').format(parseInt(valor, 10));
+        input.addEventListener('input', function() {
+            const pos = this.selectionStart;
+            const prevLen = this.value.length;
+            formatearMiles(this);
+            // Ajustar cursor
+            const diff = this.value.length - prevLen;
+            this.setSelectionRange(pos + diff, pos + diff);
         });
 
-        // 3. Si la página carga y ya tiene un valor (ej: al Editar cliente), lo formateamos
-        if (input.v
+        // Al cargar con valor existente, formatearlo
+        if (input.value !== '') {
+            // Valor puede venir como "1234.56" desde Python — normalizar
+            input.value = input.value.replace('.', ',');
+            formatearMiles(input);
+        }
+    });
+
+    // Antes de submit: convertir "10.000,99" → "10000.99" para el backend
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function() {
+            this.querySelectorAll('.formato-miles').forEach(input => {
+                input.value = input.value.replace(/\./g, '').replace(',', '.');
+            });
+        });
+    });
+
+});
+</script>
+
+</body>
+</html>
