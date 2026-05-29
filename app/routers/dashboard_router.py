@@ -1077,10 +1077,14 @@ def toggle_pago_grupo(grupo_id):
                     if total_a_pagar < -0.01:
                         credito_casas += abs(total_a_pagar)
 
-            if grupo_obj_p and credito_casas > 0.01:
-                grupo_obj_p.saldo_a_favor = float(grupo_obj_p.saldo_a_favor or 0) + credito_casas
-                grupo_obj_p.saldo_desde_mes = mes
-                grupo_obj_p.saldo_desde_anio = anio
+            if grupo_obj_p:
+                grupo_obj_p.saldo_a_favor = credito_casas
+                if credito_casas > 0.01:
+                    grupo_obj_p.saldo_desde_mes = mes
+                    grupo_obj_p.saldo_desde_anio = anio
+                else:
+                    grupo_obj_p.saldo_desde_mes = None
+                    grupo_obj_p.saldo_desde_anio = None
 
             wa_chat_url = next((generar_wa_chat_url(c) for c in casas_grupo if c.telefono), None)
 
