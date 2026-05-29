@@ -1055,6 +1055,7 @@ def toggle_pago_grupo(grupo_id):
                 grupo_obj_p.saldo_desde_anio_previo = grupo_obj_p.saldo_desde_anio
 
             txn_id = f"TXN-{uuid.uuid4().hex[:8].upper()}"
+            credito_casas = 0.0
             for h in historiales:
                 c = h.casa
                 datos = c.obtener_gastos_mensuales(mes, anio)
@@ -1073,6 +1074,13 @@ def toggle_pago_grupo(grupo_id):
                         detalle_str = f"{txn_id}:{total_a_pagar}"
                         actual = getattr(h, 'detalle_pagos', None)
                         h.detalle_pagos = f"{actual}|{detalle_str}" if actual else detalle_str
+                    if total_a_pagar < -0.01:
+                        credito_casas += abs(total_a_pagar)
+
+            if grupo_obj_p and credito_casas > 0.01:
+                grupo_obj_p.saldo_a_favor = float(grupo_obj_p.saldo_a_favor or 0) + credito_casas
+                grupo_obj_p.saldo_desde_mes = mes
+                grupo_obj_p.saldo_desde_anio = anio
 
             wa_chat_url = next((generar_wa_chat_url(c) for c in casas_grupo if c.telefono), None)
 
