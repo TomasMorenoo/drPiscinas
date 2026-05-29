@@ -10,7 +10,10 @@ product_bp = Blueprint("products", __name__, url_prefix="/products")
 def _parse_precio(value):
     if not value:
         return 0.0
-    return float(value.replace('.', '').replace(',', '.'))
+    v = value.strip()
+    if ',' in v:
+        v = v.replace('.', '').replace(',', '.')
+    return float(v)
 
 @product_bp.route("/")
 @login_required
