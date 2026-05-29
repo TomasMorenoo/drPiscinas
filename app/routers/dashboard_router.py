@@ -553,7 +553,8 @@ def index():
                     "casas": [],
                     "total_mes": 0.0, "saldo_anterior": 0.0, "saldo_restante": 0.0,
                     "monto_pagado": 0.0, "telefono": casa.telefono,
-                    "saldo_a_favor": _saldo_grupo_para_mes(casa.grupo, mes, anio)
+                    "saldo_a_favor": _saldo_grupo_para_mes(casa.grupo, mes, anio),
+                    "ultimo_saldo_aplicado": float(casa.grupo.ultimo_saldo_aplicado or 0),
                 }
             g = reporte_grupos[casa.grupo_id]
             g["casas"].append(item_casa)
@@ -1001,6 +1002,7 @@ def toggle_pago_grupo(grupo_id):
                 grupo_undo.saldo_a_favor_previo = None
                 grupo_undo.saldo_desde_mes_previo = None
                 grupo_undo.saldo_desde_anio_previo = None
+                grupo_undo.ultimo_saldo_aplicado = 0
             # else: pago via toggle (no modificó saldo) → no tocar saldo
         if casas_grupo:
             grupo_obj_aud = casas_grupo[0].grupo
@@ -1049,10 +1051,11 @@ def toggle_pago_grupo(grupo_id):
                     'PAGO',
                     f"Grupo {grupo_obj_p.nombre if grupo_obj_p else grupo_id} — {mes_nombre_gp} {anio}"
                 )
-                # Snapshot (no consumimos saldo — el toggle marca pagado al precio bruto)
+                # Snapshot
                 grupo_obj_p.saldo_a_favor_previo = grupo_obj_p.saldo_a_favor
                 grupo_obj_p.saldo_desde_mes_previo = grupo_obj_p.saldo_desde_mes
                 grupo_obj_p.saldo_desde_anio_previo = grupo_obj_p.saldo_desde_anio
+                _saldo_toggle = _saldo_grupo_para_mes(grupo_obj_p, mes, anio)
 
             txn_id = f"TXN-{uuid.uuid4().hex[:8].upper()}"
             credito_casas = 0.0
@@ -1085,6 +1088,7 @@ def toggle_pago_grupo(grupo_id):
                 else:
                     grupo_obj_p.saldo_desde_mes = None
                     grupo_obj_p.saldo_desde_anio = None
+                grupo_obj_p.ultimo_saldo_aplicado = _saldo_toggle
 
             wa_chat_url = next((generar_wa_chat_url(c) for c in casas_grupo if c.telefono), None)
 
@@ -1193,6 +1197,7 @@ def registrar_pago_grupo(grupo_id):
             grupo_obj.saldo_a_favor = disponible_total - total_deuda_grupo
             grupo_obj.saldo_desde_mes = mes
             grupo_obj.saldo_desde_anio = anio
+            grupo_obj.ultimo_saldo_aplicado = saldo_grupo
     else:
         # Pago parcial: aplica en cascada hasta agotar el disponible (incluyendo saldo del grupo)
         if grupo_obj is not None:
@@ -1202,6 +1207,7 @@ def registrar_pago_grupo(grupo_id):
             grupo_obj.saldo_a_favor = 0.0
             grupo_obj.saldo_desde_mes = None
             grupo_obj.saldo_desde_anio = None
+            grupo_obj.ultimo_saldo_aplicado = saldo_grupo
         plata_disponible = disponible_total
         for d in deudas:
             if plata_disponible <= 0.01:

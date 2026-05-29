@@ -12,6 +12,7 @@ class GrupoCliente(db.Model):
     saldo_a_favor_previo = db.Column(db.Numeric(10, 2), nullable=True)
     saldo_desde_mes_previo = db.Column(db.Integer, nullable=True)
     saldo_desde_anio_previo = db.Column(db.Integer, nullable=True)
+    ultimo_saldo_aplicado = db.Column(db.Numeric(10, 2), nullable=True, default=0)
 
     @property
     def nombre_display(self):
