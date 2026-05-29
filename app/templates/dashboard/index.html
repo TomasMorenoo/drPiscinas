@@ -836,17 +836,25 @@
                                 {% endif %}
                             </div>
 
+                            {% set _saldo_visible = g.saldo_a_favor if not g.pagado else g.ultimo_saldo_aplicado %}
+                            {% set _bruto = g.monto_pagado if g.pagado else ([g.total_mes + g.saldo_anterior, 0] | max) %}
+                            {% set _neto  = [_bruto - _saldo_visible, 0] | max %}
+
+                            {% if _saldo_visible > 0.01 %}
+                            <div class="grupo-monto-item">
+                                <span class="grupo-monto-label">Subtotal</span>
+                                <span class="fw-bold font-monospace text-dark">${{ _bruto | pesos }}</span>
+                            </div>
+                            <div class="grupo-monto-item">
+                                <span class="grupo-monto-label">Saldo a favor</span>
+                                <span class="fw-bold font-monospace text-success">-${{ _saldo_visible | pesos }}</span>
+                            </div>
+                            {% endif %}
+
                             <div class="grupo-monto-item">
                                 <span class="grupo-monto-label">Total a Pagar</span>
-                                {% set _saldo_visible = g.saldo_a_favor if not g.pagado else g.ultimo_saldo_aplicado %}
                                 {% if _saldo_visible > 0.01 %}
-                                    {% set _bruto = (g.monto_pagado + _saldo_visible) if g.pagado else ([g.total_mes + g.saldo_anterior, 0] | max) %}
-                                    {% set _neto  = g.monto_pagado if g.pagado else ([g.total_mes + g.saldo_anterior - _saldo_visible, 0] | max) %}
-                                    <div class="d-flex flex-column align-items-end" style="line-height:1.3">
-                                        <span class="font-monospace text-muted" style="font-size:0.8rem; text-decoration:line-through">${{ _bruto | pesos }}</span>
-                                        <span class="font-monospace text-success" style="font-size:0.75rem">-${{ _saldo_visible | pesos }}</span>
-                                        <span class="fw-bold font-monospace {% if g.pagado %}text-success{% else %}text-dark{% endif %}">${{ _neto | pesos }}</span>
-                                    </div>
+                                    <span class="fw-bold font-monospace {% if g.pagado %}text-success{% else %}text-dark{% endif %}">${{ _neto | pesos }}</span>
                                 {% elif g.pagado and g.monto_pagado > 0 %}
                                     <span class="fw-bold text-success font-monospace">${{ g.monto_pagado | pesos }}</span>
                                 {% else %}
