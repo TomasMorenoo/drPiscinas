@@ -9,6 +9,7 @@ from app.models.products import Product
 from app.models.promo import Promo
 from app.models.abono_historico import AbonoHistorico 
 from app.models.cierre_mes import CierreMes  # <-- IMPORTAMOS EL CANDADO
+from app.models.movimiento_stock import MovimientoStock
 from sqlalchemy import extract, func
 from sqlalchemy.orm import selectinload
 from datetime import datetime
@@ -173,6 +174,7 @@ def eliminar_visit(id):
     for vp in vps_elim:
         mover_stock(vp.product_id, float(vp.cantidad), 'ajuste', current_user.username, motivo='visita eliminada')
         db.session.delete(vp)
+    MovimientoStock.query.filter_by(visit_id=id).delete()
     db.session.delete(visit)
     registrar_auditoria(current_user.username, 'ELIMINAR_VISITA', detalle_elim)
     db.session.commit()
