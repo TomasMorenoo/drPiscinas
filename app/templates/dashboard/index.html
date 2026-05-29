@@ -838,7 +838,11 @@
 
                             <div class="grupo-monto-item">
                                 <span class="grupo-monto-label">Total a Pagar</span>
-                                <span class="fw-bold text-dark font-monospace">${{ [g.total_mes + g.saldo_anterior - g.saldo_a_favor, 0] | max | pesos }}</span>
+                                {% if g.pagado and g.monto_pagado > 0 %}
+                                    <span class="fw-bold text-success font-monospace">${{ g.monto_pagado | pesos }}</span>
+                                {% else %}
+                                    <span class="fw-bold text-dark font-monospace">${{ [g.total_mes + g.saldo_anterior - g.saldo_a_favor, 0] | max | pesos }}</span>
+                                {% endif %}
                             </div>
 
                             <div class="grupo-monto-item">
@@ -991,6 +995,8 @@
                                             </span>
                                             <span class="total-valor text-danger" style="font-size: 0.9rem;">Restan: ${{ deuda_actual | pesos }}</span>
                                         </div>
+                                    {% elif item.pagado and item.monto_pagado > 0 %}
+                                        <span class="total-valor text-success">${{ item.monto_pagado | pesos }}</span>
                                     {% else %}
                                         <span class="total-valor">${{ (item.total_mes + item.saldo_anterior) | pesos }}</span>
                                     {% endif %}
