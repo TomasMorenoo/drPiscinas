@@ -124,10 +124,6 @@ class Casa(db.Model):
                 total_hist = gastos['total']
 
                 contribucion = total_hist - pagado_hist
-                # Si el mes está pagado y hay sobrante (monto_pagado > total),
-                # no propagar el crédito — fue un exceso del cascade, no un adelanto real.
-                if getattr(hist, 'pagado', False) and contribucion < 0:
-                    continue
                 saldo += contribucion
 
         return round(saldo, 2)

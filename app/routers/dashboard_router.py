@@ -258,15 +258,19 @@ def aplicar_pago_en_cascada(casa, monto_ingresado, username, mes_contexto, anio_
                     
     if plata > 0.01 and historiales:
         ultimo = historiales[-1]
-        ultimo.monto_pagado = float(ultimo.monto_pagado or 0) + plata
-        ultimo.pagado = True
-        ultimo.mensaje_enviado = True
-        ultimo.cobrado_por = username
-        ultimo.fecha_pago = marca_tiempo
-        ultimo.transaccion_id = txn_id
-        detalle_str = f"{txn_id}:{plata}"
-        actual = getattr(ultimo, 'detalle_pagos', None)
-        ultimo.detalle_pagos = f"{actual}|{detalle_str}" if actual else detalle_str
+        datos_ultimo = casa.obtener_gastos_mensuales(ultimo.mes, ultimo.anio)
+        deficit = float(datos_ultimo['total']) - float(ultimo.monto_pagado or 0)
+        if deficit > 0.01:
+            a_aplicar = min(plata, deficit)
+            ultimo.monto_pagado = float(ultimo.monto_pagado or 0) + a_aplicar
+            ultimo.pagado = True
+            ultimo.mensaje_enviado = True
+            ultimo.cobrado_por = username
+            ultimo.fecha_pago = marca_tiempo
+            ultimo.transaccion_id = txn_id
+            detalle_str = f"{txn_id}:{a_aplicar}"
+            actual = getattr(ultimo, 'detalle_pagos', None)
+            ultimo.detalle_pagos = f"{actual}|{detalle_str}" if actual else detalle_str
 
     hist_actual = next((h for h in historiales if h.mes == mes_contexto and h.anio == anio_contexto), None)
     if hist_actual:
