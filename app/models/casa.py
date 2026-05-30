@@ -123,7 +123,12 @@ class Casa(db.Model):
                 gastos = self._calcular_gastos_mensuales(hist.mes, hist.anio, hist=hist, visitas_mes=_visitas_por_mes.get((hist.anio, hist.mes), []))
                 total_hist = gastos['total']
 
-                saldo += total_hist - pagado_hist
+                contribucion = total_hist - pagado_hist
+                # Si el mes está pagado y hay sobrante (monto_pagado > total),
+                # no propagar el crédito — fue un exceso del cascade, no un adelanto real.
+                if getattr(hist, 'pagado', False) and contribucion < 0:
+                    continue
+                saldo += contribucion
 
         return round(saldo, 2)
 
