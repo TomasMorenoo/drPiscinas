@@ -98,8 +98,21 @@
                         </div>
                     </div>
 
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-uppercase text-muted">Días de Visita</label>
+                        <div class="d-flex gap-2 flex-wrap">
+                            {% set dias_act = (casa.dia_visita or '').split(',') %}
+                            {% for val, lbl in [('0','L'),('1','M'),('2','X'),('3','J'),('4','V'),('5','S'),('6','D')] %}
+                            <div>
+                                <input type="checkbox" class="btn-check" name="dia_visita" value="{{ val }}" id="dv_e_{{ val }}" {% if val in dias_act %}checked{% endif %}>
+                                <label class="btn btn-outline-primary fw-bold" for="dv_e_{{ val }}">{{ lbl }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
                     <hr class="text-muted mt-4">
-                    
+
                     <div class="d-flex justify-content-end">
                         <a href="{{ url_for('casas.listar_casas') }}" class="btn btn-outline-secondary me-2 px-4 fw-bold shadow-sm">Cancelar</a>
                         <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm">

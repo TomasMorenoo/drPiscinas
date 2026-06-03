@@ -566,6 +566,9 @@
                                 {% else %}
                                     <span class="fw-bold text-muted">$0</span>
                                 {% endif %}
+                                {% if item.proporcional_preview > 0 %}
+                                    <br><span class="badge bg-warning text-dark font-monospace mt-1" title="Saldo proporcional mes anterior">+${{ item.proporcional_preview | pesos }}</span>
+                                {% endif %}
                             </td>
 
                             {# MONTOS MOBILE (Oculto en PC) — solo si hay algo más que el abono base #}
@@ -582,6 +585,7 @@
                                     </div>
                                     <div class="monto-item">
                                         <span class="monto-label">Debe</span>
+                                        <span>
                                         {% if item.saldo_anterior < -0.1 %}
                                             <span class="monto-valor text-success">-${{ item.saldo_anterior | abs | pesos }}</span>
                                         {% elif item.saldo_anterior > 0.1 %}
@@ -589,6 +593,10 @@
                                         {% else %}
                                             <span class="monto-valor text-muted">$0</span>
                                         {% endif %}
+                                        {% if item.proporcional_preview > 0 %}
+                                            <span class="badge bg-warning text-dark font-monospace ms-1">+${{ item.proporcional_preview | pesos }}</span>
+                                        {% endif %}
+                                        </span>
                                     </div>
                                 </div>
                             </td>
@@ -598,8 +606,8 @@
 
                             {# 5. TOTAL A PAGAR #}
                             <td class="td-total-acciones text-md-center font-monospace fw-bold text-dark align-middle">
-                                {% set deuda_actual = item.total_mes + item.saldo_anterior - item.monto_pagado %}
-                                
+                                {% set deuda_actual = item.total_mes + item.saldo_anterior + item.proporcional_preview - item.monto_pagado %}
+
                                 {% if item.pagos_en_este_dashboard > 0 and not item.pagado %}
                                     <div class="d-flex flex-column align-items-end align-items-md-center">
                                         <span class="badge bg-warning text-dark mb-1 shadow-sm" style="font-size: 0.75rem;">
@@ -608,7 +616,7 @@
                                         <span class="total-valor text-danger" style="font-size: 0.9rem;">Restan: ${{ deuda_actual | pesos }}</span>
                                     </div>
                                 {% else %}
-                                    <span class="total-valor">${{ (item.total_mes + item.saldo_anterior) | pesos }}</span>
+                                    <span class="total-valor">${{ (item.total_mes + item.saldo_anterior + item.proporcional_preview) | pesos }}</span>
                                 {% endif %}
 
                                 {# Acciones inline en mobile #}

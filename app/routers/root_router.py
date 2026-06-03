@@ -568,6 +568,92 @@ def set_footer():
 
 
 # ================================================
+# AUDITORÍA: ABONOS CON MONTO_PAGADO INFLADO
+# ================================================
+@root_bp.route("/auditoria-pagos")
+@login_required
+@root_required
+def auditoria_pagos():
+    from app.models.abono_historico import AbonoHistorico
+    MESES = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+    abonos = AbonoHistorico.query.filter_by(pagado=True).order_by(
+        AbonoHistorico.anio, AbonoHistorico.mes, AbonoHistorico.casa_id
+    ).all()
+    inflados = []
+    for ah in abonos:
+        casa = ah.casa
+        datos = casa.obtener_gastos_mensuales(ah.mes, ah.anio, hist=ah)
+        total_real = datos['total']
+        mp = float(ah.monto_pagado or 0)
+        exceso = mp - total_real
+        if exceso > 1:
+            saldo_sig = casa.obtener_saldo_anterior(
+                ah.mes + 1 if ah.mes < 12 else 1,
+                ah.anio if ah.mes < 12 else ah.anio + 1
+            )
+            inflados.append({
+                'ah_id': ah.id,
+                'casa_id': casa.id,
+                'numero': casa.numero,
+                'barrio': casa.barrio.nombre if casa.barrio else (casa.country.nombre if casa.country else '?'),
+                'mes': ah.mes,
+                'mes_str': MESES[ah.mes],
+                'anio': ah.anio,
+                'base': float(datos['abono']),
+                'extras': float(datos['extras']),
+                'total_real': total_real,
+                'monto_pagado': mp,
+                'exceso': exceso,
+                'saldo_siguiente': saldo_sig,
+            })
+    return render_template("root/auditoria_pagos.html", inflados=inflados)
+
+
+@root_bp.route("/auditoria-pagos/corregir/<int:ah_id>", methods=["POST"])
+@login_required
+@root_required
+def auditoria_corregir(ah_id):
+    from app.models.abono_historico import AbonoHistorico
+    ah = AbonoHistorico.query.get_or_404(ah_id)
+    casa = ah.casa
+    datos = casa.obtener_gastos_mensuales(ah.mes, ah.anio, hist=ah)
+    total_real = datos['total']
+    mp = float(ah.monto_pagado or 0)
+    if mp - total_real > 1:
+        ah.monto_pagado = total_real
+        db.session.commit()
+        from app.utils import registrar_auditoria
+        registrar_auditoria(current_user.username, 'CORRECCION_PAGO',
+            f"Abono {ah_id} — {casa.nombre_formateado()} {ah.mes}/{ah.anio} — {mp:.0f}→{total_real:.0f}")
+        db.session.commit()
+    return redirect(url_for('root.auditoria_pagos'))
+
+
+@root_bp.route("/auditoria-pagos/corregir-todos", methods=["POST"])
+@login_required
+@root_required
+def auditoria_corregir_todos():
+    from app.models.abono_historico import AbonoHistorico
+    from app.utils import registrar_auditoria
+    abonos = AbonoHistorico.query.filter_by(pagado=True).all()
+    corregidos = 0
+    for ah in abonos:
+        casa = ah.casa
+        datos = casa.obtener_gastos_mensuales(ah.mes, ah.anio, hist=ah)
+        total_real = datos['total']
+        mp = float(ah.monto_pagado or 0)
+        if mp - total_real > 1:
+            ah.monto_pagado = total_real
+            corregidos += 1
+    if corregidos:
+        db.session.commit()
+        registrar_auditoria(current_user.username, 'CORRECCION_PAGO_MASIVA', f"{corregidos} abonos corregidos")
+        db.session.commit()
+    flash(f"Se corrigieron {corregidos} abonos.", "success")
+    return redirect(url_for('root.auditoria_pagos'))
+
+
+# ================================================
 # SERVIR ICONO 192px
 # ================================================
 @root_bp.route("/icon/192")

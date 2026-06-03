@@ -91,6 +91,19 @@
                         </div>
                     </div>
 
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary small text-uppercase">Días de Visita</label>
+                        <div class="d-flex gap-2 flex-wrap">
+                            {% for val, lbl in [('0','L'),('1','M'),('2','X'),('3','J'),('4','V'),('5','S'),('6','D')] %}
+                            <div>
+                                <input type="checkbox" class="btn-check" name="dia_visita" value="{{ val }}" id="dv_c_{{ val }}">
+                                <label class="btn btn-outline-primary fw-bold" for="dv_c_{{ val }}">{{ lbl }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-text small text-muted">Usado para calcular el proporcional del primer mes.</div>
+                    </div>
+
                     <hr class="text-muted">
 
                     <div class="d-flex justify-content-end mt-4">

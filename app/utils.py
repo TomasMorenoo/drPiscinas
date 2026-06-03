@@ -20,6 +20,22 @@ def mover_stock(product_id, cantidad, tipo, usuario, visit_id=None, motivo=None)
             visit_id=visit_id,
         ))
 
+def proporcional_aplica(fecha_creacion):
+    """Retorna True si el sistema proporcional aplica a este cliente según la config global."""
+    from app.models.configuracion import Configuracion
+    from datetime import datetime
+    cfg = Configuracion.get('proporcional_desde')
+    if not cfg:
+        return False
+    cfg_mes = cfg.get('mes')
+    cfg_anio = cfg.get('anio')
+    if not cfg_mes or not cfg_anio:
+        return False
+    if not fecha_creacion:
+        return False
+    fc = fecha_creacion.date() if isinstance(fecha_creacion, datetime) else fecha_creacion
+    return (fc.year, fc.month) >= (cfg_anio, cfg_mes)
+
 def registrar_auditoria(usuario, accion, detalle):
     from app.models.auditoria import AuditoriaLog
     from app import db

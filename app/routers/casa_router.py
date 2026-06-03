@@ -8,11 +8,30 @@ from app.models.visit_product import VisitProduct
 from app.models.products import Product
 from app.models.abono_historico import AbonoHistorico
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, case
 from sqlalchemy.orm import joinedload, selectinload
 from app.utils import nombre_mes, registrar_auditoria, mover_stock
 import re
 import calendar
+
+DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+
+def _parse_dias(dia_visita_str):
+    if not dia_visita_str:
+        return []
+    return [int(d) for d in dia_visita_str.split(',') if d.strip().isdigit()]
+
+def _calcular_proporcional(fecha_alta, dia_visita_str, precio_base):
+    dia = fecha_alta.day
+    if dia <= 7: semana = 1
+    elif dia <= 14: semana = 2
+    elif dia <= 21: semana = 3
+    else: semana = 4
+    dias = _parse_dias(dia_visita_str)
+    if dias and max(dias) < fecha_alta.weekday():
+        semana += 1
+    semanas_cobrar = max(0, 5 - semana)
+    return round(float(precio_base) / 4 * semanas_cobrar, 2)
 from datetime import datetime
 from app.models.casa import HistorialAumento
 import os
@@ -393,7 +412,9 @@ def editar_casa(id):
         casa.telefono = telefono
         casa.email = email if email else None
         casa.fecha_creacion = nueva_fecha_creacion
-        
+        dias_edit = request.form.getlist("dia_visita")
+        casa.dia_visita = ','.join(sorted(dias_edit, key=int)) if dias_edit else None
+
         db.session.commit()
         flash("Cliente actualizado.", "success")
         return redirect(url_for("casas.listar_casas"))
@@ -429,6 +450,8 @@ def crear_casa():
             fecha_creacion_obj = datetime.strptime(fecha_creacion_str, '%Y-%m-%d') if fecha_creacion_str else datetime.now()
         except ValueError:
             fecha_creacion_obj = datetime.now()
+        dias_sel = request.form.getlist("dia_visita")
+        dia_visita = ','.join(sorted(dias_sel, key=int)) if dias_sel else None
 
         if not numeros_input or not precio_base or not country_id or not telefono:
             flash("Faltan datos obligatorios (incluyendo el Teléfono).", "error")
@@ -450,6 +473,13 @@ def crear_casa():
                 omitidos += 1
                 continue 
 
+            try:
+                pb = float(precio_base.replace('.', '').replace(',', '.'))
+            except Exception:
+                pb = 0.0
+            _prop = _calcular_proporcional(fecha_creacion_obj, dia_visita, pb)
+            proporcional = _prop if _prop > 0 else None
+
             nueva_casa = Casa(
                 numero=num,
                 precio_base=precio_base,
@@ -458,7 +488,9 @@ def crear_casa():
                 nombre_cliente=nombre_cliente,
                 telefono=telefono,
                 email=email if email else None,
-                fecha_creacion=fecha_creacion_obj
+                fecha_creacion=fecha_creacion_obj,
+                dia_visita=dia_visita,
+                proporcional_pendiente=proporcional,
             )
             db.session.add(nueva_casa)
             creados += 1
@@ -572,7 +604,15 @@ def perfil(id):
     q_prod = Product.query.filter_by(activo=True)
     if current_user.username != 'root':
         q_prod = q_prod.filter(db.func.lower(Product.nombre) != 'deuda')
-    productos = q_prod.order_by(Product.nombre).all()
+    _trim = db.func.trim(Product.nombre)
+    _priority = case(
+        (_trim.ilike('pastilla de cloro'), 0),
+        (_trim.ilike('clarificador'), 1),
+        (_trim.ilike('granulado lento'), 2),
+        (_trim.ilike('granulado rapido'), 3),
+        else_=4
+    )
+    productos = q_prod.order_by(_priority, Product.nombre).all()
 
     detalles_pagos = []
     saldo_acumulado = 0.0
@@ -613,11 +653,12 @@ def perfil(id):
             "saldo": saldo_acumulado,
             "historial": h,
             "pausada": pausada,
+            "proporcional_anterior": float(getattr(h, 'proporcional_anterior', 0) or 0),
         })
         
     detalles_pagos.reverse()
     
-    return render_template("casas/perfil.html", casa=casa, visitas=visitas, detalles_pagos=detalles_pagos, productos=productos, now=datetime.now())
+    return render_template("casas/perfil.html", casa=casa, visitas=visitas, detalles_pagos=detalles_pagos, productos=productos, now=datetime.now(), DIAS_SEMANA=DIAS_SEMANA)
 
 # ==========================================
 # OTRAS RUTAS
@@ -628,7 +669,7 @@ def barrios_por_country(country_id):
     barrios = Barrio.query.filter_by(country_id=country_id, activo=True).order_by(Barrio.nombre).all()
     return jsonify([{"id": b.id, "nombre": b.nombre} for b in barrios])
 
-@casa_bp.route("/toggle/<int:id>")
+@casa_bp.route("/toggle/<int:id>", methods=["GET", "POST"])
 @login_required
 @admin_required
 def toggle_casa(id):
@@ -651,9 +692,20 @@ def toggle_casa(id):
             casa.nombre_formateado()
         )
     else:
+        dias_sel = request.form.getlist("dia_visita")
+        if dias_sel:
+            casa.dia_visita = ','.join(sorted(dias_sel, key=int))
+        fecha_reac = datetime.now()
+        casa.fecha_reactivacion = fecha_reac
         casa.activo = True
         casa.inactivado_por = None
         casa.fecha_inactivacion = None
+        try:
+            pb = float(casa.precio_base or 0)
+        except Exception:
+            pb = 0.0
+        _prop = _calcular_proporcional(fecha_reac, casa.dia_visita, pb)
+        casa.proporcional_pendiente = _prop if _prop > 0 else None
         registrar_auditoria(
             current_user.username,
             'ACTIVAR_CLIENTE',
@@ -806,6 +858,19 @@ def reanudar_casa(id):
     if pausa:
         pausa.hasta = hasta
     casa.pausado = False
+
+    dias_sel = request.form.getlist("dia_visita")
+    if dias_sel:
+        casa.dia_visita = ','.join(sorted(dias_sel, key=int))
+    fecha_reac = datetime.now()
+    casa.fecha_reactivacion = fecha_reac
+    try:
+        pb = float(casa.precio_base or 0)
+    except Exception:
+        pb = 0.0
+    _prop = _calcular_proporcional(fecha_reac, casa.dia_visita, pb)
+    casa.proporcional_pendiente = _prop if _prop > 0 else None
+
     registrar_auditoria(current_user.username, "REANUDAR", f"{casa.nombre_formateado()} — hasta {hasta}")
     db.session.commit()
     flash("Servicio reanudado.", "success")

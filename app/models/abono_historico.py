@@ -24,6 +24,8 @@ class AbonoHistorico(db.Model):
     
     transaccion_id = db.Column(db.String(36), nullable=True)
     
+    proporcional_anterior = db.Column(db.Numeric(10, 2), nullable=True)
+
     # LA MEMORIA INTERNA: Para que múltiples pagos en el mismo mes no se pisen
     detalle_pagos = db.Column(db.String(500), nullable=True)
 

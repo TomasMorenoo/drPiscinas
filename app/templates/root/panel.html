@@ -755,4 +755,23 @@
 </div>
 {% endfor %}
 
+<div class="row g-3 mb-4 mt-2">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm border-start border-5 border-info">
+            <div class="card-body d-flex align-items-center justify-content-between gap-3 py-3">
+                <div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-percent fs-2 text-info"></i>
+                    <div>
+                        <div class="fw-bold fs-6 text-dark">Cobro Proporcional</div>
+                        <div class="text-muted small">Configurar desde qué mes aplica el sistema de cobro proporcional al alta de clientes.</div>
+                    </div>
+                </div>
+                <a href="{{ url_for('config.config_proporcional') }}" class="btn btn-info text-white fw-bold">
+                    <i class="bi bi-gear me-1"></i> Configurar
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

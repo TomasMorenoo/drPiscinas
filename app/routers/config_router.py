@@ -1,8 +1,9 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
 from app import db
-from app.decorators import admin_required
+from app.decorators import admin_required, root_required
 from app.models.plantilla_mensaje import PlantillaMensaje, DEFAULT_TEMPLATE_INDIVIDUAL, DEFAULT_TEMPLATE_GRUPO, DEFAULT_TEMPLATE_RECORDATORIO
+from app.models.configuracion import Configuracion
 
 config_bp = Blueprint("config", __name__, url_prefix="/config")
 
@@ -96,3 +97,28 @@ def eliminar_plantilla(id):
     db.session.commit()
     flash(f"Plantilla '{nombre}' eliminada.", "success")
     return redirect(url_for("config.listar_plantillas"))
+
+
+@config_bp.route("/proporcional", methods=["GET", "POST"])
+@login_required
+@root_required
+def config_proporcional():
+    if request.method == "POST":
+        accion = request.form.get("accion")
+        if accion == "desactivar":
+            Configuracion.set('proporcional_desde', None)
+            db.session.commit()
+            flash("Sistema proporcional desactivado.", "success")
+        elif accion == "guardar":
+            mes = request.form.get("mes", type=int)
+            anio = request.form.get("anio", type=int)
+            if mes and anio and 1 <= mes <= 12 and anio >= 2020:
+                Configuracion.set('proporcional_desde', {'mes': mes, 'anio': anio})
+                db.session.commit()
+                flash(f"Sistema proporcional activo desde {mes}/{anio}.", "success")
+            else:
+                flash("Mes o año inválido.", "error")
+        return redirect(url_for("config.config_proporcional"))
+
+    cfg = Configuracion.get('proporcional_desde')
+    return render_template("config/proporcional.html", cfg=cfg)

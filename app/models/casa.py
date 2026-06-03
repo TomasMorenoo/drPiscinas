@@ -1,6 +1,7 @@
 from app import db
 from sqlalchemy import UniqueConstraint
 from datetime import datetime
+from app.utils import proporcional_aplica
 
 class Casa(db.Model):
     __tablename__ = "casas"
@@ -26,12 +27,16 @@ class Casa(db.Model):
     email = db.Column(db.String(120), nullable=True)
     
     fecha_creacion = db.Column(db.DateTime, default=datetime.now)
-    
+    fecha_reactivacion = db.Column(db.DateTime, nullable=True)
+
     country_id = db.Column(db.Integer, db.ForeignKey("countries.id"), nullable=False)
     barrio_id = db.Column(db.Integer, db.ForeignKey("barrios.id"), nullable=True)
     grupo_id = db.Column(db.Integer, db.ForeignKey("grupos_clientes.id"), nullable=True)
     grupo = db.relationship("GrupoCliente", backref=db.backref("casas", lazy=True))
     
+    dia_visita = db.Column(db.String(20), nullable=True)
+    proporcional_pendiente = db.Column(db.Numeric(10, 2), nullable=True)
+
     inactivado_por = db.Column(db.String(100), nullable=True)
     fecha_inactivacion = db.Column(db.DateTime, nullable=True)
     pausado = db.Column(db.Boolean, default=False, nullable=False)
@@ -74,7 +79,13 @@ class Casa(db.Model):
                 pausa_en_mes = True
                 break
 
-        if pausa_en_mes:
+        _fref = None
+        if self.fecha_reactivacion and proporcional_aplica(self.fecha_reactivacion):
+            _fref = self.fecha_reactivacion
+        elif self.fecha_creacion and proporcional_aplica(self.fecha_creacion):
+            _fref = self.fecha_creacion
+        es_mes_alta = bool(_fref and _fref.month == mes and _fref.year == anio)
+        if pausa_en_mes or es_mes_alta:
             abono_final = 0.0
         elif hist:
             abono_final = float(hist.monto)
@@ -157,7 +168,13 @@ class Casa(db.Model):
                 pausa_en_mes = True
                 break
 
-        if pausa_en_mes:
+        _fref = None
+        if self.fecha_reactivacion and proporcional_aplica(self.fecha_reactivacion):
+            _fref = self.fecha_reactivacion
+        elif self.fecha_creacion and proporcional_aplica(self.fecha_creacion):
+            _fref = self.fecha_creacion
+        es_mes_alta = bool(_fref and _fref.month == mes and _fref.year == anio)
+        if pausa_en_mes or es_mes_alta:
             abono_final = 0.0
         elif hist:
             abono_final = float(hist.monto)

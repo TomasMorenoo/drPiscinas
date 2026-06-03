@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from app.utils import nombre_mes, MESES_LARGO, registrar_auditoria
+from app.utils import nombre_mes, MESES_LARGO, registrar_auditoria, proporcional_aplica
 from flask_login import login_required, current_user
 from app.decorators import admin_required
 from app import db
@@ -327,7 +327,30 @@ def calcular_saldos_anteriores_batch(mes, anio):
                     WHERE p.casa_id = ah.casa_id
                       AND p.desde <= make_date(ah.anio, ah.mes, 1)
                       AND (p.hasta IS NULL OR p.hasta >= make_date(ah.anio, ah.mes, 1))
-                ) THEN 0 ELSE ah.monto END
+                ) THEN 0
+                     WHEN c.fecha_creacion IS NOT NULL
+                      AND :prop_anio IS NOT NULL
+                      AND :prop_mes IS NOT NULL
+                      AND (
+                          EXTRACT(YEAR  FROM c.fecha_creacion)::int > :prop_anio
+                          OR (EXTRACT(YEAR  FROM c.fecha_creacion)::int = :prop_anio
+                              AND EXTRACT(MONTH FROM c.fecha_creacion)::int >= :prop_mes)
+                      )
+                      AND EXTRACT(YEAR  FROM c.fecha_creacion)::int = ah.anio
+                      AND EXTRACT(MONTH FROM c.fecha_creacion)::int = ah.mes
+                     THEN 0
+                     WHEN c.fecha_reactivacion IS NOT NULL
+                      AND :prop_anio IS NOT NULL
+                      AND :prop_mes IS NOT NULL
+                      AND (
+                          EXTRACT(YEAR  FROM c.fecha_reactivacion)::int > :prop_anio
+                          OR (EXTRACT(YEAR  FROM c.fecha_reactivacion)::int = :prop_anio
+                              AND EXTRACT(MONTH FROM c.fecha_reactivacion)::int >= :prop_mes)
+                      )
+                      AND EXTRACT(YEAR  FROM c.fecha_reactivacion)::int = ah.anio
+                      AND EXTRACT(MONTH FROM c.fecha_reactivacion)::int = ah.mes
+                     THEN 0
+                     ELSE ah.monto END
                 + COALESCE(prod_ext.extras, 0)
                 + COALESCE(promo_ext.extras, 0)
                 - COALESCE(ah.monto_pagado, 0)
@@ -372,9 +395,15 @@ def calcular_saldos_anteriores_batch(mes, anio):
         GROUP BY ah.casa_id
     """)
     try:
-        rows = db.session.execute(sql, {"mes": mes, "anio": anio})
+        from app.models.configuracion import Configuracion
+        cfg = Configuracion.get('proporcional_desde') or {}
+        rows = db.session.execute(sql, {
+            "mes": mes, "anio": anio,
+            "prop_mes": cfg.get('mes'), "prop_anio": cfg.get('anio'),
+        })
         return {row.casa_id: float(row.saldo or 0) for row in rows}
     except Exception:
+        db.session.rollback()
         return {}
 
 # ==========================================
@@ -435,10 +464,7 @@ def index():
         datos_v = c.obtener_gastos_mensuales(mes, anio, hist=hist_v)
         extras_v = float(datos_v.get("extras", 0))
 
-        if hist_v:
-            ab_v = float(hist_v.monto)
-        else:
-            ab_v = float(c.precio_base or 0) if (c.activo or extras_v > 0) else 0.0
+        ab_v = float(datos_v.get("abono", 0))
 
         saldo_anterior_v = saldos_batch.get(c.id, 0.0) if saldos_batch else c.obtener_saldo_anterior(mes, anio)
 
@@ -467,24 +493,55 @@ def index():
         historial = historial_dict.get(casa.id)
 
         pausado_mes = _casa_pausada_en_mes(casa, mes, anio, extras)
+        _fref_disp = None
+        if casa.fecha_reactivacion and proporcional_aplica(casa.fecha_reactivacion):
+            _fref_disp = casa.fecha_reactivacion
+        elif casa.fecha_creacion and proporcional_aplica(casa.fecha_creacion):
+            _fref_disp = casa.fecha_creacion
+        _es_mes_alta_disp = bool(_fref_disp and _fref_disp.month == mes and _fref_disp.year == anio)
         if pausado_mes:
             abono_mes = 0.0
+        elif _es_mes_alta_disp:
+            if _fref_disp.day <= 14:
+                if casa.proporcional_pendiente is not None:
+                    abono_mes = float(casa.proporcional_pendiente)
+                else:
+                    _dia = _fref_disp.day
+                    _sem = 1 if _dia <= 7 else 2
+                    _dias = [int(d) for d in (casa.dia_visita or '').split(',') if d.strip().isdigit()]
+                    if _dias and max(_dias) < _fref_disp.weekday():
+                        _sem += 1
+                    abono_mes = round(float(casa.precio_base or 0) / 4 * max(0, 5 - _sem), 2)
+            else:
+                abono_mes = 0.0
         elif historial:
-            abono_mes = float(historial.monto)
+            _prop_hist = float(getattr(historial, 'proporcional_anterior', 0) or 0)
+            abono_mes = float(historial.monto) - _prop_hist
         else:
             abono_mes = float(casa.precio_base or 0) if (casa.activo or extras > 0) else 0.0
+
+        # Calcular proporcional_preview antes de saldo_restante
+        _prop_preview = 0.0
+        _fref_prop = None
+        if casa.fecha_reactivacion and proporcional_aplica(casa.fecha_reactivacion):
+            _fref_prop = casa.fecha_reactivacion
+        elif casa.fecha_creacion and proporcional_aplica(casa.fecha_creacion):
+            _fref_prop = casa.fecha_creacion
+        if _fref_prop:
+            _nm = _fref_prop.month % 12 + 1
+            _na = _fref_prop.year + (1 if _fref_prop.month == 12 else 0)
+            if mes == _nm and anio == _na:
+                if historial and getattr(historial, 'proporcional_anterior', None):
+                    _prop_preview = float(historial.proporcional_anterior)
+                elif not historial and casa.proporcional_pendiente and float(casa.proporcional_pendiente) > 0:
+                    _prop_preview = float(casa.proporcional_pendiente)
 
         total_mes = abono_mes + extras
 
         # --- LÓGICA VISUAL DE FOTO DEL MES ---
-        # Con pagos en cascada, obtener_saldo_anterior() ya refleja correctamente
-        # todos los abonos parciales aplicados a meses anteriores.
-        # NO sumamos pago_deudas_este_mes porque eso duplicaría deudas ya saldadas.
         saldo_anterior_visual = saldo_anterior_real
         monto_pagado_mes_actual = float(getattr(historial, 'monto_pagado', 0) or 0)
 
-        # Si el monto_pagado fue aplicado por cascade de un mes anterior (fecha_pago < mes actual),
-        # tratarlo como crédito en saldo_anterior, no como pago hecho en este período.
         fp = getattr(historial, 'fecha_pago', None) if historial else None
         if monto_pagado_mes_actual > 0.01 and fp and (fp.year, fp.month) < (anio, mes):
             saldo_anterior_visual = saldo_anterior_real - monto_pagado_mes_actual
@@ -492,7 +549,7 @@ def index():
         else:
             pagos_en_este_dashboard = monto_pagado_mes_actual
 
-        saldo_restante = (total_mes + saldo_anterior_visual) - pagos_en_este_dashboard
+        saldo_restante = (total_mes + saldo_anterior_visual + _prop_preview) - pagos_en_este_dashboard
         
         esta_pagado = getattr(historial, 'pagado', False) if historial else False
         mensaje_enviado = getattr(historial, 'mensaje_enviado', False) if historial else False
@@ -532,6 +589,7 @@ def index():
             "historial_obj": historial,
             "casa": casa,
             "abono": abono_mes,
+            "proporcional_preview": _prop_preview,
             "extras": extras,
             "detalle_productos": obtener_detalle_productos(casa, mes, anio) if extras > 0 else [],
             "total_mes": total_mes,
@@ -913,15 +971,51 @@ def sync_abonos():
         if not casa.activo and extras_v <= 0:
             continue
 
-        if _casa_pausada_en_mes(casa, mes, anio, extras_v):
+        _fref_sync = None
+        if casa.fecha_reactivacion and proporcional_aplica(casa.fecha_reactivacion):
+            _fref_sync = casa.fecha_reactivacion
+        elif casa.fecha_creacion and proporcional_aplica(casa.fecha_creacion):
+            _fref_sync = casa.fecha_creacion
+        _es_mes_alta = bool(_fref_sync and _fref_sync.month == mes and _fref_sync.year == anio)
+        if _casa_pausada_en_mes(casa, mes, anio, extras_v) or _es_mes_alta:
             abono_a_guardar = 0.0
         else:
             abono_a_guardar = float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0
+
+        prop = 0.0
+        _fref_prop_sync = None
+        if casa.fecha_reactivacion and proporcional_aplica(casa.fecha_reactivacion):
+            _fref_prop_sync = casa.fecha_reactivacion
+        elif casa.fecha_creacion and proporcional_aplica(casa.fecha_creacion):
+            _fref_prop_sync = casa.fecha_creacion
+        if _fref_prop_sync:
+            next_mes = _fref_prop_sync.month % 12 + 1
+            next_anio = _fref_prop_sync.year + (1 if _fref_prop_sync.month == 12 else 0)
+            if mes == next_mes and anio == next_anio:
+                if casa.proporcional_pendiente is not None:
+                    prop = float(casa.proporcional_pendiente)
+                else:
+                    _dia = _fref_prop_sync.day
+                    _sem = 1 if _dia <= 7 else 2 if _dia <= 14 else 3 if _dia <= 21 else 4
+                    _dias = [int(d) for d in (casa.dia_visita or '').split(',') if d.strip().isdigit()]
+                    if _dias and max(_dias) < _fref_prop_sync.weekday():
+                        _sem += 1
+                    prop = round(float(casa.precio_base or 0) / 4 * max(0, 5 - _sem), 2)
+
         if not hist:
-            db.session.add(AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=abono_a_guardar))
+            nuevo = AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=abono_a_guardar + prop)
+            if prop > 0:
+                nuevo.proporcional_anterior = prop
+                casa.proporcional_pendiente = None
+            db.session.add(nuevo)
         else:
-            if not getattr(hist, 'pagado', False) and float(hist.monto_pagado or 0) == 0 and float(hist.monto or 0) != 0:
-                hist.monto = abono_a_guardar
+            if not getattr(hist, 'pagado', False) and float(hist.monto_pagado or 0) == 0:
+                nuevo_monto = abono_a_guardar + prop
+                if float(hist.monto or 0) != nuevo_monto:
+                    hist.monto = nuevo_monto
+                if prop > 0 and not getattr(hist, 'proporcional_anterior', None):
+                    hist.proporcional_anterior = prop
+                    casa.proporcional_pendiente = None
 
     mes_nombre_s = nombre_mes(mes)
     registrar_auditoria(current_user.username, 'CERRAR_MES', f"{mes_nombre_s} {anio}")

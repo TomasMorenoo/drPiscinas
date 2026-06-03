@@ -161,11 +161,19 @@
                                 <i class="bi bi-pencil-square fs-5"></i>
                             </a>
 
-                            <a href="{{ url_for('casas.toggle_casa', id=casa.id) }}" 
-                               class="btn btn-sm border-0 {{ 'text-danger' if casa.activo else 'text-success' }}"
-                               title="{{ 'Pausar servicio' if casa.activo else 'Reactivar servicio' }}">
-                                <i class="bi {{ 'bi-pause-circle-fill' if casa.activo else 'bi-play-circle-fill' }} fs-5"></i>
+                            {% if casa.activo %}
+                            <a href="{{ url_for('casas.toggle_casa', id=casa.id) }}"
+                               class="btn btn-sm border-0 text-danger"
+                               title="Dar de baja">
+                                <i class="bi bi-pause-circle-fill fs-5"></i>
                             </a>
+                            {% else %}
+                            <button type="button" class="btn btn-sm border-0 text-success"
+                                    title="Reactivar servicio"
+                                    onclick="abrirModalActivar({{ casa.id }}, '{{ casa.nombre_formateado() }}', '{{ casa.dia_visita or '' }}')">
+                                <i class="bi bi-play-circle-fill fs-5"></i>
+                            </button>
+                            {% endif %}
 
                             {% if borrado_activado %}
                             <form action="{{ url_for('casas.eliminar_casa', id=casa.id) }}" method="POST" class="d-inline" onsubmit="return confirm('⚠️ ATENCIÓN: ¿Estás seguro de querer borrar este cliente de la base de datos para siempre?');">
@@ -250,5 +258,53 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+</script>
+
+<div class="modal fade" id="modalActivarCasa" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 shadow overflow-hidden">
+            <div class="modal-header border-0 text-white py-3" style="background: linear-gradient(135deg, #198754, #20c997);">
+                <div class="w-100 text-center">
+                    <i class="bi bi-play-circle-fill fs-2 mb-1 d-block"></i>
+                    <h5 class="modal-title fw-bold mb-0">Reactivar Cliente</h5>
+                    <small class="opacity-75" id="modalActivarNombre"></small>
+                </div>
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-2" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formActivar" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body px-4 py-3">
+                    <label class="form-label fw-bold small text-uppercase text-muted mb-2">Días de Visita</label>
+                    <div class="d-flex gap-2 flex-wrap" id="diasActivar">
+                        {% for val, lbl in [('0','L'),('1','M'),('2','X'),('3','J'),('4','V'),('5','S'),('6','D')] %}
+                        <div>
+                            <input type="checkbox" class="btn-check" name="dia_visita" value="{{ val }}" id="dv_a_{{ val }}">
+                            <label class="btn btn-outline-primary btn-sm fw-bold" for="dv_a_{{ val }}">{{ lbl }}</label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="form-text small text-muted mt-1">Para calcular el proporcional del mes de reactivación.</div>
+                </div>
+                <div class="modal-footer border-0 px-4 pb-3 pt-0 d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success btn-sm fw-bold flex-fill">
+                        <i class="bi bi-play-circle me-1"></i>Reactivar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+function abrirModalActivar(id, nombre, diasActuales) {
+    document.getElementById('modalActivarNombre').textContent = nombre;
+    document.getElementById('formActivar').action = '/casas/toggle/' + id;
+    const dias = diasActuales ? diasActuales.split(',') : [];
+    ['0','1','2','3','4','5','6'].forEach(v => {
+        const cb = document.getElementById('dv_a_' + v);
+        if (cb) cb.checked = dias.includes(v);
+    });
+    new bootstrap.Modal(document.getElementById('modalActivarCasa')).show();
+}
 </script>
 {% endblock %}

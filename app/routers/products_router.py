@@ -4,6 +4,7 @@ from app.decorators import admin_required
 from app import db
 from app.models.products import Product
 from app.utils import registrar_auditoria
+from sqlalchemy import case
 
 product_bp = Blueprint("products", __name__, url_prefix="/products")
 
@@ -19,7 +20,15 @@ def _parse_precio(value):
 @login_required
 @admin_required
 def listar_products():
-    products = Product.query.filter(db.func.lower(Product.nombre) != 'deuda').order_by(Product.nombre).all()
+    _trim = db.func.trim(Product.nombre)
+    _priority = case(
+        (_trim.ilike('pastilla de cloro'), 0),
+        (_trim.ilike('clarificador'), 1),
+        (_trim.ilike('granulado lento'), 2),
+        (_trim.ilike('granulado rapido'), 3),
+        else_=4
+    )
+    products = Product.query.filter(db.func.lower(Product.nombre) != 'deuda').order_by(_priority, Product.nombre).all()
     return render_template("products/list.html", products=products)
 
 @product_bp.route("/create", methods=["GET", "POST"])

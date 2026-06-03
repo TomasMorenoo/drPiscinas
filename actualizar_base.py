@@ -127,6 +127,15 @@ def migrar_base_de_datos():
         print("ultimo_saldo_aplicado en grupos_clientes...")
         _run("ALTER TABLE grupos_clientes ADD COLUMN IF NOT EXISTS ultimo_saldo_aplicado NUMERIC(10,2);")
 
+        print("Proporcional primer mes...")
+        _run("ALTER TABLE casas ADD COLUMN IF NOT EXISTS dia_visita VARCHAR(20);")
+        _run("ALTER TABLE casas ALTER COLUMN dia_visita TYPE VARCHAR(20) USING dia_visita::TEXT;")
+        _run("ALTER TABLE casas ADD COLUMN IF NOT EXISTS proporcional_pendiente NUMERIC(10,2);")
+        _run("ALTER TABLE abonos_historicos ADD COLUMN IF NOT EXISTS proporcional_anterior NUMERIC(10,2);")
+
+        print("Fecha reactivacion...")
+        _run("ALTER TABLE casas ADD COLUMN IF NOT EXISTS fecha_reactivacion TIMESTAMP;")
+
         print("Listo.")
 
 if __name__ == "__main__":
