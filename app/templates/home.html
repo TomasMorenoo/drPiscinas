@@ -24,7 +24,7 @@
                 <div class="position-absolute end-0 top-50 translate-middle-y opacity-10 pe-4 d-none d-md-block" style="font-size: 8rem;">
                     <i class="bi bi-stopwatch-fill"></i>
                 </div>
-                
+
                 <div class="position-relative z-1">
                     <h2 class="fw-bold text-uppercase mb-3">Operación Diaria</h2>
                     <p class="text-light opacity-75 mb-4 col-md-8" style="font-size: 1.1rem;">
@@ -106,7 +106,7 @@
 {% endif %}
 
 <div class="row g-4">
-    
+
     {% if current_user.is_admin() %}
     <div class="col-md-6 col-xl-3">
         <a href="{{ url_for('dashboard.index') }}" class="text-decoration-none text-dark">
