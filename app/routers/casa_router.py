@@ -853,7 +853,13 @@ def reanudar_casa(id):
     hoy = date.today()
     hasta_mes = request.form.get("hasta_mes", type=int)
     hasta_anio = request.form.get("hasta_anio", type=int)
-    hasta = date(hasta_anio, hasta_mes, 1) if hasta_mes and hasta_anio else date(hoy.year, hoy.month, 1)
+    hasta_dia = request.form.get("hasta_dia", type=int)
+    if hasta_mes and hasta_anio:
+        max_dia = calendar.monthrange(hasta_anio, hasta_mes)[1]
+        dia = min(hasta_dia, max_dia) if hasta_dia else 1
+        hasta = date(hasta_anio, hasta_mes, dia)
+    else:
+        hasta = date(hoy.year, hoy.month, hoy.day)
     pausa = Pausa.query.filter_by(casa_id=casa.id, hasta=None).order_by(Pausa.desde.desc()).first()
     if pausa:
         pausa.hasta = hasta
@@ -862,7 +868,8 @@ def reanudar_casa(id):
     dias_sel = request.form.getlist("dia_visita")
     if dias_sel:
         casa.dia_visita = ','.join(sorted(dias_sel, key=int))
-    fecha_reac = datetime.now()
+    _now = datetime.now()
+    fecha_reac = datetime(hasta.year, hasta.month, hasta.day, _now.hour, _now.minute)
     casa.fecha_reactivacion = fecha_reac
     try:
         pb = float(casa.precio_base or 0)

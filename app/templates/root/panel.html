@@ -1,752 +1,690 @@
 {% extends "base.html" %}
-{% block title %}Panel Root - Dr. Piscinas{% endblock %}
+{% block title %}Panel Root — Dr. Piscinas{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h3 mb-0 fw-bold">
-        <i class="bi bi-shield-lock-fill text-danger me-2"></i>Panel Root
-    </h1>
-    <span class="badge bg-danger px-3 py-2 fs-6">root</span>
+
+{# ══════════════════════════════════════════════════════
+   HEADER
+══════════════════════════════════════════════════════ #}
+<div class="rp-header d-flex flex-wrap align-items-center gap-3 mb-4">
+    <div class="d-flex align-items-center gap-3 me-auto">
+        <div class="rp-avatar">
+            <i class="bi bi-shield-lock-fill"></i>
+        </div>
+        <div>
+            <h1 class="rp-title mb-0">Panel Root</h1>
+            <p class="rp-sub mb-0">Administración del sistema</p>
+        </div>
+    </div>
+    {% if modo_mantenimiento %}
+    <div class="rp-status-badge rp-status-warning">
+        <span class="rp-pulse" style="background:#f59e0b;"></span>
+        Mantenimiento activo
+    </div>
+    {% else %}
+    <div class="rp-status-badge rp-status-ok">
+        <span class="rp-pulse" style="background:#22c55e;"></span>
+        Sistema en línea
+    </div>
+    {% endif %}
+    <span class="badge bg-danger px-3 py-2 fw-semibold" style="font-size:.75rem;letter-spacing:.03em;">ROOT</span>
 </div>
 
-{# ══════════════════════════════════════════════════════════
-   FILA 1: MODO MANTENIMIENTO
-══════════════════════════════════════════════════════════ #}
+{# ══════════════════════════════════════════════════════
+   KPIs
+══════════════════════════════════════════════════════ #}
 <div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm
-            {% if modo_mantenimiento %}border-start border-5 border-warning bg-warning bg-opacity-10
-            {% else %}border-start border-5 border-success{% endif %}">
-            <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 py-4">
-                <div class="d-flex align-items-center gap-3">
-                    <i class="bi {% if modo_mantenimiento %}bi-cone-striped text-warning{% else %}bi-check-circle-fill text-success{% endif %} fs-1"></i>
-                    <div>
-                        <div class="fw-bold fs-5 text-dark">Modo Mantenimiento</div>
-                        {% if modo_mantenimiento %}
-                            <div class="text-warning fw-bold">🔧 ACTIVO — Solo root puede navegar</div>
-                        {% else %}
-                            <div class="text-success fw-bold">✅ Sistema en línea y operativo</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <form method="POST" action="{{ url_for('root.toggle_mantenimiento') }}"
-                      onsubmit="return confirm('{% if modo_mantenimiento %}¿Desactivar el modo mantenimiento?{% else %}¿Activar modo mantenimiento? Los demás usuarios serán bloqueados.{% endif %}')">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    {% if modo_mantenimiento %}
-                        <button type="submit" class="btn btn-success btn-lg fw-bold px-4">
-                            <i class="bi bi-check-lg me-2"></i>Volver a poner en línea
-                        </button>
-                    {% else %}
-                        <button type="submit" class="btn btn-warning btn-lg fw-bold px-4">
-                            <i class="bi bi-cone-striped me-2"></i>Activar Mantenimiento
-                        </button>
-                    {% endif %}
-                </form>
+    <div class="col-6 col-md-3">
+        <div class="rp-kpi-card">
+            <div class="rp-kpi-icon" style="background:#dcfce7;color:#16a34a;">
+                <i class="bi bi-house-fill"></i>
+            </div>
+            <div>
+                <p class="rp-kpi-label">Clientes Activos</p>
+                <p class="rp-kpi-value text-success">{{ total_clientes }}</p>
+                <p class="rp-kpi-sub text-muted">{{ total_inactivos }} inactivos</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="rp-kpi-card">
+            <div class="rp-kpi-icon" style="background:#dbeafe;color:#2563eb;">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div>
+                <p class="rp-kpi-label">Usuarios</p>
+                <p class="rp-kpi-value" style="color:#2563eb;">{{ total_usuarios }}</p>
+                <p class="rp-kpi-sub text-muted">{{ total_admins }} admins</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="rp-kpi-card">
+            <div class="rp-kpi-icon" style="{% if modo_mantenimiento %}background:#fef3c7;color:#d97706;{% else %}background:#dcfce7;color:#16a34a;{% endif %}">
+                <i class="bi bi-{% if modo_mantenimiento %}cone-striped{% else %}wifi{% endif %}"></i>
+            </div>
+            <div>
+                <p class="rp-kpi-label">Acceso</p>
+                <p class="rp-kpi-value {% if modo_mantenimiento %}text-warning{% else %}text-success{% endif %}" style="font-size:1.1rem;margin-top:.2rem;">
+                    {% if modo_mantenimiento %}Restringido{% else %}Público{% endif %}
+                </p>
+                <p class="rp-kpi-sub text-muted">
+                    {% if modo_mantenimiento %}Solo root{% else %}Todos los usuarios{% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="rp-kpi-card">
+            <div class="rp-kpi-icon" style="{% if editar_countries %}background:#ede9fe;color:#7c3aed;{% else %}background:#f1f5f9;color:#64748b;{% endif %}">
+                <i class="bi bi-{% if editar_countries %}pencil-square{% else %}lock-fill{% endif %}"></i>
+            </div>
+            <div>
+                <p class="rp-kpi-label">Countries</p>
+                <p class="rp-kpi-value {% if editar_countries %}text-purple{% else %}text-muted{% endif %}" style="font-size:1.1rem;margin-top:.2rem;color:{% if editar_countries %}#7c3aed{% else %}#94a3b8{% endif %};">
+                    {% if editar_countries %}Editable{% else %}Bloqueado{% endif %}
+                </p>
+                <p class="rp-kpi-sub text-muted">Edición de nombres</p>
             </div>
         </div>
     </div>
 </div>
 
-{# ══════════════════════════════════════════════════════════
-   FILA 1b: EDICIÓN DE COUNTRIES
-══════════════════════════════════════════════════════════ #}
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm
-            {% if editar_countries %}border-start border-5 border-primary bg-primary bg-opacity-10
-            {% else %}border-start border-5 border-secondary{% endif %}">
-            <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 py-3">
-                <div class="d-flex align-items-center gap-3">
-                    <i class="bi {% if editar_countries %}bi-pencil-square text-primary{% else %}bi-lock-fill text-secondary{% endif %} fs-2"></i>
-                    <div>
-                        <div class="fw-bold fs-6 text-dark">Edición de Countries</div>
-                        {% if editar_countries %}
-                            <div class="text-primary fw-bold">🔓 ACTIVO — El botón Editar es visible en /countries</div>
-                        {% else %}
-                            <div class="text-secondary">🔒 Desactivado — No se puede editar nombres de countries</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <form method="POST" action="{{ url_for('root.toggle_edicion_countries') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    {% if editar_countries %}
-                        <button type="submit" class="btn btn-outline-secondary fw-bold px-4">
-                            <i class="bi bi-lock me-2"></i>Desactivar edición
-                        </button>
-                    {% else %}
-                        <button type="submit" class="btn btn-primary fw-bold px-4">
-                            <i class="bi bi-pencil-square me-2"></i>Activar edición
-                        </button>
-                    {% endif %}
-                </form>
-            </div>
-        </div>
-    </div>
+{# ══════════════════════════════════════════════════════
+   QUICK LINKS
+══════════════════════════════════════════════════════ #}
+<div class="d-flex gap-2 flex-wrap mb-4">
+    <a href="{{ url_for('dashboard.auditoria') }}" class="rp-pill-btn rp-pill-dark">
+        <i class="bi bi-shield-check me-1"></i>Auditoría
+    </a>
+    <a href="{{ url_for('config.config_proporcional') }}" class="rp-pill-btn rp-pill-outline">
+        <i class="bi bi-percent me-1"></i>Cobro Proporcional
+    </a>
+    <a href="{{ url_for('root.auditoria_pagos') }}" class="rp-pill-btn rp-pill-outline">
+        <i class="bi bi-currency-exchange me-1"></i>Auditoría de Pagos
+    </a>
 </div>
 
-{# ══════════════════════════════════════════════════════════
-   FILA 1c: BACKUP DE BASE DE DATOS
-══════════════════════════════════════════════════════════ #}
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm border-start border-5 border-dark">
-            <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 py-4">
-                <div class="d-flex align-items-center gap-3">
-                    <i class="bi bi-database-down fs-1 text-dark"></i>
-                    <div>
-                        <div class="fw-bold fs-5 text-dark">Backup de Base de Datos</div>
-                        <div class="text-muted small">
-                            Genera y descarga un <code>.sql</code> con toda la base de datos.
-                            Los backups también se guardan automáticamente en <code>sueltos/</code>.
-                        </div>
-                    </div>
+{# ══════════════════════════════════════════════════════
+   TABS
+══════════════════════════════════════════════════════ #}
+<ul class="nav rp-tabs mb-0" id="rootTabs" role="tablist">
+    <li class="nav-item">
+        <button class="rp-tab active" data-bs-toggle="tab" data-bs-target="#tab-sistema" type="button">
+            <i class="bi bi-toggles me-2"></i>Sistema
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="rp-tab" data-bs-toggle="tab" data-bs-target="#tab-db" type="button">
+            <i class="bi bi-database-fill me-2"></i>Base de Datos
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="rp-tab" data-bs-toggle="tab" data-bs-target="#tab-usuarios" type="button">
+            <i class="bi bi-people me-2"></i>Usuarios
+            {% if total_usuarios %}<span class="rp-tab-badge">{{ total_usuarios }}</span>{% endif %}
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="rp-tab" data-bs-toggle="tab" data-bs-target="#tab-logs" type="button">
+            <i class="bi bi-journal-text me-2"></i>Logs
+        </button>
+    </li>
+</ul>
+
+<div class="rp-tab-content tab-content">
+
+{# ══════════════════════════════════════════════════════
+   TAB: SISTEMA
+══════════════════════════════════════════════════════ #}
+<div class="tab-pane fade show active" id="tab-sistema" role="tabpanel">
+<div class="row g-3">
+
+    {# ── Mantenimiento ── #}
+    <div class="col-12 col-sm-6 col-xl-4">
+        <div class="rp-control-card {% if modo_mantenimiento %}rp-control-warning{% endif %}">
+            <div class="d-flex align-items-center gap-3 flex-grow-1">
+                <div class="rp-ctrl-icon {% if modo_mantenimiento %}rp-ctrl-icon-warning{% else %}rp-ctrl-icon-success{% endif %}">
+                    <i class="bi bi-{% if modo_mantenimiento %}cone-striped{% else %}wifi{% endif %}"></i>
                 </div>
-                <a href="{{ url_for('root.backup_db') }}"
-                   id="btn-backup"
-                   class="btn btn-dark btn-lg fw-bold px-4"
-                   onclick="var b=this; b.innerHTML='<span class=\'spinner-border spinner-border-sm me-2\'></span>Generando...'; b.classList.add('disabled'); setTimeout(function(){ b.innerHTML='<i class=\'bi bi-download me-2\'></i>Descargar Backup'; b.classList.remove('disabled'); }, 15000);">
-                    <i class="bi bi-download me-2"></i>Descargar Backup
+                <div>
+                    <p class="rp-ctrl-title">Mantenimiento</p>
+                    <p class="rp-ctrl-status {% if modo_mantenimiento %}text-warning{% else %}text-success{% endif %}">
+                        {% if modo_mantenimiento %}Activo — solo root{% else %}Sistema en línea{% endif %}
+                    </p>
+                </div>
+            </div>
+            <form id="form-mant" method="POST" action="{{ url_for('root.toggle_mantenimiento') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input rp-switch" type="checkbox" role="switch"
+                           data-form="form-mant"
+                           data-confirm-on="¿Activar mantenimiento? Otros usuarios quedarán bloqueados."
+                           data-confirm-off="¿Desactivar mantenimiento y volver en línea?"
+                           style="width:2.8rem;height:1.4rem;cursor:pointer;"
+                           {% if modo_mantenimiento %}checked{% endif %}>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# ── Countries ── #}
+    <div class="col-12 col-sm-6 col-xl-4">
+        <div class="rp-control-card {% if editar_countries %}rp-control-primary{% endif %}">
+            <div class="d-flex align-items-center gap-3 flex-grow-1">
+                <div class="rp-ctrl-icon {% if editar_countries %}rp-ctrl-icon-primary{% else %}rp-ctrl-icon-neutral{% endif %}">
+                    <i class="bi bi-{% if editar_countries %}pencil-square{% else %}lock-fill{% endif %}"></i>
+                </div>
+                <div>
+                    <p class="rp-ctrl-title">Editar Countries</p>
+                    <p class="rp-ctrl-status {% if editar_countries %}text-primary{% else %}text-muted{% endif %}">
+                        {% if editar_countries %}Edición habilitada{% else %}Bloqueado{% endif %}
+                    </p>
+                </div>
+            </div>
+            <form id="form-countries" method="POST" action="{{ url_for('root.toggle_edicion_countries') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input rp-switch" type="checkbox" role="switch"
+                           data-form="form-countries"
+                           data-confirm-on="¿Activar edición de countries?"
+                           data-confirm-off="¿Desactivar edición de countries?"
+                           style="width:2.8rem;height:1.4rem;cursor:pointer;"
+                           {% if editar_countries %}checked{% endif %}>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# ── Stock ── #}
+    <div class="col-12 col-sm-6 col-xl-4">
+        <div class="rp-control-card {% if config_stock_activo_desde %}rp-control-success{% endif %}">
+            <div class="d-flex align-items-center gap-3 flex-grow-1">
+                <div class="rp-ctrl-icon {% if config_stock_activo_desde %}rp-ctrl-icon-success{% else %}rp-ctrl-icon-warning{% endif %}">
+                    <i class="bi bi-boxes"></i>
+                </div>
+                <div>
+                    <p class="rp-ctrl-title">Control de Stock</p>
+                    <p class="rp-ctrl-status {% if config_stock_activo_desde %}text-success{% else %}text-muted{% endif %}">
+                        {% if config_stock_activo_desde %}Activo desde {{ config_stock_activo_desde }}{% else %}Sin activar{% endif %}
+                    </p>
+                </div>
+            </div>
+            <form method="POST" action="{{ url_for('root.activar_stock') }}"
+                  onsubmit="return confirm('¿Marcar HOY como inicio oficial del stock?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm {% if config_stock_activo_desde %}btn-outline-success{% else %}btn-warning{% endif %} fw-semibold px-3 flex-shrink-0">
+                    {% if config_stock_activo_desde %}Reiniciar{% else %}Activar{% endif %}
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {# ── Tipo de Dólar ── #}
+    <div class="col-12 col-sm-6 col-xl-4">
+        <div class="rp-control-card">
+            <div class="d-flex align-items-center gap-3 flex-grow-1">
+                <div class="rp-ctrl-icon rp-ctrl-icon-info">
+                    <i class="bi bi-currency-dollar"></i>
+                </div>
+                <div>
+                    <p class="rp-ctrl-title">Tipo de Dólar</p>
+                    <p class="rp-ctrl-status" style="color:#0284c7;">
+                        {% if tipo_dolar == 'blue' %}Dólar Blue{% else %}Dólar MEP{% endif %}
+                    </p>
+                </div>
+            </div>
+            <form method="POST" action="{{ url_for('root.set_tipo_dolar') }}" class="d-flex align-items-center gap-2 flex-shrink-0">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="btn-group btn-group-sm">
+                    <input type="radio" class="btn-check" name="tipo_dolar" id="opt_blue" value="blue"
+                           {% if tipo_dolar == 'blue' %}checked{% endif %} autocomplete="off">
+                    <label class="btn btn-outline-info fw-semibold" for="opt_blue">Blue</label>
+                    <input type="radio" class="btn-check" name="tipo_dolar" id="opt_mep" value="mep"
+                           {% if tipo_dolar == 'mep' %}checked{% endif %} autocomplete="off">
+                    <label class="btn btn-outline-info fw-semibold" for="opt_mep">MEP</label>
+                </div>
+                <button type="submit" class="btn btn-info btn-sm fw-semibold text-white">
+                    <i class="bi bi-floppy2"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {# ── WhatsApp Errores ── #}
+    <div class="col-12 col-sm-6 col-xl-4">
+        <div class="rp-control-card rp-control-card-tall">
+            <div class="d-flex align-items-center gap-3 w-100 mb-3">
+                <div class="rp-ctrl-icon rp-ctrl-icon-success">
+                    <i class="bi bi-whatsapp"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <p class="rp-ctrl-title">WhatsApp Errores</p>
+                    <p class="rp-ctrl-status {% if cfg.wa_numero_error %}text-success{% else %}text-muted{% endif %}">
+                        {% if cfg.wa_numero_error %}+549{{ cfg.wa_numero_error }}{% if cfg.wa_nombre_error %} · {{ cfg.wa_nombre_error }}{% endif %}{% else %}Sin configurar{% endif %}
+                    </p>
+                </div>
+                {% if cfg.wa_numero_error %}
+                <a href="whatsapp://send?phone=549{{ cfg.wa_numero_error }}"
+                   class="btn btn-outline-success btn-sm flex-shrink-0" title="Probar">
+                    <i class="bi bi-box-arrow-up-right"></i>
                 </a>
+                {% endif %}
             </div>
+            <form method="POST" action="{{ url_for('root.set_wa_error') }}" class="d-flex gap-2 w-100">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="text" name="wa_nombre_error" class="form-control form-control-sm"
+                       placeholder="Nombre" value="{{ cfg.wa_nombre_error or '' }}"
+                       style="width:90px;flex:0 0 auto;">
+                <div class="input-group input-group-sm flex-grow-1">
+                    <span class="input-group-text text-muted fw-bold small">+54 9</span>
+                    <input type="text" name="wa_numero_error" class="form-control"
+                           placeholder="11 2345 6789"
+                           value="{{ cfg.wa_numero_error or '' }}" maxlength="12">
+                </div>
+                <button type="submit" class="btn btn-success btn-sm fw-semibold flex-shrink-0">
+                    <i class="bi bi-floppy2"></i>
+                </button>
+            </form>
         </div>
     </div>
-</div>
 
-{# ══════════════════════════════════════════════════════════
-   FILA 1b2: RESTAURAR BACKUP
-══════════════════════════════════════════════════════════ #}
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm border-start border-5 border-danger">
-            <div class="card-body py-4">
-                <div class="d-flex align-items-center gap-3 mb-3">
-                    <i class="bi bi-database-up fs-1 text-danger"></i>
-                    <div>
-                        <div class="fw-bold fs-5 text-dark">Inyectar Backup</div>
-                        <div class="text-muted small">
-                            Restaura la base de datos a partir de un archivo <code>.sql</code>.
-                            <span class="text-danger fw-bold">Esta operación sobreescribe datos existentes.</span>
-                        </div>
-                    </div>
+    {# ── Foto del Login ── #}
+    <div class="col-12 col-sm-6 col-xl-4">
+        <div class="rp-control-card rp-control-card-tall {% if login_image_exists %}rp-control-primary{% endif %}">
+            <div class="d-flex align-items-center gap-3 w-100 mb-3">
+                {% if login_image_exists %}
+                <img src="{{ url_for('root.serve_login_image') }}" alt=""
+                     style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.15);">
+                {% else %}
+                <div class="rp-ctrl-icon rp-ctrl-icon-primary">
+                    <i class="bi bi-image"></i>
                 </div>
-                {# Banner de progreso (visible solo cuando hay restore en curso o terminado) #}
-                <div id="restore-banner" class="alert mb-3 d-none" role="alert"></div>
-
-                <form id="restore-form" method="POST"
-                      action="{{ url_for('root.restore_db') }}"
-                      enctype="multipart/form-data"
-                      onsubmit="if(!confirm('⚠️ ATENCIÓN: Esta operación inyectará el SQL directamente en la base de datos. Los datos existentes pueden quedar sobreescritos.\n\n¿Estás seguro?')) return false; startRestorePolling();">
+                {% endif %}
+                <div class="flex-grow-1">
+                    <p class="rp-ctrl-title">Foto del Login</p>
+                    <p class="rp-ctrl-status {% if login_image_exists %}text-primary{% else %}text-muted{% endif %}">
+                        {% if login_image_exists %}Imagen activa{% else %}Mostrando ícono por defecto{% endif %}
+                    </p>
+                </div>
+                {% if login_image_exists %}
+                <form method="POST" action="{{ url_for('root.remove_login_image') }}"
+                      onsubmit="return confirm('¿Eliminar la imagen del login?')">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div class="input-group" style="max-width: 480px;">
-                        <input type="file"
-                               name="backup_file"
-                               accept=".sql"
-                               class="form-control"
-                               required>
-                        <button type="submit" class="btn btn-danger fw-bold px-4">
-                            <i class="bi bi-upload me-2"></i>Restaurar
-                        </button>
-                    </div>
-                    <div class="form-text text-danger mt-1">
-                        <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                        Solo archivos <code>.sql</code> generados por <em>Descargar Backup</em>.
-                    </div>
+                    <button type="submit" class="btn btn-outline-danger btn-sm flex-shrink-0" title="Eliminar">
+                        <i class="bi bi-trash3"></i>
+                    </button>
                 </form>
-
-                <script>
-                (function() {
-                    var pollTimer = null;
-
-                    function showBanner(cls, html, autohide) {
-                        var b = document.getElementById('restore-banner');
-                        b.className = 'alert alert-dismissible mb-3 ' + cls;
-                        b.innerHTML = html + '<button type="button" class="btn-close" onclick="this.parentElement.classList.add(\'d-none\')"></button>';
-                        b.classList.remove('d-none');
-                        if (autohide) { setTimeout(function(){ b.classList.add('d-none'); }, 6000); }
-                    }
-
-                    function poll() {
-                        fetch("{{ url_for('root.restore_status') }}")
-                            .then(function(r) { return r.json(); })
-                            .then(function(data) {
-                                if (data.status === 'running') {
-                                    showBanner('alert-warning', '<span class="spinner-border spinner-border-sm me-2"></span><strong>Restaurando base de datos...</strong> No cerrés la pestaña.');
-                                    pollTimer = setTimeout(poll, 1500);
-                                } else if (data.status === 'ok') {
-                                    clearTimeout(pollTimer);
-                                    showBanner('alert-success', '<i class="bi bi-check-circle-fill me-2"></i><strong>¡Restauración completada!</strong> La base de datos fue restaurada correctamente.', true);
-                                } else if (data.status === 'error') {
-                                    clearTimeout(pollTimer);
-                                    showBanner('alert-danger', '<i class="bi bi-x-circle-fill me-2"></i><strong>Error en la restauración:</strong> ' + (data.message || 'Error desconocido'));
-                                }
-                            })
-                            .catch(function() {
-                                pollTimer = setTimeout(poll, 3000);
-                            });
-                    }
-
-                    window.startRestorePolling = function() {
-                        showBanner('alert-warning', '<span class="spinner-border spinner-border-sm me-2"></span><strong>Enviando archivo...</strong>');
-                        pollTimer = setTimeout(poll, 500);
-                    };
-
-                    // Al cargar la página, verificar si hay un restore en curso
-                    fetch("{{ url_for('root.restore_status') }}")
-                        .then(function(r) { return r.json(); })
-                        .then(function(data) {
-                            if (data.status === 'running') {
-                                showBanner('alert-warning', '<span class="spinner-border spinner-border-sm me-2"></span><strong>Restaurando base de datos...</strong> Esto puede tardar varios minutos.');
-                                pollTimer = setTimeout(poll, 1500);
-                            } else if (data.status === 'ok') {
-                                showBanner('alert-success', '<i class="bi bi-check-circle-fill me-2"></i><strong>¡Restauración completada!</strong>', true);
-                            } else if (data.status === 'error') {
-                                showBanner('alert-danger', '<i class="bi bi-x-circle-fill me-2"></i><strong>La última restauración falló:</strong> ' + (data.message || ''));
-                            }
-                        });
-                })();
-                </script>
+                {% endif %}
             </div>
+            <form method="POST" action="{{ url_for('root.upload_login_image') }}"
+                  enctype="multipart/form-data" class="w-100">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="input-group input-group-sm">
+                    <input type="file" name="login_image"
+                           accept=".jpg,.jpeg,.png,.webp" class="form-control" required>
+                    <button type="submit" class="btn btn-primary btn-sm fw-semibold">
+                        <i class="bi bi-upload"></i>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
-</div>
 
-{# ══════════════════════════════════════════════════════════
-   FILA 1c: IMAGEN DEL LOGIN
-══════════════════════════════════════════════════════════ #}
-<div class="row g-3 mb-4">
+    {# ── Footer del Sitio ── #}
     <div class="col-12">
-        <div class="card border-0 shadow-sm border-start border-5 border-primary">
-            <div class="card-body d-flex flex-column flex-md-row align-items-md-start justify-content-between gap-3 py-4">
-                <div class="d-flex align-items-center gap-3">
-                    <i class="bi bi-image text-primary fs-1"></i>
-                    <div>
-                        <div class="fw-bold fs-5 text-dark">Foto del Login</div>
-                        <div class="text-muted small">
-                            Reemplaza el ícono de grilla por una foto cuadrada en el panel izquierdo.
-                            {% if login_image_exists %}
-                                <span class="badge bg-success ms-1">✅ Foto activa</span>
-                            {% else %}
-                                <span class="badge bg-secondary ms-1">Mostrando ícono por defecto</span>
-                            {% endif %}
+        <div class="rp-control-card rp-control-card-tall">
+            <div class="d-flex align-items-center gap-3 w-100 mb-3">
+                <div class="rp-ctrl-icon rp-ctrl-icon-neutral">
+                    <i class="bi bi-window-stack"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <p class="rp-ctrl-title">Footer del Sitio</p>
+                    <p class="rp-ctrl-status text-muted">Se muestra en la barra inferior de todas las páginas</p>
+                </div>
+            </div>
+            <form method="POST" action="{{ url_for('root.set_footer') }}" class="w-100">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="d-flex gap-2 flex-wrap align-items-center">
+                    <input type="text" name="footer_texto" class="form-control form-control-sm"
+                           placeholder="Texto principal (ej: Todos los derechos reservados)"
+                           value="{{ cfg.footer_texto or '' }}"
+                           style="min-width:200px;flex:1;">
+                    <input type="text" name="footer_contacto" class="form-control form-control-sm"
+                           placeholder="Contacto (ej: 011-1234-5678)"
+                           value="{{ cfg.footer_contacto or '' }}"
+                           style="min-width:180px;flex:1;">
+                    <button type="submit" class="btn btn-secondary btn-sm fw-semibold flex-shrink-0">
+                        <i class="bi bi-floppy2 me-1"></i>Guardar
+                    </button>
+                </div>
+                <div class="rp-footer-preview mt-3">
+                    <span>&copy; {{ now.year }} <strong>{{ cfg.app_name }}</strong>{% if cfg.footer_texto %} — {{ cfg.footer_texto }}{% endif %}</span>
+                    {% if cfg.footer_contacto %}<span>{{ cfg.footer_contacto }}</span>{% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+</div>{# /tab-sistema #}
+
+
+{# ══════════════════════════════════════════════════════
+   TAB: BASE DE DATOS
+══════════════════════════════════════════════════════ #}
+<div class="tab-pane fade" id="tab-db" role="tabpanel">
+    <div class="row g-4">
+
+        {# Backup #}
+        <div class="col-12 col-md-6">
+            <div class="card rp-card border-0 shadow-sm h-100">
+                <div class="card-body p-4 d-flex flex-column">
+                    <div class="d-flex align-items-center gap-3 mb-4">
+                        <div class="rp-db-icon" style="background:#f1f5f9;color:#334155;">
+                            <i class="bi bi-database-down fs-4"></i>
                         </div>
-                        {% if login_image_exists %}
-                        <div class="mt-2">
-                            <img src="{{ url_for('root.serve_login_image') }}"
-                                 alt="Preview login"
-                                 style="height: 110px; width: 200px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+                        <div>
+                            <p class="fw-bold mb-0">Backup</p>
+                            <p class="text-muted small mb-0">Descarga un <code>.sql</code> completo con toda la base.</p>
                         </div>
-                        {% endif %}
+                    </div>
+                    <div class="mt-auto">
+                        <a href="{{ url_for('root.backup_db') }}"
+                           id="btn-backup"
+                           class="btn btn-dark fw-semibold px-4"
+                           onclick="var b=this;b.innerHTML='<span class=\'spinner-border spinner-border-sm me-2\'></span>Generando...';b.classList.add('disabled');setTimeout(function(){b.innerHTML='<i class=\'bi bi-download me-2\'></i>Descargar Backup';b.classList.remove('disabled');},15000);">
+                            <i class="bi bi-download me-2"></i>Descargar Backup
+                        </a>
                     </div>
                 </div>
-                <div class="d-flex flex-column gap-2" style="min-width: 240px;">
-                    <form method="POST"
-                          action="{{ url_for('root.upload_login_image') }}"
-                          enctype="multipart/form-data">
+            </div>
+        </div>
+
+        {# Restore — zona de peligro #}
+        <div class="col-12 col-md-6">
+            <div class="card rp-card border-0 shadow-sm h-100 rp-danger-zone">
+                <div class="card-body p-4 d-flex flex-column">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="rp-db-icon" style="background:#fee2e2;color:#dc2626;">
+                            <i class="bi bi-database-up fs-4"></i>
+                        </div>
+                        <div>
+                            <p class="fw-bold mb-0">Restaurar Backup</p>
+                            <p class="small mb-0">
+                                <span class="text-danger fw-semibold">Operación destructiva.</span>
+                                <span class="text-muted"> Sobreescribe datos existentes.</span>
+                            </p>
+                        </div>
+                    </div>
+                    <div id="restore-banner" class="alert mb-3 d-none" role="alert"></div>
+                    <form id="restore-form" method="POST"
+                          action="{{ url_for('root.restore_db') }}"
+                          enctype="multipart/form-data"
+                          class="mt-auto"
+                          onsubmit="if(!confirm('⚠️ Esta operación inyectará el SQL en la base de datos.\nLos datos existentes serán sobreescritos.\n\n¿Estás seguro?')) return false; startRestorePolling();">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <label class="form-label small fw-bold text-uppercase text-muted mb-1">
-                            {% if login_image_exists %}Reemplazar imagen{% else %}Subir imagen{% endif %}
-                        </label>
                         <div class="input-group">
-                            <input type="file" name="login_image"
-                                   accept=".jpg,.jpeg,.png,.webp"
-                                   class="form-control form-control-sm" required>
-                            <button type="submit" class="btn btn-primary btn-sm fw-bold">
-                                <i class="bi bi-upload me-1"></i>Subir
+                            <input type="file" name="backup_file" accept=".sql" class="form-control" required>
+                            <button type="submit" class="btn btn-danger fw-semibold px-4">
+                                <i class="bi bi-upload me-1"></i>Restaurar
                             </button>
                         </div>
-                        <div class="form-text">JPG, PNG o WebP. Se muestra como cuadrado con esquinas redondeadas.</div>
+                        <p class="text-danger small mt-2 mb-0">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i>Solo archivos <code>.sql</code> generados por este sistema.
+                        </p>
                     </form>
-
-                    {% if login_image_exists %}
-                    <form method="POST"
-                          action="{{ url_for('root.remove_login_image') }}"
-                          onsubmit="return confirm('¿Eliminar la imagen del login?')">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="btn btn-outline-danger btn-sm fw-bold w-100">
-                            <i class="bi bi-trash3 me-1"></i>Eliminar imagen
-                        </button>
-                    </form>
-                    {% endif %}
                 </div>
             </div>
         </div>
-    </div>
-</div>
 
-{# ══════════════════════════════════════════════════════════
-   FILA 1d: COTIZACIÓN DÓLAR
-══════════════════════════════════════════════════════════ #}
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm border-start border-5 border-info">
-            <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 py-4">
-                <div class="d-flex align-items-center gap-3">
-                    <i class="bi bi-currency-dollar text-info fs-1"></i>
-                    <div>
-                        <div class="fw-bold fs-5 text-dark">Tipo de Dólar para Pagos</div>
-                        <div class="text-muted small">
-                            Cotización usada en los pagos parciales en USD.
-                            Actualmente: <strong class="text-info">
-                                {% if tipo_dolar == 'blue' %}Dólar Blue{% else %}Dólar MEP{% endif %}
-                            </strong>
-                        </div>
-                    </div>
+    </div>
+</div>{# /tab-db #}
+
+
+{# ══════════════════════════════════════════════════════
+   TAB: USUARIOS
+══════════════════════════════════════════════════════ #}
+<div class="tab-pane fade" id="tab-usuarios" role="tabpanel">
+    <div class="row g-4">
+
+        <div class="col-12 col-lg-8">
+            <div class="card rp-card border-0 shadow-sm h-100">
+                <div class="rp-card-header">
+                    <i class="bi bi-people-fill me-2"></i>Usuarios del sistema
                 </div>
-                <form method="POST" action="{{ url_for('root.set_tipo_dolar') }}" class="d-flex align-items-center gap-2">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div class="btn-group" role="group">
-                        <input type="radio" class="btn-check" name="tipo_dolar" id="opt_blue" value="blue"
-                               {% if tipo_dolar == 'blue' %}checked{% endif %} autocomplete="off">
-                        <label class="btn btn-outline-info fw-bold px-4" for="opt_blue">
-                            <i class="bi bi-droplet-fill me-1"></i>Blue
-                        </label>
-
-                        <input type="radio" class="btn-check" name="tipo_dolar" id="opt_mep" value="mep"
-                               {% if tipo_dolar == 'mep' %}checked{% endif %} autocomplete="off">
-                        <label class="btn btn-outline-info fw-bold px-4" for="opt_mep">
-                            <i class="bi bi-graph-up me-1"></i>MEP
-                        </label>
-                    </div>
-                    <button type="submit" class="btn btn-info fw-bold text-white px-4">
-                        <i class="bi bi-save me-1"></i>Guardar
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-{# ══════════════════════════════════════════════════════════
-   FILA 1e: FOOTER DEL SITIO
-══════════════════════════════════════════════════════════ #}
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm border-start border-5 border-secondary">
-            <div class="card-body py-4">
-                <div class="d-flex align-items-center gap-3 mb-3">
-                    <i class="bi bi-layout-text-window-reverse text-secondary fs-1"></i>
-                    <div>
-                        <div class="fw-bold fs-5 text-dark">Footer del sitio</div>
-                        <div class="text-muted small">
-                            Se muestra en la barra inferior de todas las páginas y en el login.
-                            El año y el nombre de la app se agregan automáticamente.
-                        </div>
-                    </div>
-                </div>
-                <form method="POST" action="{{ url_for('root.set_footer') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div class="row g-3">
-                        <div class="col-12 col-md-6">
-                            <label class="form-label small fw-bold text-uppercase text-muted">
-                                Texto principal
-                            </label>
-                            <input type="text" name="footer_texto"
-                                   class="form-control"
-                                   placeholder="Ej: Todos los derechos reservados"
-                                   value="{{ cfg.footer_texto or '' }}">
-                            <div class="form-text">
-                                Aparece junto al año y nombre: <em>&copy; 2025 Dr. Piscinas — [texto]</em>
-                            </div>
-                        </div>
-                        <div class="col-12 col-md-6">
-                            <label class="form-label small fw-bold text-uppercase text-muted">
-                                Contacto / texto secundario
-                            </label>
-                            <input type="text" name="footer_contacto"
-                                   class="form-control"
-                                   placeholder="Ej: Tel: 011-1234-5678 | info@drpiscinas.com"
-                                   value="{{ cfg.footer_contacto or '' }}">
-                            <div class="form-text">
-                                Se muestra alineado a la derecha del footer.
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-3">
-                        <button type="submit" class="btn btn-secondary fw-bold">
-                            <i class="bi bi-save me-1"></i>Guardar footer
-                        </button>
-                    </div>
-                </form>
-
-                {# Preview #}
-                <div class="mt-3 rounded p-2 px-3 d-flex justify-content-between align-items-center flex-wrap gap-1"
-                     style="background:#212529; font-size:0.78rem; color:#6c757d;">
-                    <span>
-                        &copy; <span id="prev-year">{{ now.year }}</span>
-                        <strong style="color:#adb5bd;">{{ cfg.app_name }}</strong>
-                        {% if cfg.footer_texto %}&mdash; {{ cfg.footer_texto }}{% endif %}
-                    </span>
-                    {% if cfg.footer_contacto %}
-                    <span>{{ cfg.footer_contacto }}</span>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-{# ══════════════════════════════════════════════════════════
-   FILA 1f: WHATSAPP NOTIFICACIÓN DE ERRORES
-══════════════════════════════════════════════════════════ #}
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm border-start border-5 border-success">
-            <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4 py-4">
-                <div class="d-flex align-items-center gap-3">
-                    <i class="bi bi-whatsapp text-success fs-2"></i>
-                    <div>
-                        <div class="fw-bold fs-6 text-dark">WhatsApp para notificar errores</div>
-                        <div class="text-muted small">Los usuarios verán un botón en la pantalla de error para avisarte.</div>
-                        {% if cfg.wa_numero_error %}
-                        <div class="text-success small fw-bold mt-1">
-                            <i class="bi bi-check-circle-fill me-1"></i>549{{ cfg.wa_numero_error }}
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-                <form method="POST" action="{{ url_for('root.set_wa_error') }}" class="d-flex align-items-center gap-2 flex-shrink-0">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="text" name="wa_nombre_error"
-                           class="form-control"
-                           placeholder="Nombre (ej: Tomi)"
-                           value="{{ cfg.wa_nombre_error or '' }}"
-                           style="width: 130px;">
-                    <div class="input-group" style="width: 220px;">
-                        <span class="input-group-text text-muted fw-bold">+54 9</span>
-                        <input type="text" name="wa_numero_error"
-                               class="form-control"
-                               placeholder="11 2345 6789"
-                               value="{{ cfg.wa_numero_error or '' }}"
-                               maxlength="12">
-                    </div>
-                    <button type="submit" class="btn btn-success fw-bold px-3">
-                        <i class="bi bi-floppy"></i>
-                    </button>
-                    {% if cfg.wa_numero_error %}
-                    <a href="whatsapp://send?phone=549{{ cfg.wa_numero_error }}" class="btn btn-outline-success px-3" title="Probar">
-                        <i class="bi bi-box-arrow-up-right"></i>
-                    </a>
-                    {% endif %}
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-{# ══════════════════════════════════════════════════════════
-   FILA STOCK
-══════════════════════════════════════════════════════════ #}
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm border-start border-5 border-warning">
-            <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 py-4">
-                <div class="d-flex align-items-center gap-3">
-                    <i class="bi bi-boxes text-warning fs-2"></i>
-                    <div>
-                        <div class="fw-bold fs-6 text-dark">Control de Stock</div>
-                        {% if config_stock_activo_desde %}
-                        <div class="text-success small fw-bold mt-1">
-                            <i class="bi bi-check-circle-fill me-1"></i>Activo desde {{ config_stock_activo_desde }}
-                        </div>
-                        {% else %}
-                        <div class="text-muted small mt-1">Aún no activado oficialmente. Las visitas ya descuentan stock, pero este botón marca la fecha de inicio real.</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <form method="POST" action="{{ url_for('root.activar_stock') }}"
-                      onsubmit="return confirm('¿Marcar HOY como fecha de inicio oficial del stock?')">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-warning fw-bold px-4">
-                        <i class="bi bi-play-circle-fill me-2"></i>Aplicar stock a partir de hoy
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-{# ══════════════════════════════════════════════════════════
-   FILA 2: KPIs DEL SISTEMA
-══════════════════════════════════════════════════════════ #}
-<div class="row g-3 mb-4">
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm text-center py-3">
-            <div class="text-muted small text-uppercase fw-bold mb-1">Clientes Activos</div>
-            <div class="fs-2 fw-bold text-success">{{ total_clientes }}</div>
-        </div>
-    </div>
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm text-center py-3">
-            <div class="text-muted small text-uppercase fw-bold mb-1">Clientes Inactivos</div>
-            <div class="fs-2 fw-bold text-secondary">{{ total_inactivos }}</div>
-        </div>
-    </div>
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm text-center py-3">
-            <div class="text-muted small text-uppercase fw-bold mb-1">Usuarios</div>
-            <div class="fs-2 fw-bold text-info">{{ total_usuarios }}</div>
-        </div>
-    </div>
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm text-center py-3">
-            <div class="text-muted small text-uppercase fw-bold mb-1">Admins</div>
-            <div class="fs-2 fw-bold text-primary">{{ total_admins }}</div>
-        </div>
-    </div>
-</div>
-
-{# ══════════════════════════════════════════════════════════
-   FILA 3: USUARIOS + CREAR USUARIO
-══════════════════════════════════════════════════════════ #}
-<div class="row g-3 mb-4">
-
-    {# Tabla de usuarios #}
-    <div class="col-12 col-lg-8">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="bi bi-people-fill me-2"></i>Usuarios del sistema</h5>
-            </div>
-            <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="ps-3">Usuario</th>
+                        <thead>
+                            <tr class="rp-thead">
+                                <th class="ps-4">Usuario</th>
                                 <th class="text-center">Rol</th>
-                                <th class="text-center">Cambiar Rol</th>
-                                <th class="text-center">Reset Clave</th>
-                                <th class="text-center pe-3">Eliminar</th>
+                                <th class="text-center">Cambiar rol</th>
+                                <th class="text-center">Contraseña</th>
+                                <th class="text-center pe-4"></th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for u in usuarios %}
                             <tr>
-                                <td class="ps-3 fw-bold">
-                                    <i class="bi bi-person-circle me-1 text-muted"></i>{{ u.username }}
+                                <td class="ps-4">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="rp-user-avatar">{{ u.username[0].upper() }}</div>
+                                        <span class="fw-semibold text-dark">{{ u.username }}</span>
+                                    </div>
                                 </td>
                                 <td class="text-center">
                                     {% if u.rol == 'admin' %}
-                                        <span class="badge bg-primary">Admin</span>
+                                    <span class="rp-badge-primary">Admin</span>
                                     {% else %}
-                                        <span class="badge bg-secondary">Empleado</span>
+                                    <span class="rp-badge-neutral">Empleado</span>
                                     {% endif %}
                                 </td>
                                 <td class="text-center">
                                     <form method="POST" action="{{ url_for('root.toggle_rol', id=u.id) }}"
                                           onsubmit="return confirm('¿Cambiar rol de {{ u.username }}?')">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <button type="submit" class="btn btn-sm
-                                            {% if u.rol == 'admin' %}btn-outline-secondary{% else %}btn-outline-primary{% endif %}">
+                                        <button type="submit" class="btn btn-sm {% if u.rol == 'admin' %}btn-outline-secondary{% else %}btn-outline-primary{% endif %} fw-semibold">
                                             {% if u.rol == 'admin' %}→ Empleado{% else %}→ Admin{% endif %}
                                         </button>
                                     </form>
                                 </td>
                                 <td class="text-center">
-                                    <button type="button" class="btn btn-sm btn-outline-warning"
+                                    <button type="button" class="btn btn-sm btn-outline-warning fw-semibold"
                                             data-bs-toggle="modal" data-bs-target="#modalReset{{ u.id }}">
-                                        <i class="bi bi-key-fill"></i>
+                                        <i class="bi bi-key me-1"></i>Reset
                                     </button>
                                 </td>
-                                <td class="text-center pe-3">
+                                <td class="text-center pe-4">
                                     <form method="POST" action="{{ url_for('root.eliminar_usuario', id=u.id) }}"
-                                          onsubmit="return confirm('¿Eliminar definitivamente a {{ u.username }}?')">
+                                          onsubmit="return confirm('¿Eliminar a {{ u.username }}?')">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn btn-sm btn-outline-danger">
-                                            <i class="bi bi-trash3-fill"></i>
+                                            <i class="bi bi-trash3"></i>
                                         </button>
                                     </form>
                                 </td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="5" class="text-center text-muted py-4 fst-italic">No hay usuarios creados.</td></tr>
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-5 fst-italic">
+                                    <i class="bi bi-people d-block fs-3 mb-2 opacity-25"></i>
+                                    No hay usuarios creados.
+                                </td>
+                            </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
-    </div>
 
-    {# Crear usuario #}
-    <div class="col-12 col-lg-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="bi bi-person-plus-fill me-2"></i>Nuevo Usuario</h5>
-            </div>
-            <div class="card-body">
-                <form method="POST" action="{{ url_for('root.crear_usuario') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-uppercase text-muted">Usuario</label>
-                        <input type="text" name="username" class="form-control" required placeholder="nombre_usuario">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-uppercase text-muted">Contraseña</label>
-                        <input type="password" name="password" class="form-control" required placeholder="••••••••">
-                    </div>
-                    <div class="mb-4">
-                        <label class="form-label small fw-bold text-uppercase text-muted">Rol</label>
-                        <select name="rol" class="form-select">
-                            <option value="empleado">Empleado</option>
-                            <option value="admin">Administrador</option>
-                        </select>
-                    </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-dark fw-bold">
-                            <i class="bi bi-plus-circle me-1"></i>Crear usuario
+        <div class="col-12 col-lg-4">
+            <div class="card rp-card border-0 shadow-sm h-100">
+                <div class="rp-card-header">
+                    <i class="bi bi-person-plus me-2"></i>Nuevo Usuario
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" action="{{ url_for('root.crear_usuario') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label class="rp-form-label">Usuario</label>
+                            <input type="text" name="username" class="form-control" required placeholder="nombre_usuario">
+                        </div>
+                        <div class="mb-3">
+                            <label class="rp-form-label">Contraseña</label>
+                            <input type="password" name="password" class="form-control" required placeholder="••••••••">
+                        </div>
+                        <div class="mb-4">
+                            <label class="rp-form-label">Rol</label>
+                            <select name="rol" class="form-select">
+                                <option value="empleado">Empleado</option>
+                                <option value="admin">Administrador</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-dark fw-semibold w-100">
+                            <i class="bi bi-plus-lg me-1"></i>Crear usuario
                         </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-</div>
-
-{# ══════════════════════════════════════════════════════════
-   FILA 4: LOG DE AUDITORÍA DB
-══════════════════════════════════════════════════════════ #}
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm border-start border-5 border-dark">
-            <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 py-3">
-                <div class="d-flex align-items-center gap-3">
-                    <i class="bi bi-journal-check fs-2 text-dark"></i>
-                    <div>
-                        <div class="fw-bold fs-6 text-dark">Auditoría del Sistema</div>
-                        <div class="text-muted small">Historial completo de acciones — todos los usuarios incluido root</div>
-                    </div>
+                    </form>
                 </div>
-                <a href="{{ url_for('dashboard.auditoria') }}" class="btn btn-dark fw-bold px-4">
-                    <i class="bi bi-shield-check me-2"></i>Ver Auditoría
-                </a>
             </div>
         </div>
+
     </div>
-</div>
+</div>{# /tab-usuarios #}
 
-{# ══════════════════════════════════════════════════════════
-   FILA 5: HISTORIAL DE AUMENTOS + LOG TXT
-══════════════════════════════════════════════════════════ #}
-<div class="row g-3">
 
-    {# Historial de aumentos (DB) #}
-    <div class="col-12 col-lg-6">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="bi bi-graph-up-arrow me-2"></i>Historial de Aumentos</h5>
-            </div>
-            <div class="card-body p-0" style="max-height: 380px; overflow-y: auto;">
-                <table class="table table-hover align-middle small mb-0">
-                    <thead class="table-light sticky-top">
-                        <tr>
-                            <th class="ps-3">Fecha</th>
-                            <th>Descripción</th>
-                            <th class="text-center">Desde</th>
-                            <th class="text-center pe-3">Casas</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for a in ultimos_aumentos %}
-                        <tr>
-                            <td class="ps-3 text-muted font-monospace" style="white-space:nowrap;">
-                                {{ a.fecha.strftime('%d/%m %H:%M') }}
-                            </td>
-                            <td class="fw-bold">{{ a.descripcion }}</td>
-                            <td class="text-center">
-                                {% if a.mes_desde and a.anio_desde %}
-                                    <span class="badge bg-primary">{{ a.mes_desde }}/{{ a.anio_desde }}</span>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-center pe-3 font-monospace">{{ a.casas_afectadas }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="4" class="text-center text-muted py-4 fst-italic">Sin registros.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+{# ══════════════════════════════════════════════════════
+   TAB: LOGS
+══════════════════════════════════════════════════════ #}
+<div class="tab-pane fade" id="tab-logs" role="tabpanel">
+    <div class="row g-4">
 
-    {# Log de aumentos (txt) #}
-    <div class="col-12 col-lg-6">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-dark text-white py-3 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 fw-bold"><i class="bi bi-file-text me-2"></i>Log de Auditoría (txt)</h5>
-                {% if lineas_log %}
-                <form method="POST" action="{{ url_for('root.limpiar_log') }}"
-                      onsubmit="return confirm('¿Limpiar el log de auditoría? Esta acción no se puede deshacer.')">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-sm btn-outline-light">
-                        <i class="bi bi-trash3 me-1"></i>Limpiar
-                    </button>
-                </form>
-                {% endif %}
-            </div>
-            <div class="card-body p-0" style="max-height: 380px; overflow-y: auto;">
-                {% if lineas_log %}
-                <table class="table table-hover align-middle small mb-0 font-monospace">
-                    <thead class="table-light sticky-top">
-                        <tr>
-                            <th class="ps-3">Cliente</th>
-                            <th class="text-end">Precio Ant.</th>
-                            <th class="text-end">Aumento</th>
-                            <th class="text-end">Precio Nuevo</th>
-                            <th class="text-end pe-3">Desde</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for linea in lineas_log %}
-                        {% set partes = linea.split(' | ') %}
-                        {% if partes | length == 5 %}
-                        <tr>
-                            <td class="ps-3 fw-bold text-dark">{{ partes[0] }}</td>
-                            <td class="text-end text-muted">${{ partes[1] }}</td>
-                            <td class="text-end text-success fw-bold">+${{ partes[2] }}</td>
-                            <td class="text-end text-dark">${{ partes[3] }}</td>
-                            <td class="text-end pe-3 text-primary">{{ partes[4] }}</td>
-                        </tr>
-                        {% endif %}
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <div class="text-center text-muted fst-italic py-5">
-                    <i class="bi bi-file-earmark-x fs-2 d-block mb-2 opacity-50"></i>
-                    Sin registros en el log.
+        <div class="col-12 col-lg-6">
+            <div class="card rp-card border-0 shadow-sm h-100">
+                <div class="rp-card-header">
+                    <i class="bi bi-graph-up-arrow me-2"></i>Historial de Aumentos
                 </div>
-                {% endif %}
+                <div class="card-body p-0" style="max-height:420px;overflow-y:auto;">
+                    <table class="table table-hover align-middle small mb-0">
+                        <thead class="rp-thead sticky-top">
+                            <tr>
+                                <th class="ps-4">Fecha</th>
+                                <th>Descripción</th>
+                                <th class="text-center">Desde</th>
+                                <th class="text-center pe-4">Casas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for a in ultimos_aumentos %}
+                            <tr>
+                                <td class="ps-4 text-muted font-monospace" style="white-space:nowrap;">
+                                    {{ a.fecha.strftime('%d/%m %H:%M') }}
+                                </td>
+                                <td class="fw-semibold">{{ a.descripcion }}</td>
+                                <td class="text-center">
+                                    {% if a.mes_desde and a.anio_desde %}
+                                    <span class="rp-badge-primary">{{ a.mes_desde }}/{{ a.anio_desde }}</span>
+                                    {% else %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center pe-4 font-monospace fw-semibold">{{ a.casas_afectadas }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-5 fst-italic">
+                                    <i class="bi bi-graph-up d-block fs-3 mb-2 opacity-25"></i>
+                                    Sin registros.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
+
+        <div class="col-12 col-lg-6">
+            <div class="card rp-card border-0 shadow-sm h-100">
+                <div class="rp-card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-file-text me-2"></i>Log de Auditoría</span>
+                    {% if lineas_log %}
+                    <form method="POST" action="{{ url_for('root.limpiar_log') }}"
+                          onsubmit="return confirm('¿Limpiar el log? No se puede deshacer.')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash3 me-1"></i>Limpiar
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+                <div class="card-body p-0" style="max-height:420px;overflow-y:auto;">
+                    {% if lineas_log %}
+                    <table class="table table-hover align-middle small mb-0 font-monospace">
+                        <thead class="rp-thead sticky-top">
+                            <tr>
+                                <th class="ps-4">Cliente</th>
+                                <th class="text-end">Anterior</th>
+                                <th class="text-end">+</th>
+                                <th class="text-end">Nuevo</th>
+                                <th class="text-end pe-4">Desde</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for linea in lineas_log %}
+                            {% set p = linea.split(' | ') %}
+                            {% if p | length == 5 %}
+                            <tr>
+                                <td class="ps-4 fw-semibold text-dark">{{ p[0] }}</td>
+                                <td class="text-end text-muted">${{ p[1] }}</td>
+                                <td class="text-end text-success fw-bold">+${{ p[2] }}</td>
+                                <td class="text-end text-dark">${{ p[3] }}</td>
+                                <td class="text-end pe-4 text-primary">{{ p[4] }}</td>
+                            </tr>
+                            {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="text-center py-5 text-muted fst-italic">
+                        <i class="bi bi-file-earmark-x d-block fs-3 mb-2 opacity-25"></i>
+                        Sin registros en el log.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
     </div>
+</div>{# /tab-logs #}
 
-</div>
+</div>{# /tab-content #}
 
-{# ── Modales de reset de contraseña ──────────────────────────────────────── #}
+
+{# ── Modales reset contraseña ──────────────────────── #}
 {% for u in usuarios %}
 <div class="modal fade" id="modalReset{{ u.id }}" tabindex="-1">
     <div class="modal-dialog modal-sm">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-dark text-white border-0">
-                <h5 class="modal-title fw-bold">
-                    <i class="bi bi-key-fill me-2"></i>Reset: {{ u.username }}
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <div class="modal-content border-0 shadow-lg" style="border-radius:12px;">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title fw-bold">
+                    <i class="bi bi-key me-2 text-warning"></i>Reset contraseña
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="{{ url_for('root.reset_password', id=u.id) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body">
-                    <label class="form-label small fw-bold text-uppercase text-muted">Nueva contraseña</label>
+                    <p class="text-muted small mb-3">Usuario: <strong>{{ u.username }}</strong></p>
+                    <label class="rp-form-label">Nueva contraseña</label>
                     <input type="password" name="nueva_password" class="form-control" required
                            placeholder="Nueva clave" autofocus>
                 </div>
                 <div class="modal-footer border-0 pt-0">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-warning btn-sm fw-bold">
-                        <i class="bi bi-check-lg me-1"></i>Guardar
+                    <button type="submit" class="btn btn-warning btn-sm fw-semibold">
+                        <i class="bi bi-check me-1"></i>Guardar
                     </button>
                 </div>
             </form>
@@ -755,23 +693,381 @@
 </div>
 {% endfor %}
 
-<div class="row g-3 mb-4 mt-2">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm border-start border-5 border-info">
-            <div class="card-body d-flex align-items-center justify-content-between gap-3 py-3">
-                <div class="d-flex align-items-center gap-3">
-                    <i class="bi bi-percent fs-2 text-info"></i>
-                    <div>
-                        <div class="fw-bold fs-6 text-dark">Cobro Proporcional</div>
-                        <div class="text-muted small">Configurar desde qué mes aplica el sistema de cobro proporcional al alta de clientes.</div>
-                    </div>
-                </div>
-                <a href="{{ url_for('config.config_proporcional') }}" class="btn btn-info text-white fw-bold">
-                    <i class="bi bi-gear me-1"></i> Configurar
-                </a>
-            </div>
-        </div>
-    </div>
-</div>
+
+{# ══════════════════════════════════════════════════════
+   STYLES
+══════════════════════════════════════════════════════ #}
+<style>
+/* ── Layout ── */
+.rp-header { padding-bottom: .25rem; }
+
+/* ── Avatar + title ── */
+.rp-avatar {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg,#1e293b,#374151);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.rp-avatar i { color: #f87171; font-size: 1.2rem; }
+.rp-title {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -.03em;
+}
+.rp-sub { font-size: .75rem; color: #94a3b8; }
+
+/* ── Status badge ── */
+.rp-status-badge {
+    display: flex; align-items: center; gap: 7px;
+    padding: .35rem .85rem;
+    border-radius: 999px;
+    font-size: .75rem;
+    font-weight: 600;
+}
+.rp-status-ok    { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
+.rp-status-warning { background:#fefce8; color:#a16207; border:1px solid #fde68a; }
+.rp-pulse {
+    width: 7px; height: 7px; border-radius: 50%; display: inline-block;
+    animation: rp-pulse-anim 2s ease-in-out infinite;
+}
+@keyframes rp-pulse-anim {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:.5; transform:scale(.75); }
+}
+
+/* ── KPI cards ── */
+.rp-kpi-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    border: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: box-shadow .15s, transform .15s;
+}
+.rp-kpi-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); transform: translateY(-1px); }
+.rp-kpi-icon {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+}
+.rp-kpi-label {
+    font-size: .65rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-weight: 700;
+    color: #94a3b8;
+    margin-bottom: .2rem;
+}
+.rp-kpi-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1;
+    color: #0f172a;
+    margin-bottom: .15rem;
+}
+.rp-kpi-sub { font-size: .7rem; margin-bottom: 0; }
+
+/* ── Quick links ── */
+.rp-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: .35rem .9rem;
+    border-radius: 999px;
+    font-size: .78rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all .15s;
+}
+.rp-pill-dark { background:#0f172a; color:#fff; }
+.rp-pill-dark:hover { background:#1e293b; color:#fff; }
+.rp-pill-outline { background:#fff; color:#475569; border:1px solid #cbd5e1; }
+.rp-pill-outline:hover { background:#f8fafc; color:#0f172a; border-color:#94a3b8; }
+
+/* ── Tabs ── */
+.rp-tabs { border-bottom: 2px solid #e2e8f0; gap: .25rem; }
+.rp-tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    padding: .6rem 1.1rem;
+    font-size: .82rem;
+    font-weight: 600;
+    color: #64748b;
+    transition: color .15s, border-color .15s;
+    border-radius: 0;
+    cursor: pointer;
+}
+.rp-tab:hover { color: #0f172a; }
+.rp-tab.active { color: #0f172a; border-bottom-color: #0f172a; }
+.rp-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #e2e8f0;
+    color: #475569;
+    border-radius: 999px;
+    font-size: .65rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    margin-left: 5px;
+}
+.rp-tab-content {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,.05);
+    margin-bottom: 2rem;
+}
+
+/* ── Section label ── */
+.rp-section-label {
+    font-size: .65rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    font-weight: 700;
+    color: #94a3b8;
+    margin-bottom: .75rem;
+}
+
+/* ── Control cards ── */
+.rp-control-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: .9rem 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    transition: box-shadow .15s;
+}
+.rp-control-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,.08); }
+.rp-control-warning { border-color: #fde68a; background: #fefce8; }
+.rp-control-primary  { border-color: #bfdbfe; background: #eff6ff; }
+.rp-control-success  { border-color: #bbf7d0; background: #f0fdf4; }
+
+.rp-ctrl-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+.rp-ctrl-icon-success { background:#dcfce7; color:#16a34a; }
+.rp-ctrl-icon-warning { background:#fef3c7; color:#d97706; }
+.rp-ctrl-icon-primary { background:#dbeafe; color:#2563eb; }
+.rp-ctrl-icon-neutral { background:#f1f5f9; color:#64748b; }
+.rp-ctrl-icon-info    { background:#e0f2fe; color:#0284c7; }
+.rp-control-card-tall { flex-wrap: wrap; align-items: flex-start; }
+.rp-ctrl-title  { font-size:.82rem; font-weight:700; color:#0f172a; margin-bottom:.1rem; }
+.rp-ctrl-status { font-size:.72rem; font-weight:600; margin-bottom:0; }
+
+/* ── Config section ── */
+.rp-card { border-radius: 10px !important; }
+.rp-cfg-icon { font-size: 1.15rem; }
+.rp-cfg-title { font-size: .88rem; font-weight: 700; color: #0f172a; }
+.rp-footer-preview {
+    background: #1a1d21;
+    border-radius: 6px;
+    padding: .5rem .85rem;
+    font-size: .72rem;
+    color: #6c757d;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .25rem;
+}
+.rp-login-thumb {
+    width: 72px; height: 72px;
+    object-fit: cover;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+
+/* ── DB section ── */
+.rp-db-icon {
+    width: 52px; height: 52px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.rp-danger-zone { border-left: 3px solid #dc2626 !important; }
+
+/* ── Card headers ── */
+.rp-card-header {
+    padding: .85rem 1.5rem;
+    font-size: .82rem;
+    font-weight: 700;
+    color: #fff;
+    background: #1e293b;
+    border-radius: 10px 10px 0 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+.rp-card-header.d-flex { justify-content: space-between; }
+
+/* ── Table ── */
+.rp-thead th {
+    background: #f8fafc !important;
+    color: #64748b !important;
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    font-weight: 700;
+    border-color: #e2e8f0;
+    padding-top: .75rem;
+    padding-bottom: .75rem;
+}
+
+/* ── User avatar ── */
+.rp-user-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    color: #475569;
+    font-size: .72rem;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+
+/* ── Badges ── */
+.rp-badge-primary {
+    display: inline-block;
+    padding: .2rem .6rem;
+    border-radius: 999px;
+    font-size: .68rem;
+    font-weight: 700;
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+}
+.rp-badge-neutral {
+    display: inline-block;
+    padding: .2rem .6rem;
+    border-radius: 999px;
+    font-size: .68rem;
+    font-weight: 700;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+.rp-badge-success {
+    display: inline-block;
+    padding: .2rem .6rem;
+    border-radius: 999px;
+    font-size: .68rem;
+    font-weight: 700;
+    background: #f0fdf4;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+}
+.rp-badge-info {
+    display: inline-block;
+    padding: .2rem .6rem;
+    border-radius: 999px;
+    font-size: .68rem;
+    font-weight: 700;
+    background: #eff6ff;
+    color: #0284c7;
+    border: 1px solid #bae6fd;
+}
+
+/* ── Form label ── */
+.rp-form-label {
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 700;
+    color: #94a3b8;
+    margin-bottom: .4rem;
+    display: block;
+}
+
+/* ── Responsive ── */
+@media (max-width:575px) {
+    .rp-kpi-value { font-size: 1.4rem; }
+    .rp-tab { padding: .5rem .7rem; font-size: .75rem; }
+    .rp-tab-content { padding: 1rem; }
+    .rp-title { font-size: 1.15rem; }
+}
+</style>
+
+
+{# ══════════════════════════════════════════════════════
+   SCRIPTS
+══════════════════════════════════════════════════════ #}
+<script>
+// Toggle switches with confirm
+document.querySelectorAll('.rp-switch').forEach(function(sw) {
+    sw.addEventListener('change', function() {
+        var msg = this.checked ? this.dataset.confirmOn : this.dataset.confirmOff;
+        if (!confirm(msg)) {
+            this.checked = !this.checked;
+            return;
+        }
+        document.getElementById(this.dataset.form).submit();
+    });
+});
+
+// Restore polling
+(function() {
+    var pollTimer = null;
+    function showBanner(cls, html, autohide) {
+        var b = document.getElementById('restore-banner');
+        if (!b) return;
+        b.className = 'alert alert-dismissible mb-3 ' + cls;
+        b.innerHTML = html + '<button type="button" class="btn-close" onclick="this.parentElement.classList.add(\'d-none\')"></button>';
+        b.classList.remove('d-none');
+        if (autohide) setTimeout(function(){ b.classList.add('d-none'); }, 6000);
+    }
+    function poll() {
+        fetch("{{ url_for('root.restore_status') }}")
+            .then(function(r){ return r.json(); })
+            .then(function(d) {
+                if (d.status === 'running') {
+                    showBanner('alert-warning', '<span class="spinner-border spinner-border-sm me-2"></span><strong>Restaurando...</strong> No cerrés la pestaña.');
+                    pollTimer = setTimeout(poll, 1500);
+                } else if (d.status === 'ok') {
+                    clearTimeout(pollTimer);
+                    showBanner('alert-success', '<i class="bi bi-check-circle-fill me-2"></i><strong>Restauración completada.</strong>', true);
+                } else if (d.status === 'error') {
+                    clearTimeout(pollTimer);
+                    showBanner('alert-danger', '<i class="bi bi-x-circle-fill me-2"></i><strong>Error:</strong> ' + (d.message || 'Error desconocido'));
+                }
+            })
+            .catch(function(){ pollTimer = setTimeout(poll, 3000); });
+    }
+    window.startRestorePolling = function() {
+        showBanner('alert-warning', '<span class="spinner-border spinner-border-sm me-2"></span><strong>Enviando archivo...</strong>');
+        pollTimer = setTimeout(poll, 500);
+    };
+    fetch("{{ url_for('root.restore_status') }}")
+        .then(function(r){ return r.json(); })
+        .then(function(d) {
+            if (d.status === 'running') {
+                showBanner('alert-warning', '<span class="spinner-border spinner-border-sm me-2"></span><strong>Restaurando...</strong>');
+                pollTimer = setTimeout(poll, 1500);
+            } else if (d.status === 'ok') {
+                showBanner('alert-success', '<i class="bi bi-check-circle-fill me-2"></i><strong>Restauración completada.</strong>', true);
+            } else if (d.status === 'error') {
+                showBanner('alert-danger', '<i class="bi bi-x-circle-fill me-2"></i><strong>Última restauración falló:</strong> ' + (d.message || ''));
+            }
+        });
+})();
+</script>
 
 {% endblock %}

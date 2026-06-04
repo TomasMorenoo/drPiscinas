@@ -293,8 +293,14 @@ def _casa_pausada_en_mes(casa, mes, anio, extras=0.0):
     mes_actual = (anio, mes)
     for p in getattr(casa, 'historial_pausas', []):
         inicio = (p.desde.year, p.desde.month)
-        fin = (p.hasta.year, p.hasta.month) if p.hasta else None
-        if inicio <= mes_actual and (fin is None or fin >= mes_actual):
+        if p.hasta:
+            fin = (p.hasta.year, p.hasta.month)
+            # día > 1 = reactivación a mitad de mes → ese mes NO está pausado
+            # día == 1 = semántica antigua: pausado durante ese mes completo
+            cond_fin = fin >= mes_actual if p.hasta.day == 1 else fin > mes_actual
+        else:
+            cond_fin = True
+        if inicio <= mes_actual and cond_fin:
             return True
     return False
 
@@ -453,6 +459,9 @@ def index():
         ).with_entities(AbonoHistorico.casa_id, AbonoHistorico.transaccion_id).all()
         _cascade_txns = {(r.casa_id, r.transaccion_id) for r in _cascade_rows}
 
+    from app.models.configuracion import Configuracion
+    _prop_cfg = Configuracion.get('proporcional_desde')
+
     casas = []
     _cache_datos = {}
     for c in casas_raw:
@@ -494,26 +503,31 @@ def index():
 
         pausado_mes = _casa_pausada_en_mes(casa, mes, anio, extras)
         _fref_disp = None
-        if casa.fecha_reactivacion and proporcional_aplica(casa.fecha_reactivacion):
-            _fref_disp = casa.fecha_reactivacion
-        elif casa.fecha_creacion and proporcional_aplica(casa.fecha_creacion):
-            _fref_disp = casa.fecha_creacion
+        _has_pendiente = casa.proporcional_pendiente is not None and float(casa.proporcional_pendiente) > 0
+        if casa.fecha_reactivacion:
+            _fr = casa.fecha_reactivacion
+            if proporcional_aplica(_fr, _prop_cfg) or (_has_pendiente and _fr.month == mes and _fr.year == anio):
+                _fref_disp = _fr
+        if _fref_disp is None and casa.fecha_creacion:
+            _fc = casa.fecha_creacion
+            if proporcional_aplica(_fc, _prop_cfg) or (_has_pendiente and _fc.month == mes and _fc.year == anio):
+                _fref_disp = _fc
         _es_mes_alta_disp = bool(_fref_disp and _fref_disp.month == mes and _fref_disp.year == anio)
         if pausado_mes:
             abono_mes = 0.0
         elif _es_mes_alta_disp:
-            if _fref_disp.day <= 14:
-                if casa.proporcional_pendiente is not None:
-                    abono_mes = float(casa.proporcional_pendiente)
-                else:
-                    _dia = _fref_disp.day
-                    _sem = 1 if _dia <= 7 else 2
-                    _dias = [int(d) for d in (casa.dia_visita or '').split(',') if d.strip().isdigit()]
-                    if _dias and max(_dias) < _fref_disp.weekday():
-                        _sem += 1
-                    abono_mes = round(float(casa.precio_base or 0) / 4 * max(0, 5 - _sem), 2)
+            if casa.proporcional_pendiente is not None:
+                abono_mes = float(casa.proporcional_pendiente)
             else:
-                abono_mes = 0.0
+                _dia = _fref_disp.day
+                if _dia <= 7: _sem = 1
+                elif _dia <= 14: _sem = 2
+                elif _dia <= 21: _sem = 3
+                else: _sem = 4
+                _dias = [int(d) for d in (casa.dia_visita or '').split(',') if d.strip().isdigit()]
+                if _dias and max(_dias) < _fref_disp.weekday():
+                    _sem += 1
+                abono_mes = round(float(casa.precio_base or 0) / 4 * max(0, 5 - _sem), 2)
         elif historial:
             _prop_hist = float(getattr(historial, 'proporcional_anterior', 0) or 0)
             abono_mes = float(historial.monto) - _prop_hist
@@ -523,9 +537,9 @@ def index():
         # Calcular proporcional_preview antes de saldo_restante
         _prop_preview = 0.0
         _fref_prop = None
-        if casa.fecha_reactivacion and proporcional_aplica(casa.fecha_reactivacion):
+        if casa.fecha_reactivacion and proporcional_aplica(casa.fecha_reactivacion, _prop_cfg):
             _fref_prop = casa.fecha_reactivacion
-        elif casa.fecha_creacion and proporcional_aplica(casa.fecha_creacion):
+        elif casa.fecha_creacion and proporcional_aplica(casa.fecha_creacion, _prop_cfg):
             _fref_prop = casa.fecha_creacion
         if _fref_prop:
             _nm = _fref_prop.month % 12 + 1
@@ -963,6 +977,9 @@ def sync_abonos():
     ).all()
     hist_sync_dict = {h.casa_id: h for h in AbonoHistorico.query.filter_by(mes=mes, anio=anio).all()}
 
+    from app.models.configuracion import Configuracion
+    _prop_cfg_sync = Configuracion.get('proporcional_desde')
+
     for casa in casas_sync:
         hist = hist_sync_dict.get(casa.id)
         datos_v = casa.obtener_gastos_mensuales(mes, anio, hist=hist)
@@ -972,9 +989,9 @@ def sync_abonos():
             continue
 
         _fref_sync = None
-        if casa.fecha_reactivacion and proporcional_aplica(casa.fecha_reactivacion):
+        if casa.fecha_reactivacion and proporcional_aplica(casa.fecha_reactivacion, _prop_cfg_sync):
             _fref_sync = casa.fecha_reactivacion
-        elif casa.fecha_creacion and proporcional_aplica(casa.fecha_creacion):
+        elif casa.fecha_creacion and proporcional_aplica(casa.fecha_creacion, _prop_cfg_sync):
             _fref_sync = casa.fecha_creacion
         _es_mes_alta = bool(_fref_sync and _fref_sync.month == mes and _fref_sync.year == anio)
         if _casa_pausada_en_mes(casa, mes, anio, extras_v) or _es_mes_alta:
@@ -984,9 +1001,9 @@ def sync_abonos():
 
         prop = 0.0
         _fref_prop_sync = None
-        if casa.fecha_reactivacion and proporcional_aplica(casa.fecha_reactivacion):
+        if casa.fecha_reactivacion and proporcional_aplica(casa.fecha_reactivacion, _prop_cfg_sync):
             _fref_prop_sync = casa.fecha_reactivacion
-        elif casa.fecha_creacion and proporcional_aplica(casa.fecha_creacion):
+        elif casa.fecha_creacion and proporcional_aplica(casa.fecha_creacion, _prop_cfg_sync):
             _fref_prop_sync = casa.fecha_creacion
         if _fref_prop_sync:
             next_mes = _fref_prop_sync.month % 12 + 1

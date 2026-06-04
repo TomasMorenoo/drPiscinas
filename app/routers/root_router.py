@@ -514,7 +514,6 @@ def restore_db():
     t = threading.Thread(target=_run_restore_bg, args=(tmp.name, cmd, env), daemon=True)
     t.start()
 
-    flash("⏳ Restauración iniciada. La página se actualizará automáticamente cuando termine.", "info")
     return redirect(url_for("root.panel"))
 
 
