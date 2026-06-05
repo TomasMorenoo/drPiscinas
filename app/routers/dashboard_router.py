@@ -180,10 +180,24 @@ def _wa_breakdown(casa, mes, anio, hist, pausado=False, prop_cfg=None):
     if hist and getattr(hist, 'proporcional_anterior', None):
         abono_base = float(hist.monto) - float(hist.proporcional_anterior)
         prop_prev = float(hist.proporcional_anterior)
-    elif extras_dif > 0:
-        prop_prev = float(casa.proporcional_pendiente) if casa.proporcional_pendiente else 0.0
     else:
-        prop_prev = 0.0
+        _fref_ant = casa.fecha_reactivacion or casa.fecha_creacion
+        _prev_mes = 12 if mes == 1 else mes - 1
+        _prev_anio = anio - 1 if mes == 1 else anio
+        if (_fref_ant and _fref_ant.day > 14
+                and _fref_ant.month == _prev_mes and _fref_ant.year == _prev_anio
+                and (proporcional_aplica(_fref_ant, prop_cfg) or has_pend)):
+            if casa.proporcional_pendiente and float(casa.proporcional_pendiente) > 0:
+                prop_prev = float(casa.proporcional_pendiente)
+            else:
+                _dia_w = _fref_ant.day
+                _sem_w = 3 if _dia_w <= 21 else 4
+                _dias_w = [int(d) for d in (casa.dia_visita or '').split(',') if d.strip().isdigit()]
+                if _dias_w and max(_dias_w) < _fref_ant.weekday():
+                    _sem_w += 1
+                prop_prev = round(float(casa.precio_base or 0) / 4 * max(0, 5 - _sem_w), 2)
+        else:
+            prop_prev = 0.0
     return {**_BD_EMPTY,
             'abono': abono_base,
             'extras': curr_extras, 'detalle_extras': curr_detalle,
@@ -685,8 +699,16 @@ def index():
             if mes == _nm and anio == _na:
                 if historial and getattr(historial, 'proporcional_anterior', None):
                     _prop_preview = float(historial.proporcional_anterior)
-                elif not historial and casa.proporcional_pendiente and float(casa.proporcional_pendiente) > 0:
-                    _prop_preview = float(casa.proporcional_pendiente)
+                elif not historial:
+                    if casa.proporcional_pendiente and float(casa.proporcional_pendiente) > 0:
+                        _prop_preview = float(casa.proporcional_pendiente)
+                    else:
+                        _dia_p = _fref_prop.day
+                        _sem_p = 3 if _dia_p <= 21 else 4
+                        _dias_p = [int(d) for d in (casa.dia_visita or '').split(',') if d.strip().isdigit()]
+                        if _dias_p and max(_dias_p) < _fref_prop.weekday():
+                            _sem_p += 1
+                        _prop_preview = round(float(casa.precio_base or 0) / 4 * max(0, 5 - _sem_p), 2)
 
         # Extras diferidos: productos de mes de alta día 15+ se muestran en el mes siguiente
         _fref_alta = casa.fecha_reactivacion or casa.fecha_creacion
