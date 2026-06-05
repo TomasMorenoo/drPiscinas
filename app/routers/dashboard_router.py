@@ -178,10 +178,8 @@ def _wa_breakdown(casa, mes, anio, hist, pausado=False, prop_cfg=None):
             return dict(_BD_EMPTY)
     abono_base = float(hist.monto if hist and hist.monto is not None else casa.precio_base or 0)
     if hist and getattr(hist, 'proporcional_anterior', None):
-        abono_base = float(hist.monto) - float(hist.proporcional_anterior)
+        abono_base = float(hist.monto) - float(hist.proporcional_anterior) - extras_dif
         prop_prev = float(hist.proporcional_anterior)
-        extras_dif = 0.0
-        detalle_dif = []
     else:
         _fref_ant = casa.fecha_reactivacion or casa.fecha_creacion
         _prev_mes = 12 if mes == 1 else mes - 1
@@ -665,6 +663,7 @@ def index():
             if proporcional_aplica(_fc, _prop_cfg) or (_has_pendiente and _fc.month == mes and _fc.year == anio):
                 _fref_disp = _fc
         _es_mes_alta_disp = bool(_fref_disp and _fref_disp.month == mes and _fref_disp.year == anio)
+        extras_diferidos, detalle_extras_diferidos = 0.0, []
         if pausado_mes:
             abono_mes = 0.0
         elif _es_mes_alta_disp:
@@ -684,7 +683,8 @@ def index():
                 abono_mes = 0.0
         elif historial:
             _prop_hist = float(getattr(historial, 'proporcional_anterior', 0) or 0)
-            abono_mes = float(historial.monto) - _prop_hist
+            extras_diferidos, detalle_extras_diferidos = _calcular_extras_diferidos(casa, mes, anio, _prop_cfg)
+            abono_mes = float(historial.monto) - _prop_hist - extras_diferidos
         else:
             abono_mes = float(casa.precio_base or 0) if (casa.activo or extras > 0) else 0.0
 
@@ -717,12 +717,8 @@ def index():
         if _fref_alta and _fref_alta.day > 14 and (proporcional_aplica(_fref_alta, _prop_cfg) or _has_pendiente):
             if _fref_alta.month == mes and _fref_alta.year == anio:
                 extras = 0.0
-        extras_diferidos, detalle_extras_diferidos = _calcular_extras_diferidos(casa, mes, anio, _prop_cfg)
-        # Si el mes ya está cerrado con proporcional_anterior, los extras diferidos
-        # ya están incluidos en hist.monto → no sumarlos de nuevo en el display
-        if historial and getattr(historial, 'proporcional_anterior', None) and extras_diferidos > 0:
-            extras_diferidos = 0.0
-            detalle_extras_diferidos = []
+        if not historial:
+            extras_diferidos, detalle_extras_diferidos = _calcular_extras_diferidos(casa, mes, anio, _prop_cfg)
 
         total_mes = abono_mes + extras + extras_diferidos
 
