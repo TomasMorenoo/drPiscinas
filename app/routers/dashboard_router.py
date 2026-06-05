@@ -67,6 +67,111 @@ def get_nombre_limpio(casa):
     nombre = casa.nombre_formateado()
     return re.sub(r'(?i)\s+S/N$', '', nombre).strip()
 
+def _calcular_extras_diferidos(casa, mes, anio, prop_cfg=None):
+    """Retorna (monto, detalle) de productos diferidos para casas de alta día 15+ en el mes anterior."""
+    _fref = casa.fecha_reactivacion or casa.fecha_creacion
+    if not _fref or _fref.day <= 14:
+        return 0.0, []
+    has_pend = casa.proporcional_pendiente is not None and float(casa.proporcional_pendiente) > 0
+    prev_mes = 12 if mes == 1 else mes - 1
+    prev_anio = anio - 1 if mes == 1 else anio
+    prev_hist = next((h for h in (casa.historial_abonos or []) if h.mes == prev_mes and h.anio == prev_anio), None)
+    has_prop_ant = prev_hist is not None and float(getattr(prev_hist, 'proporcional_anterior', 0) or 0) > 0
+    if not (proporcional_aplica(_fref, prop_cfg) or has_pend or has_prop_ant):
+        return 0.0, []
+    if _fref.month != prev_mes or _fref.year != prev_anio:
+        return 0.0, []
+    total = 0.0
+    detalle = []
+    for v in casa.visitas:
+        vd = v.fecha.date() if hasattr(v.fecha, 'date') else v.fecha
+        if vd.month != prev_mes or vd.year != prev_anio:
+            continue
+        for vp in v.productos:
+            precio = float(vp.precio_unitario or 0) if (prev_hist and vp.precio_unitario) else float(vp.product.precio)
+            total += float(vp.cantidad) * precio
+            c = float(vp.cantidad)
+            cs = str(int(c)) if c == int(c) else str(c)
+            u = (vp.product.unidad or '').strip()
+            detalle.append(f"{cs}{u} de {vp.product.nombre}")
+        if v.promo:
+            total += float(v.promo.precio)
+            detalle.append(v.promo.nombre)
+    return total, detalle
+
+def _abono_display_wa(casa, mes, anio, hist, prop_cfg=None):
+    """Calcula el abono a mostrar en mensajes WA, igual que la lógica visual de index()."""
+    has_pend = casa.proporcional_pendiente is not None and float(casa.proporcional_pendiente) > 0
+    fref = None
+    if casa.fecha_reactivacion:
+        _fr = casa.fecha_reactivacion
+        if proporcional_aplica(_fr, prop_cfg) or (has_pend and _fr.month == mes and _fr.year == anio):
+            fref = _fr
+    if fref is None and casa.fecha_creacion:
+        _fc = casa.fecha_creacion
+        if proporcional_aplica(_fc, prop_cfg) or (has_pend and _fc.month == mes and _fc.year == anio):
+            fref = _fc
+    es_mes_alta = bool(fref and fref.month == mes and fref.year == anio)
+    if es_mes_alta:
+        if fref.day <= 14:
+            if casa.proporcional_pendiente is not None:
+                return float(casa.proporcional_pendiente)
+            dia = fref.day
+            sem = 1 if dia <= 7 else 2
+            dias = [int(d) for d in (casa.dia_visita or '').split(',') if d.strip().isdigit()]
+            if dias and max(dias) < fref.weekday():
+                sem += 1
+            return round(float(casa.precio_base or 0) / 4 * max(0, 5 - sem), 2)
+        else:
+            return 0.0
+    return float(hist.monto if hist is not None and hist.monto is not None else casa.precio_base or 0)
+
+def _wa_breakdown(casa, mes, anio, hist, pausado=False, prop_cfg=None):
+    """Retorna dict con todos los montos para el mensaje WA individual, separando proporcional."""
+    if pausado:
+        return {'abono': 0.0, 'proporcional': 0.0,
+                'extras': 0.0, 'detalle_extras': [],
+                'extras_prop': 0.0, 'detalle_extras_prop': []}
+    has_pend = casa.proporcional_pendiente is not None and float(casa.proporcional_pendiente) > 0
+    fref = None
+    if casa.fecha_reactivacion:
+        fr = casa.fecha_reactivacion
+        if proporcional_aplica(fr, prop_cfg) or (has_pend and fr.month == mes and fr.year == anio):
+            fref = fr
+    if fref is None and casa.fecha_creacion:
+        fc = casa.fecha_creacion
+        if proporcional_aplica(fc, prop_cfg) or (has_pend and fc.month == mes and fc.year == anio):
+            fref = fc
+    es_mes_alta = bool(fref and fref.month == mes and fref.year == anio)
+    datos = casa.obtener_gastos_mensuales(mes, anio, hist=hist)
+    curr_extras = float(datos.get("extras", 0))
+    curr_detalle = obtener_detalle_productos(casa, mes, anio)
+    extras_dif, detalle_dif = _calcular_extras_diferidos(casa, mes, anio, prop_cfg)
+    if es_mes_alta:
+        if fref.day <= 14:
+            prop_amount = _abono_display_wa(casa, mes, anio, hist, prop_cfg)
+            return {'abono': 0.0, 'proporcional': prop_amount,
+                    'extras': 0.0, 'detalle_extras': [],
+                    'extras_prop': curr_extras, 'detalle_extras_prop': curr_detalle}
+        else:
+            return {'abono': 0.0, 'proporcional': 0.0,
+                    'extras': 0.0, 'detalle_extras': [],
+                    'extras_prop': 0.0, 'detalle_extras_prop': []}
+    abono_base = float(hist.monto if hist and hist.monto is not None else casa.precio_base or 0)
+    if hist and getattr(hist, 'proporcional_anterior', None):
+        abono_base = float(hist.monto) - float(hist.proporcional_anterior)
+        prop_preview = float(hist.proporcional_anterior)
+    elif extras_dif > 0:
+        if hist and casa.proporcional_pendiente is None:
+            prop_preview = 0.0
+        else:
+            prop_preview = float(casa.proporcional_pendiente) if casa.proporcional_pendiente else 0.0
+    else:
+        prop_preview = 0.0
+    return {'abono': abono_base, 'proporcional': prop_preview,
+            'extras': curr_extras, 'detalle_extras': curr_detalle,
+            'extras_prop': extras_dif, 'detalle_extras_prop': detalle_dif}
+
 def obtener_detalle_productos(casa, mes, anio):
     productos_dict = {}
     for v in casa.visitas:
@@ -87,7 +192,8 @@ def obtener_detalle_productos(casa, mes, anio):
         detalles.append(f"{cant_str}{p['unidad']} de {p['nombre']}")
     return detalles
 
-def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_visual, pagos_en_este_dashboard, pt=None):
+def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_visual, pagos_en_este_dashboard,
+                          pt=None, proporcional=0.0, extras_proporcional=0.0, detalle_proporcional=None):
     from app.models.plantilla_mensaje import PlantillaMensaje, renderizar_template
     if pt is None:
         pt = PlantillaMensaje.get_activa()
@@ -96,25 +202,30 @@ def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_vis
     saludo = obtener_saludo_tiempo(nombre_wa)
     saldo_favor = abs(saldo_anterior_visual) if saldo_anterior_visual < -0.01 else 0.0
     saldo_deuda = saldo_anterior_visual if saldo_anterior_visual > 0.01 else 0.0
-    total_final = abono_mes + extras + saldo_anterior_visual - pagos_en_este_dashboard
+    total_final = abono_mes + extras + proporcional + extras_proporcional + saldo_anterior_visual - pagos_en_este_dashboard
 
     if total_final <= 0.01:
         resumen_total = "*-- CUENTA AL DÍA --*"
     else:
         resumen_total = f"*-- TOTAL A PAGAR: ${format_money(total_final)} --*"
 
-    prods = obtener_detalle_productos(casa, mes, anio)
+    prods = obtener_detalle_productos(casa, mes, anio) if extras > 0 else []
     detalle_productos = '\n'.join(f'* {p}' for p in prods)
+    det_prop = detalle_proporcional or []
+    detalle_prop_str = '\n'.join(f'* {p}' for p in det_prop)
 
     variables = {
-        'saludo':            (saludo,                          None),
-        'resumen_total':     (resumen_total,                   None),
-        'mantenimiento':     (format_money(abono_mes),         None),
-        'extras':            (format_money(extras),            extras),
-        'detalle_productos': (detalle_productos,               len(prods)),
-        'saldo_anterior':    (format_money(saldo_deuda),       saldo_deuda),
-        'saldo_favor':       (format_money(saldo_favor),       saldo_favor),
-        'pagado':            (format_money(pagos_en_este_dashboard), pagos_en_este_dashboard),
+        'saludo':               (saludo,                                    None),
+        'resumen_total':        (resumen_total,                             None),
+        'mantenimiento':        (format_money(abono_mes),                   abono_mes),
+        'extras':               (format_money(extras),                      extras),
+        'detalle_productos':    (detalle_productos,                         len(prods)),
+        'proporcional':         (format_money(proporcional),                proporcional),
+        'extras_proporcional':  (format_money(extras_proporcional),         extras_proporcional),
+        'detalle_proporcional': (detalle_prop_str,                          len(det_prop)),
+        'saldo_anterior':       (format_money(saldo_deuda),                 saldo_deuda),
+        'saldo_favor':          (format_money(saldo_favor),                 saldo_favor),
+        'pagado':               (format_money(pagos_en_este_dashboard),     pagos_en_este_dashboard),
     }
     return renderizar_template(pt.get_template_individual(), variables)
 
@@ -516,31 +627,33 @@ def index():
         if pausado_mes:
             abono_mes = 0.0
         elif _es_mes_alta_disp:
-            if casa.proporcional_pendiente is not None:
-                abono_mes = float(casa.proporcional_pendiente)
+            if _fref_disp.day <= 14:
+                # Semanas 1-2: cobrar proporcional en el mes de alta
+                if casa.proporcional_pendiente is not None:
+                    abono_mes = float(casa.proporcional_pendiente)
+                else:
+                    _dia = _fref_disp.day
+                    _sem = 1 if _dia <= 7 else 2
+                    _dias = [int(d) for d in (casa.dia_visita or '').split(',') if d.strip().isdigit()]
+                    if _dias and max(_dias) < _fref_disp.weekday():
+                        _sem += 1
+                    abono_mes = round(float(casa.precio_base or 0) / 4 * max(0, 5 - _sem), 2)
             else:
-                _dia = _fref_disp.day
-                if _dia <= 7: _sem = 1
-                elif _dia <= 14: _sem = 2
-                elif _dia <= 21: _sem = 3
-                else: _sem = 4
-                _dias = [int(d) for d in (casa.dia_visita or '').split(',') if d.strip().isdigit()]
-                if _dias and max(_dias) < _fref_disp.weekday():
-                    _sem += 1
-                abono_mes = round(float(casa.precio_base or 0) / 4 * max(0, 5 - _sem), 2)
+                # Semanas 3-4: 0 en el mes de alta, proporcional se suma el mes siguiente
+                abono_mes = 0.0
         elif historial:
             _prop_hist = float(getattr(historial, 'proporcional_anterior', 0) or 0)
             abono_mes = float(historial.monto) - _prop_hist
         else:
             abono_mes = float(casa.precio_base or 0) if (casa.activo or extras > 0) else 0.0
 
-        # Calcular proporcional_preview antes de saldo_restante
+        # Proporcional_preview: solo para altas de semana 3-4, se suma al mes siguiente
         _prop_preview = 0.0
         _fref_prop = None
-        if casa.fecha_reactivacion and proporcional_aplica(casa.fecha_reactivacion, _prop_cfg):
-            _fref_prop = casa.fecha_reactivacion
-        elif casa.fecha_creacion and proporcional_aplica(casa.fecha_creacion, _prop_cfg):
-            _fref_prop = casa.fecha_creacion
+        _fref_check = casa.fecha_reactivacion or casa.fecha_creacion
+        if _fref_check and _fref_check.day > 14:
+            if proporcional_aplica(_fref_check, _prop_cfg) or _has_pendiente:
+                _fref_prop = _fref_check
         if _fref_prop:
             _nm = _fref_prop.month % 12 + 1
             _na = _fref_prop.year + (1 if _fref_prop.month == 12 else 0)
@@ -550,7 +663,14 @@ def index():
                 elif not historial and casa.proporcional_pendiente and float(casa.proporcional_pendiente) > 0:
                     _prop_preview = float(casa.proporcional_pendiente)
 
-        total_mes = abono_mes + extras
+        # Extras diferidos: productos de mes de alta día 15+ se muestran en el mes siguiente
+        _fref_alta = casa.fecha_reactivacion or casa.fecha_creacion
+        if _fref_alta and _fref_alta.day > 14 and (proporcional_aplica(_fref_alta, _prop_cfg) or _has_pendiente):
+            if _fref_alta.month == mes and _fref_alta.year == anio:
+                extras = 0.0
+        extras_diferidos, detalle_extras_diferidos = _calcular_extras_diferidos(casa, mes, anio, _prop_cfg)
+
+        total_mes = abono_mes + extras + extras_diferidos
 
         # --- LÓGICA VISUAL DE FOTO DEL MES ---
         saldo_anterior_visual = saldo_anterior_real
@@ -606,6 +726,8 @@ def index():
             "proporcional_preview": _prop_preview,
             "extras": extras,
             "detalle_productos": obtener_detalle_productos(casa, mes, anio) if extras > 0 else [],
+            "extras_diferidos": extras_diferidos,
+            "detalle_extras_diferidos": detalle_extras_diferidos,
             "total_mes": total_mes,
             "saldo_anterior": saldo_anterior_visual,
             "saldo_restante": saldo_restante,
@@ -643,7 +765,7 @@ def index():
 
         total_clientes += 1
         total_abono += abono_mes
-        total_extras += extras
+        total_extras += extras + extras_diferidos
         total_recaudado += pagos_en_este_dashboard
 
     total_general = total_abono + total_extras + total_deuda_anterior
@@ -809,13 +931,13 @@ def api_wa_url_recordatorio(id_historial):
     if not casa or not casa.telefono:
         return jsonify({"url": None})
     mes, anio = hist.mes, hist.anio
+    from app.models.configuracion import Configuracion
+    _pcfg_wa_r = Configuracion.get('proporcional_desde')
+    pausado = _casa_pausada_en_mes(casa, mes, anio)
+    bd_r = _wa_breakdown(casa, mes, anio, hist, pausado, _pcfg_wa_r)
     saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
-    datos = casa.obtener_gastos_mensuales(mes, anio, hist=hist)
-    extras = float(datos.get("extras", 0))
-    pausado = _casa_pausada_en_mes(casa, mes, anio, extras)
-    abono_mes = 0.0 if pausado else (float(hist.monto) if float(hist.monto) > 0 else float(casa.precio_base or 0))
     pagos = float(hist.monto_pagado or 0)
-    deuda = abono_mes + extras + saldo_anterior - pagos
+    deuda = bd_r['abono'] + bd_r['extras'] + bd_r['proporcional'] + bd_r['extras_prop'] + saldo_anterior - pagos
     nombre_wa = casa.nombre_cliente if casa.nombre_cliente else get_nombre_limpio(casa)
     saludo = obtener_saludo_tiempo(nombre_wa)
     from app.models.plantilla_mensaje import PlantillaMensaje, renderizar_template
@@ -880,12 +1002,19 @@ def toggle_pago(id):
             registro.mensaje_enviado = True
             casa = registro.casa
             if casa.telefono:
-                datos = casa.obtener_gastos_mensuales(registro.mes, registro.anio)
-                # obtener_saldo_anterior ya refleja correctamente todos los pagos en cascada
+                from app.models.configuracion import Configuracion
+                _pcfg_tw = Configuracion.get('proporcional_desde')
+                _pausado_tw = _casa_pausada_en_mes(casa, registro.mes, registro.anio)
+                bd = _wa_breakdown(casa, registro.mes, registro.anio, registro, _pausado_tw, _pcfg_tw)
                 saldo_anterior_visual = casa.obtener_saldo_anterior(registro.mes, registro.anio)
                 pagos_en_este_dashboard = float(registro.monto_pagado or 0)
-
-                texto_wa = generar_wa_individual(casa, registro.mes, registro.anio, float(registro.monto), float(datos['extras']), saldo_anterior_visual, pagos_en_este_dashboard)
+                texto_wa = generar_wa_individual(
+                    casa, registro.mes, registro.anio,
+                    bd['abono'], bd['extras'], saldo_anterior_visual, pagos_en_este_dashboard,
+                    proporcional=bd['proporcional'],
+                    extras_proporcional=bd['extras_prop'],
+                    detalle_proporcional=bd['detalle_extras_prop']
+                )
                 url_wa = f"whatsapp://send?phone={limpiar_telefono(casa.telefono)}&text={urllib.parse.quote(texto_wa)}"
         else:
             casa = registro.casa
@@ -988,23 +1117,38 @@ def sync_abonos():
         if not casa.activo and extras_v <= 0:
             continue
 
+        _has_pend_sync = casa.proporcional_pendiente is not None and float(casa.proporcional_pendiente) > 0
+
         _fref_sync = None
-        if casa.fecha_reactivacion and proporcional_aplica(casa.fecha_reactivacion, _prop_cfg_sync):
-            _fref_sync = casa.fecha_reactivacion
-        elif casa.fecha_creacion and proporcional_aplica(casa.fecha_creacion, _prop_cfg_sync):
-            _fref_sync = casa.fecha_creacion
+        if casa.fecha_reactivacion:
+            _fr = casa.fecha_reactivacion
+            if proporcional_aplica(_fr, _prop_cfg_sync) or (_has_pend_sync and _fr.month == mes and _fr.year == anio):
+                _fref_sync = _fr
+        if _fref_sync is None and casa.fecha_creacion:
+            _fc = casa.fecha_creacion
+            if proporcional_aplica(_fc, _prop_cfg_sync) or (_has_pend_sync and _fc.month == mes and _fc.year == anio):
+                _fref_sync = _fc
         _es_mes_alta = bool(_fref_sync and _fref_sync.month == mes and _fref_sync.year == anio)
-        if _casa_pausada_en_mes(casa, mes, anio, extras_v) or _es_mes_alta:
+
+        if _casa_pausada_en_mes(casa, mes, anio, extras_v):
             abono_a_guardar = 0.0
+        elif _es_mes_alta:
+            if _fref_sync.day <= 14:
+                # Semanas 1-2: guardar proporcional en el mes de alta
+                abono_a_guardar = float(casa.proporcional_pendiente) if _has_pend_sync else 0.0
+            else:
+                # Semanas 3-4: 0 este mes, proporcional va al siguiente
+                abono_a_guardar = 0.0
         else:
             abono_a_guardar = float(casa.precio_base or 0) if (casa.activo or extras_v > 0) else 0.0
 
+        # Proporcional diferido: solo para altas de semana 3-4, se suma al mes siguiente
         prop = 0.0
         _fref_prop_sync = None
-        if casa.fecha_reactivacion and proporcional_aplica(casa.fecha_reactivacion, _prop_cfg_sync):
-            _fref_prop_sync = casa.fecha_reactivacion
-        elif casa.fecha_creacion and proporcional_aplica(casa.fecha_creacion, _prop_cfg_sync):
-            _fref_prop_sync = casa.fecha_creacion
+        _fref_check_sync = casa.fecha_reactivacion or casa.fecha_creacion
+        if _fref_check_sync and _fref_check_sync.day > 14:
+            if proporcional_aplica(_fref_check_sync, _prop_cfg_sync) or _has_pend_sync:
+                _fref_prop_sync = _fref_check_sync
         if _fref_prop_sync:
             next_mes = _fref_prop_sync.month % 12 + 1
             next_anio = _fref_prop_sync.year + (1 if _fref_prop_sync.month == 12 else 0)
@@ -1013,7 +1157,7 @@ def sync_abonos():
                     prop = float(casa.proporcional_pendiente)
                 else:
                     _dia = _fref_prop_sync.day
-                    _sem = 1 if _dia <= 7 else 2 if _dia <= 14 else 3 if _dia <= 21 else 4
+                    _sem = 3 if _dia <= 21 else 4
                     _dias = [int(d) for d in (casa.dia_visita or '').split(',') if d.strip().isdigit()]
                     if _dias and max(_dias) < _fref_prop_sync.weekday():
                         _sem += 1
@@ -1024,6 +1168,8 @@ def sync_abonos():
             if prop > 0:
                 nuevo.proporcional_anterior = prop
                 casa.proporcional_pendiente = None
+            elif _es_mes_alta and _fref_sync and _fref_sync.day <= 14:
+                casa.proporcional_pendiente = None
             db.session.add(nuevo)
         else:
             if not getattr(hist, 'pagado', False) and float(hist.monto_pagado or 0) == 0:
@@ -1032,6 +1178,8 @@ def sync_abonos():
                     hist.monto = nuevo_monto
                 if prop > 0 and not getattr(hist, 'proporcional_anterior', None):
                     hist.proporcional_anterior = prop
+                    casa.proporcional_pendiente = None
+                elif _es_mes_alta and _fref_sync and _fref_sync.day <= 14:
                     casa.proporcional_pendiente = None
 
     mes_nombre_s = nombre_mes(mes)
@@ -1614,15 +1762,20 @@ def api_wa_url(id_historial):
         return jsonify({"url": None})
     mes, anio = hist.mes, hist.anio
     from app.models.plantilla_mensaje import PlantillaMensaje
+    from app.models.configuracion import Configuracion
     pt = PlantillaMensaje.get_activa()
-    datos = casa.obtener_gastos_mensuales(mes, anio, hist=hist)
-    extras = float(datos.get("extras", 0))
-    pausado = _casa_pausada_en_mes(casa, mes, anio, extras)
-    abono_mes = 0.0 if pausado else (float(hist.monto) if float(hist.monto) > 0 else float(casa.precio_base or 0))
+    _pcfg_wa = Configuracion.get('proporcional_desde')
+    pausado = _casa_pausada_en_mes(casa, mes, anio)
+    bd_wa = _wa_breakdown(casa, mes, anio, hist, pausado, _pcfg_wa)
     saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
     pagos = float(hist.monto_pagado or 0)
     num_tel = limpiar_telefono(casa.telefono)
-    texto = generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior, pagos, pt=pt)
+    texto = generar_wa_individual(
+        casa, mes, anio, bd_wa['abono'], bd_wa['extras'], saldo_anterior, pagos, pt=pt,
+        proporcional=bd_wa['proporcional'],
+        extras_proporcional=bd_wa['extras_prop'],
+        detalle_proporcional=bd_wa['detalle_extras_prop']
+    )
     return jsonify({"url": f"whatsapp://send?phone={num_tel}&text={urllib.parse.quote(texto)}"})
 
 

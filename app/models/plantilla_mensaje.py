@@ -10,6 +10,9 @@ Detalle:
 Mes de mantenimiento: ${mantenimiento}
 Productos Utilizados: ${extras}
 {detalle_productos}
+Proporcional del mes de mantenimiento: ${proporcional}
+Productos del mes de alta: ${extras_proporcional}
+{detalle_proporcional}
 Saldo adeudado de meses anteriores: ${saldo_anterior}
 Saldo a favor aplicado: -${saldo_favor}
 Entregado este mes: -${pagado}
@@ -32,7 +35,8 @@ Entregado este mes: *-${pagado}*
 Muchas Gracias."""
 
 # Variables que ocultan su línea completa si el valor numérico es 0
-VARS_CONDICIONALES = {'extras', 'detalle_productos', 'saldo_anterior', 'pagado', 'saldo_favor'}
+VARS_CONDICIONALES = {'mantenimiento', 'extras', 'detalle_productos', 'proporcional',
+                      'extras_proporcional', 'detalle_proporcional', 'saldo_anterior', 'pagado', 'saldo_favor'}
 
 
 def renderizar_template(template_str, variables):
