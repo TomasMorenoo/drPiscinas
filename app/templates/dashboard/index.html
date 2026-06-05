@@ -556,7 +556,7 @@
                             <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">
                                 ${{ item.extras | pesos }}
                                 {% if item.extras_diferidos > 0 %}
-                                    <br><span class="badge bg-info text-dark font-monospace mt-1" title="{{ item.detalle_extras_diferidos | join(', ') }}">+${{ item.extras_diferidos | pesos }} diferido</span>
+                                    <br><span class="badge bg-warning text-dark font-monospace mt-1" title="{{ item.detalle_extras_diferidos | join(', ') }}">+${{ item.extras_diferidos | pesos }}</span>
                                 {% endif %}
                             </td>
 
@@ -570,7 +570,7 @@
                                     <span class="fw-bold text-muted">$0</span>
                                 {% endif %}
                                 {% if item.proporcional_preview > 0 %}
-                                    <br><span class="badge bg-warning text-dark font-monospace mt-1" title="Proporcional del mes de alta">+${{ item.proporcional_preview | pesos }} prop.</span>
+                                    <br><span class="badge bg-warning text-dark font-monospace mt-1" title="Proporcional del mes de alta">${{ item.proporcional_preview | pesos }}</span>
                                 {% endif %}
                             </td>
 
@@ -586,7 +586,7 @@
                                         <span class="monto-label">Productos</span>
                                         <span class="monto-valor">${{ item.extras | pesos }}</span>
                                         {% if item.extras_diferidos > 0 %}
-                                            <span class="badge bg-info text-dark font-monospace ms-1">+${{ item.extras_diferidos | pesos }} dif.</span>
+                                            <span class="badge bg-warning text-dark font-monospace ms-1">+${{ item.extras_diferidos | pesos }}</span>
                                         {% endif %}
                                     </div>
                                     <div class="monto-item">
@@ -600,7 +600,7 @@
                                             <span class="monto-valor text-muted">$0</span>
                                         {% endif %}
                                         {% if item.proporcional_preview > 0 %}
-                                            <span class="badge bg-warning text-dark font-monospace ms-1">+${{ item.proporcional_preview | pesos }} prop.</span>
+                                            <span class="badge bg-warning text-dark font-monospace ms-1">${{ item.proporcional_preview | pesos }}</span>
                                         {% endif %}
                                         </span>
                                     </div>

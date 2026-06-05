@@ -126,12 +126,34 @@ def _abono_display_wa(casa, mes, anio, hist, prop_cfg=None):
             return 0.0
     return float(hist.monto if hist is not None and hist.monto is not None else casa.precio_base or 0)
 
+_BD_EMPTY = {
+    'abono': 0.0,
+    'proporcional': 0.0, 'extras_prop': 0.0, 'detalle_extras_prop': [],
+    'proporcional_ant': 0.0, 'extras_prop_ant': 0.0, 'detalle_extras_prop_ant': [],
+    'extras': 0.0, 'detalle_extras': [],
+}
+
+def _bd_totals(bd):
+    """Retorna (abono_total, extras_total) sumando los 3 componentes de cada."""
+    return (
+        bd['abono'] + bd['proporcional'] + bd['proporcional_ant'],
+        bd['extras'] + bd['extras_prop'] + bd['extras_prop_ant'],
+    )
+
+def _bd_label(bd):
+    if bd['proporcional'] > 0 and bd['abono'] == 0:
+        return 'Prop.'
+    if bd['proporcional_ant'] > 0 and bd['abono'] > 0:
+        return 'Abono+Prop.'
+    return 'Abono'
+
 def _wa_breakdown(casa, mes, anio, hist, pausado=False, prop_cfg=None):
-    """Retorna dict con todos los montos para el mensaje WA individual, separando proporcional."""
+    """Retorna dict con todos los montos para el mensaje WA individual.
+    proporcional/extras_prop = mes de alta actual (día 1-14)
+    proporcional_ant/extras_prop_ant = proporcional diferido del mes anterior (día 15+)
+    """
     if pausado:
-        return {'abono': 0.0, 'proporcional': 0.0,
-                'extras': 0.0, 'detalle_extras': [],
-                'extras_prop': 0.0, 'detalle_extras_prop': []}
+        return dict(_BD_EMPTY)
     has_pend = casa.proporcional_pendiente is not None and float(casa.proporcional_pendiente) > 0
     fref = None
     if casa.fecha_reactivacion:
@@ -150,27 +172,23 @@ def _wa_breakdown(casa, mes, anio, hist, pausado=False, prop_cfg=None):
     if es_mes_alta:
         if fref.day <= 14:
             prop_amount = _abono_display_wa(casa, mes, anio, hist, prop_cfg)
-            return {'abono': 0.0, 'proporcional': prop_amount,
-                    'extras': 0.0, 'detalle_extras': [],
+            return {**_BD_EMPTY, 'proporcional': prop_amount,
                     'extras_prop': curr_extras, 'detalle_extras_prop': curr_detalle}
         else:
-            return {'abono': 0.0, 'proporcional': 0.0,
-                    'extras': 0.0, 'detalle_extras': [],
-                    'extras_prop': 0.0, 'detalle_extras_prop': []}
+            return dict(_BD_EMPTY)
     abono_base = float(hist.monto if hist and hist.monto is not None else casa.precio_base or 0)
     if hist and getattr(hist, 'proporcional_anterior', None):
         abono_base = float(hist.monto) - float(hist.proporcional_anterior)
-        prop_preview = float(hist.proporcional_anterior)
+        prop_prev = float(hist.proporcional_anterior)
     elif extras_dif > 0:
-        if hist and casa.proporcional_pendiente is None:
-            prop_preview = 0.0
-        else:
-            prop_preview = float(casa.proporcional_pendiente) if casa.proporcional_pendiente else 0.0
+        prop_prev = float(casa.proporcional_pendiente) if casa.proporcional_pendiente else 0.0
     else:
-        prop_preview = 0.0
-    return {'abono': abono_base, 'proporcional': prop_preview,
+        prop_prev = 0.0
+    return {**_BD_EMPTY,
+            'abono': abono_base,
             'extras': curr_extras, 'detalle_extras': curr_detalle,
-            'extras_prop': extras_dif, 'detalle_extras_prop': detalle_dif}
+            'proporcional_ant': prop_prev,
+            'extras_prop_ant': extras_dif, 'detalle_extras_prop_ant': detalle_dif}
 
 def obtener_detalle_productos(casa, mes, anio):
     productos_dict = {}
@@ -193,7 +211,8 @@ def obtener_detalle_productos(casa, mes, anio):
     return detalles
 
 def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_visual, pagos_en_este_dashboard,
-                          pt=None, proporcional=0.0, extras_proporcional=0.0, detalle_proporcional=None):
+                          pt=None, proporcional=0.0, extras_proporcional=0.0, detalle_proporcional=None,
+                          proporcional_anterior=0.0, extras_proporcional_anterior=0.0, detalle_proporcional_anterior=None):
     from app.models.plantilla_mensaje import PlantillaMensaje, renderizar_template
     if pt is None:
         pt = PlantillaMensaje.get_activa()
@@ -202,7 +221,9 @@ def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_vis
     saludo = obtener_saludo_tiempo(nombre_wa)
     saldo_favor = abs(saldo_anterior_visual) if saldo_anterior_visual < -0.01 else 0.0
     saldo_deuda = saldo_anterior_visual if saldo_anterior_visual > 0.01 else 0.0
-    total_final = abono_mes + extras + proporcional + extras_proporcional + saldo_anterior_visual - pagos_en_este_dashboard
+    total_final = (abono_mes + extras + proporcional + extras_proporcional
+                   + proporcional_anterior + extras_proporcional_anterior
+                   + saldo_anterior_visual - pagos_en_este_dashboard)
 
     if total_final <= 0.01:
         resumen_total = "*-- CUENTA AL DÍA --*"
@@ -212,20 +233,23 @@ def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_vis
     prods = obtener_detalle_productos(casa, mes, anio) if extras > 0 else []
     detalle_productos = '\n'.join(f'* {p}' for p in prods)
     det_prop = detalle_proporcional or []
-    detalle_prop_str = '\n'.join(f'* {p}' for p in det_prop)
+    det_prop_ant = detalle_proporcional_anterior or []
 
     variables = {
-        'saludo':               (saludo,                                    None),
-        'resumen_total':        (resumen_total,                             None),
-        'mantenimiento':        (format_money(abono_mes),                   abono_mes),
-        'extras':               (format_money(extras),                      extras),
-        'detalle_productos':    (detalle_productos,                         len(prods)),
-        'proporcional':         (format_money(proporcional),                proporcional),
-        'extras_proporcional':  (format_money(extras_proporcional),         extras_proporcional),
-        'detalle_proporcional': (detalle_prop_str,                          len(det_prop)),
-        'saldo_anterior':       (format_money(saldo_deuda),                 saldo_deuda),
-        'saldo_favor':          (format_money(saldo_favor),                 saldo_favor),
-        'pagado':               (format_money(pagos_en_este_dashboard),     pagos_en_este_dashboard),
+        'saludo':                           (saludo,                                        None),
+        'resumen_total':                    (resumen_total,                                 None),
+        'mantenimiento':                    (format_money(abono_mes),                       abono_mes),
+        'extras':                           (format_money(extras),                          extras),
+        'detalle_productos':                (detalle_productos,                             len(prods)),
+        'proporcional':                     (format_money(proporcional),                    proporcional),
+        'extras_proporcional':              (format_money(extras_proporcional),             extras_proporcional),
+        'detalle_proporcional':             ('\n'.join(f'* {p}' for p in det_prop),         len(det_prop)),
+        'proporcional_anterior':            (format_money(proporcional_anterior),           proporcional_anterior),
+        'extras_proporcional_anterior':     (format_money(extras_proporcional_anterior),    extras_proporcional_anterior),
+        'detalle_proporcional_anterior':    ('\n'.join(f'* {p}' for p in det_prop_ant),     len(det_prop_ant)),
+        'saldo_anterior':                   (format_money(saldo_deuda),                     saldo_deuda),
+        'saldo_favor':                      (format_money(saldo_favor),                     saldo_favor),
+        'pagado':                           (format_money(pagos_en_este_dashboard),         pagos_en_este_dashboard),
     }
     return renderizar_template(pt.get_template_individual(), variables)
 
@@ -252,8 +276,9 @@ def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo_mes, total
         abono = c['abono']
         extras = c['extras']
         saldo_ant = c.get('saldo_anterior', 0.0)
+        label = c.get('label_abono', 'Abono')
         total_c = abono + extras
-        linea = f"• *{nombre_casa}:* Abono ${format_money(abono)} + Prod. ${format_money(extras)} = *${format_money(total_c)}*"
+        linea = f"• *{nombre_casa}:* {label} ${format_money(abono)} + Prod. ${format_money(extras)} = *${format_money(total_c)}*"
         if saldo_ant < -0.1:
             linea += f" _(saldo a favor: ${format_money(abs(saldo_ant))})_"
         if extras > 0:
@@ -911,9 +936,7 @@ def api_wa_url_recordatorio_grupo(grupo_id):
         'anio':   (str(anio), None),
     }
     texto = renderizar_template(pt.get_template_recordatorio(), variables)
-    tel = re.sub(r'\D', '', telefono_repr)
-    if len(tel) == 10:
-        tel = "549" + tel
+    tel = limpiar_telefono(telefono_repr)
     return jsonify({"url": f"whatsapp://send?phone={tel}&text={urllib.parse.quote(texto)}"})
 
 
@@ -937,7 +960,8 @@ def api_wa_url_recordatorio(id_historial):
     bd_r = _wa_breakdown(casa, mes, anio, hist, pausado, _pcfg_wa_r)
     saldo_anterior = casa.obtener_saldo_anterior(mes, anio)
     pagos = float(hist.monto_pagado or 0)
-    deuda = bd_r['abono'] + bd_r['extras'] + bd_r['proporcional'] + bd_r['extras_prop'] + saldo_anterior - pagos
+    _bd_ab, _bd_ex = _bd_totals(bd_r)
+    deuda = _bd_ab + _bd_ex + saldo_anterior - pagos
     nombre_wa = casa.nombre_cliente if casa.nombre_cliente else get_nombre_limpio(casa)
     saludo = obtener_saludo_tiempo(nombre_wa)
     from app.models.plantilla_mensaje import PlantillaMensaje, renderizar_template
@@ -1013,7 +1037,10 @@ def toggle_pago(id):
                     bd['abono'], bd['extras'], saldo_anterior_visual, pagos_en_este_dashboard,
                     proporcional=bd['proporcional'],
                     extras_proporcional=bd['extras_prop'],
-                    detalle_proporcional=bd['detalle_extras_prop']
+                    detalle_proporcional=bd['detalle_extras_prop'],
+                    proporcional_anterior=bd['proporcional_ant'],
+                    extras_proporcional_anterior=bd['extras_prop_ant'],
+                    detalle_proporcional_anterior=bd['detalle_extras_prop_ant']
                 )
                 url_wa = f"whatsapp://send?phone={limpiar_telefono(casa.telefono)}&text={urllib.parse.quote(texto_wa)}"
         else:
@@ -1227,9 +1254,11 @@ def marcar_mensaje_grupo(grupo_id):
 @login_required
 @admin_required
 def toggle_pago_grupo(grupo_id):
+    from app.models.configuracion import Configuracion
     mes = request.json.get("mes")
     anio = request.json.get("anio")
     action = request.json.get("action")
+    _pcfg_tpg = Configuracion.get('proporcional_desde')
     
     casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).options(
         joinedload(Casa.grupo),
@@ -1372,22 +1401,21 @@ def toggle_pago_grupo(grupo_id):
 
                 for h in historiales:
                     c = h.casa
-                    abono = float(h.monto)
-                    extras = float(c.obtener_gastos_mensuales(mes, anio)['extras'])
+                    pausado = _casa_pausada_en_mes(c, mes, anio)
+                    bd = _wa_breakdown(c, mes, anio, h, pausado, _pcfg_tpg)
+                    abono, extras = _bd_totals(bd)
                     saldo_ant = c.obtener_saldo_anterior(mes, anio)
 
                     total_grupo_mes += (abono + extras)
                     total_grupo_saldo_ant_visual += saldo_ant
                     total_pagos_dashboard += float(h.monto_pagado or 0)
 
-                    casas_data.append({'casa': c, 'abono': abono, 'extras': extras, 'saldo_anterior': saldo_ant, 'pausado': _casa_pausada_en_mes(c, mes, anio, extras)})
+                    casas_data.append({'casa': c, 'abono': abono, 'extras': extras, 'saldo_anterior': saldo_ant, 'pausado': pausado, 'label_abono': _bd_label(bd)})
 
                 saldo_a_favor_grupo = _saldo_grupo_para_mes(grupo, mes, anio)
                 texto_wa = generar_wa_grupo(grupo.nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard, saldo_a_favor_grupo)
 
-                tel = re.sub(r'\D', '', telefono_repr)
-                if len(tel) == 10: tel = "549" + tel
-                url_wa = f"whatsapp://send?phone={tel}&text={urllib.parse.quote(texto_wa)}"
+                url_wa = f"whatsapp://send?phone={limpiar_telefono(telefono_repr)}&text={urllib.parse.quote(texto_wa)}"
 
     db.session.commit()
     return jsonify({"success": True, "url_wa": url_wa, "wa_chat_url": wa_chat_url})
@@ -1774,7 +1802,10 @@ def api_wa_url(id_historial):
         casa, mes, anio, bd_wa['abono'], bd_wa['extras'], saldo_anterior, pagos, pt=pt,
         proporcional=bd_wa['proporcional'],
         extras_proporcional=bd_wa['extras_prop'],
-        detalle_proporcional=bd_wa['detalle_extras_prop']
+        detalle_proporcional=bd_wa['detalle_extras_prop'],
+        proporcional_anterior=bd_wa['proporcional_ant'],
+        extras_proporcional_anterior=bd_wa['extras_prop_ant'],
+        detalle_proporcional_anterior=bd_wa['detalle_extras_prop_ant']
     )
     return jsonify({"url": f"whatsapp://send?phone={num_tel}&text={urllib.parse.quote(texto)}"})
 
@@ -1802,28 +1833,26 @@ def api_wa_url_grupo(grupo_id):
         AbonoHistorico.casa_id.in_([c.id for c in casas_grupo]),
         AbonoHistorico.mes == mes, AbonoHistorico.anio == anio
     ).all()}
+    from app.models.configuracion import Configuracion
+    from app.models.plantilla_mensaje import PlantillaMensaje
+    _pcfg_wa_g = Configuracion.get('proporcional_desde')
     casas_data = []
     total_grupo_mes = total_grupo_saldo = total_pagos = 0.0
     for c in casas_grupo:
         h = hist_dict.get(c.id)
-        datos = c.obtener_gastos_mensuales(mes, anio, hist=h)
-        extras = float(datos.get("extras", 0))
-        pausado = _casa_pausada_en_mes(c, mes, anio, extras)
-        abono = 0.0 if pausado else (float(h.monto) if h and float(h.monto) > 0 else float(c.precio_base or 0))
+        pausado = _casa_pausada_en_mes(c, mes, anio)
+        bd = _wa_breakdown(c, mes, anio, h, pausado, _pcfg_wa_g)
+        abono, extras = _bd_totals(bd)
         saldo = c.obtener_saldo_anterior(mes, anio)
         pagos = float(h.monto_pagado or 0) if h else 0.0
         total_grupo_mes += abono + extras
         total_grupo_saldo += saldo
         total_pagos += pagos
-        casas_data.append({"casa": c, "abono": abono, "extras": extras, "saldo_anterior": saldo, "pausado": pausado})
-    from app.models.plantilla_mensaje import PlantillaMensaje
+        casas_data.append({"casa": c, "abono": abono, "extras": extras, "saldo_anterior": saldo, "pausado": pausado, "label_abono": _bd_label(bd)})
     pt = PlantillaMensaje.get_activa()
     saldo_a_favor = _saldo_grupo_para_mes(grupo, mes, anio)
     texto = generar_wa_grupo(grupo.nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo, total_pagos, saldo_a_favor, pt=pt)
-    tel = re.sub(r'\D', '', telefono_repr)
-    if len(tel) == 10:
-        tel = "549" + tel
-    return jsonify({"url": f"whatsapp://send?phone={tel}&text={urllib.parse.quote(texto)}"})
+    return jsonify({"url": f"whatsapp://send?phone={limpiar_telefono(telefono_repr)}&text={urllib.parse.quote(texto)}"})
 
 
 # ================================================

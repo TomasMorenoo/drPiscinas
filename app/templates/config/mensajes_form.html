@@ -146,14 +146,20 @@
                 <span class="d-lg-none">Tocá para insertar en el editor</span>
             </div>
             <div class="d-flex flex-wrap gap-2" id="chips-ind">
-                <span class="chip chip-always" draggable="true" data-var="{saludo}"            title="Buenas Tardes / Días + nombre del cliente"><i class="bi bi-hand-wave"></i> {saludo}</span>
-                <span class="chip chip-always" draggable="true" data-var="{resumen_total}"     title="TOTAL A PAGAR o CUENTA AL DÍA (automático)"><i class="bi bi-cash-coin"></i> {resumen_total}</span>
-                <span class="chip chip-always" draggable="true" data-var="${mantenimiento}"    title="Monto del abono mensual"><i class="bi bi-tools"></i> ${mantenimiento}</span>
-                <span class="chip chip-cond"   draggable="true" data-var="${extras}"           title="Monto de productos. Se oculta si es $0"><i class="bi bi-box-seam"></i> ${extras}</span>
-                <span class="chip chip-cond"   draggable="true" data-var="{detalle_productos}" title="Lista de productos usados. Se oculta si no hay"><i class="bi bi-list-ul"></i> {detalle_productos}</span>
-                <span class="chip chip-cond"   draggable="true" data-var="${saldo_anterior}"   title="Deuda meses anteriores. Se oculta si es $0"><i class="bi bi-clock-history"></i> ${saldo_anterior}</span>
-                <span class="chip chip-cond"   draggable="true" data-var="${saldo_favor}"      title="Saldo a favor de la casa. Se oculta si es $0"><i class="bi bi-piggy-bank"></i> ${saldo_favor}</span>
-                <span class="chip chip-cond"   draggable="true" data-var="${pagado}"           title="Pagado este mes. Se oculta si es $0"><i class="bi bi-check-circle"></i> ${pagado}</span>
+                <span class="chip chip-always" draggable="true" data-var="{saludo}"                          title="Buenas Tardes / Días + nombre del cliente"><i class="bi bi-hand-wave"></i> {saludo}</span>
+                <span class="chip chip-always" draggable="true" data-var="{resumen_total}"                 title="TOTAL A PAGAR o CUENTA AL DÍA (automático)"><i class="bi bi-cash-coin"></i> {resumen_total}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${mantenimiento}"                title="Abono mensual. Se oculta si es $0 (clientes proporcionales mes de alta)"><i class="bi bi-tools"></i> ${mantenimiento}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${extras}"                       title="Productos del mes. Se oculta si es $0"><i class="bi bi-box-seam"></i> ${extras}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="{detalle_productos}"             title="Lista de productos. Se oculta si no hay"><i class="bi bi-list-ul"></i> {detalle_productos}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${proporcional}"                 title="Proporcional mes de alta (día 1-14). Se oculta si es $0"><i class="bi bi-percent"></i> ${proporcional}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${extras_proporcional}"          title="Productos del mes proporcional. Se oculta si es $0"><i class="bi bi-box-seam"></i> ${extras_proporcional}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="{detalle_proporcional}"         title="Lista de productos proporcionales. Se oculta si no hay"><i class="bi bi-list-ul"></i> {detalle_proporcional}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${proporcional_anterior}"        title="Proporcional diferido (alta día 15+, aparece el mes siguiente). Se oculta si es $0"><i class="bi bi-percent"></i> ${proporcional_anterior}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${extras_proporcional_anterior}" title="Productos del proporcional diferido. Se oculta si es $0"><i class="bi bi-box-seam"></i> ${extras_proporcional_anterior}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="{detalle_proporcional_anterior}" title="Lista de productos del proporcional diferido. Se oculta si no hay"><i class="bi bi-list-ul"></i> {detalle_proporcional_anterior}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${saldo_anterior}"               title="Deuda meses anteriores. Se oculta si es $0"><i class="bi bi-clock-history"></i> ${saldo_anterior}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${saldo_favor}"                  title="Saldo a favor de la casa. Se oculta si es $0"><i class="bi bi-piggy-bank"></i> ${saldo_favor}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${pagado}"                       title="Pagado este mes. Se oculta si es $0"><i class="bi bi-check-circle"></i> ${pagado}</span>
             </div>
             <div class="chip-desc">
                 <span class="badge" style="background:#d1e7ff;color:#0a58ca;font-weight:600;">azul</span> siempre aparece &nbsp;|&nbsp;
@@ -187,7 +193,15 @@
                 </button>
             </div>
             <div class="col-lg-6 preview-col">
-                <div class="chip-label mb-2 d-none d-lg-block">Vista previa</div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="chip-label mb-0 d-none d-lg-block">Vista previa</div>
+                    <select id="sel-sample-ind" class="form-select form-select-sm w-auto">
+                        <option value="deuda">Con deuda</option>
+                        <option value="aldia">Al día</option>
+                        <option value="proporcional">Solo proporcional</option>
+                        <option value="mixto">Prop. anterior + abono</option>
+                    </select>
+                </div>
                 <div class="wa-preview-screen">
                     <div style="width:100%">
                         <div class="wa-bubble" id="preview-ind"></div>
@@ -344,25 +358,69 @@ const defaultRecordatorio  = {{ default_recordatorio | tojson }};
 // ── Datos de ejemplo ──
 const SAMPLE_IND = {
     deuda: {
-        saludo:            'Buenas Tardes Juan García',
-        resumen_total:     '*-- TOTAL A PAGAR: $55.000 --*',
-        mantenimiento:     '40.000',
-        extras:            '10.000',     condExtras: 10000,
-        detalle_productos: '* 2lts de Cloro\n* 500gr de Algicida',  condDetalle: 2,
-        saldo_anterior:    '5.000',      condSaldoAnt: 5000,
-        saldo_favor:       '0',          condSaldoFav: 0,
-        pagado:            '0',          condPagado: 0,
+        saludo:                        'Buenas Tardes Juan García',
+        resumen_total:                 '*-- TOTAL A PAGAR: $55.000 --*',
+        mantenimiento:                 '40.000',     condMantenimiento: 40000,
+        extras:                        '10.000',     condExtras: 10000,
+        detalle_productos:             '* 2lts de Cloro\n* 500gr de Algicida',  condDetalle: 2,
+        proporcional:                  '0',          condProporcional: 0,
+        extras_proporcional:           '0',          condExtrasProp: 0,
+        detalle_proporcional:          '',           condDetalleProp: 0,
+        proporcional_anterior:         '0',          condPropAnt: 0,
+        extras_proporcional_anterior:  '0',          condExtrasPropAnt: 0,
+        detalle_proporcional_anterior: '',           condDetallePropAnt: 0,
+        saldo_anterior:                '5.000',      condSaldoAnt: 5000,
+        saldo_favor:                   '0',          condSaldoFav: 0,
+        pagado:                        '0',          condPagado: 0,
     },
     aldia: {
-        saludo:            'Buenas Tardes Juan García',
-        resumen_total:     '*-- CUENTA AL DÍA --*',
-        mantenimiento:     '40.000',
-        extras:            '0',          condExtras: 0,
-        detalle_productos: '',           condDetalle: 0,
-        saldo_anterior:    '0',          condSaldoAnt: 0,
-        saldo_favor:       '10.000',     condSaldoFav: 10000,
-        pagado:            '40.000',     condPagado: 40000,
-    }
+        saludo:                        'Buenas Tardes Juan García',
+        resumen_total:                 '*-- CUENTA AL DÍA --*',
+        mantenimiento:                 '40.000',     condMantenimiento: 40000,
+        extras:                        '0',          condExtras: 0,
+        detalle_productos:             '',           condDetalle: 0,
+        proporcional:                  '0',          condProporcional: 0,
+        extras_proporcional:           '0',          condExtrasProp: 0,
+        detalle_proporcional:          '',           condDetalleProp: 0,
+        proporcional_anterior:         '0',          condPropAnt: 0,
+        extras_proporcional_anterior:  '0',          condExtrasPropAnt: 0,
+        detalle_proporcional_anterior: '',           condDetallePropAnt: 0,
+        saldo_anterior:                '0',          condSaldoAnt: 0,
+        saldo_favor:                   '10.000',     condSaldoFav: 10000,
+        pagado:                        '40.000',     condPagado: 40000,
+    },
+    proporcional: {
+        saludo:                        'Buenas Tardes María López',
+        resumen_total:                 '*-- TOTAL A PAGAR: $112.500 --*',
+        mantenimiento:                 '0',          condMantenimiento: 0,
+        extras:                        '0',          condExtras: 0,
+        detalle_productos:             '',           condDetalle: 0,
+        proporcional:                  '112.500',    condProporcional: 112500,
+        extras_proporcional:           '3.000',      condExtrasProp: 3000,
+        detalle_proporcional:          '* 1lt de Cloro',  condDetalleProp: 1,
+        proporcional_anterior:         '0',          condPropAnt: 0,
+        extras_proporcional_anterior:  '0',          condExtrasPropAnt: 0,
+        detalle_proporcional_anterior: '',           condDetallePropAnt: 0,
+        saldo_anterior:                '0',          condSaldoAnt: 0,
+        saldo_favor:                   '0',          condSaldoFav: 0,
+        pagado:                        '0',          condPagado: 0,
+    },
+    mixto: {
+        saludo:                        'Buenas Tardes María López',
+        resumen_total:                 '*-- TOTAL A PAGAR: $190.000 --*',
+        mantenimiento:                 '150.000',    condMantenimiento: 150000,
+        extras:                        '5.000',      condExtras: 5000,
+        detalle_productos:             '* 2lts de Cloro',  condDetalle: 2,
+        proporcional:                  '0',          condProporcional: 0,
+        extras_proporcional:           '0',          condExtrasProp: 0,
+        detalle_proporcional:          '',           condDetalleProp: 0,
+        proporcional_anterior:         '35.000',     condPropAnt: 35000,
+        extras_proporcional_anterior:  '0',          condExtrasPropAnt: 0,
+        detalle_proporcional_anterior: '',           condDetallePropAnt: 0,
+        saldo_anterior:                '0',          condSaldoAnt: 0,
+        saldo_favor:                   '0',          condSaldoFav: 0,
+        pagado:                        '0',          condPagado: 0,
+    },
 };
 
 const SAMPLE_GRP = {
@@ -388,11 +446,18 @@ const SAMPLE_GRP = {
 
 // Variables condicionales (ocultan la línea si su valor numérico es 0)
 const COND_IND = {
-    'extras':            s => s.condExtras,
-    'detalle_productos': s => s.condDetalle,
-    'saldo_anterior':    s => s.condSaldoAnt,
-    'saldo_favor':       s => s.condSaldoFav,
-    'pagado':            s => s.condPagado,
+    'mantenimiento':                 s => s.condMantenimiento,
+    'extras':                        s => s.condExtras,
+    'detalle_productos':             s => s.condDetalle,
+    'proporcional':                  s => s.condProporcional,
+    'extras_proporcional':           s => s.condExtrasProp,
+    'detalle_proporcional':          s => s.condDetalleProp,
+    'proporcional_anterior':         s => s.condPropAnt,
+    'extras_proporcional_anterior':  s => s.condExtrasPropAnt,
+    'detalle_proporcional_anterior': s => s.condDetallePropAnt,
+    'saldo_anterior':                s => s.condSaldoAnt,
+    'saldo_favor':                   s => s.condSaldoFav,
+    'pagado':                        s => s.condPagado,
 };
 const COND_GRP = {
     'saldo_anterior': s => s.condSaldoAnt,
@@ -450,9 +515,16 @@ const SAMPLE_REC = {
     anio:   '2026',
 };
 
+// ── Sample selector para individual ──
+let currentSampleInd = 'deuda';
+document.getElementById('sel-sample-ind')?.addEventListener('change', function() {
+    currentSampleInd = this.value;
+    updatePreview('ta-ind','preview-ind', COND_IND, () => SAMPLE_IND[currentSampleInd]);
+});
+
 // ── Live update al escribir ──
 document.getElementById('ta-ind').addEventListener('input', () =>
-    updatePreview('ta-ind','preview-ind', COND_IND, () => SAMPLE_IND.deuda));
+    updatePreview('ta-ind','preview-ind', COND_IND, () => SAMPLE_IND[currentSampleInd]));
 document.getElementById('ta-grp').addEventListener('input', () =>
     updatePreview('ta-grp','preview-grp', COND_GRP, () => SAMPLE_GRP.deuda));
 document.getElementById('ta-rec').addEventListener('input', () =>
@@ -565,7 +637,7 @@ function switchTab(panel, tab, btn) {
 }
 
 // ── Init previews ──
-updatePreview('ta-ind','preview-ind', COND_IND, () => SAMPLE_IND.deuda);
+updatePreview('ta-ind','preview-ind', COND_IND, () => SAMPLE_IND[currentSampleInd]);
 updatePreview('ta-grp','preview-grp', COND_GRP, () => SAMPLE_GRP.deuda);
 updatePreview('ta-rec','preview-rec', {}, () => SAMPLE_REC);
 
