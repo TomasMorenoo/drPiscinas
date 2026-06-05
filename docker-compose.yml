@@ -21,10 +21,8 @@ services:
     build: .
     container_name: dr_piscinas_app
     restart: always
-    depends_on:
-      - db
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-drPiscinas}:${DB_PASS:-administrador}@db:5432/${DB_NAME:-drPiscinas_db}
+      - DATABASE_URL=postgresql://${DB_USER:-drPiscinas}:${DB_PASS:-administrador}@dr_piscinas_db:5432/${DB_NAME:-drPiscinas_db}
       - SECRET_KEY=${SECRET_KEY}
       - TZ=America/Argentina/Buenos_Aires
     ports:
@@ -33,3 +31,10 @@ services:
       - .:/sistema
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
+    networks:
+      - drpiscinas_net
+
+networks:
+  drpiscinas_net:
+    external: true
+    name: drpiscinas_drpiscinas_net
