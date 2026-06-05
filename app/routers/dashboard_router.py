@@ -180,6 +180,8 @@ def _wa_breakdown(casa, mes, anio, hist, pausado=False, prop_cfg=None):
     if hist and getattr(hist, 'proporcional_anterior', None):
         abono_base = float(hist.monto) - float(hist.proporcional_anterior)
         prop_prev = float(hist.proporcional_anterior)
+        extras_dif = 0.0
+        detalle_dif = []
     else:
         _fref_ant = casa.fecha_reactivacion or casa.fecha_creacion
         _prev_mes = 12 if mes == 1 else mes - 1
@@ -716,6 +718,11 @@ def index():
             if _fref_alta.month == mes and _fref_alta.year == anio:
                 extras = 0.0
         extras_diferidos, detalle_extras_diferidos = _calcular_extras_diferidos(casa, mes, anio, _prop_cfg)
+        # Si el mes ya está cerrado con proporcional_anterior, los extras diferidos
+        # ya están incluidos en hist.monto → no sumarlos de nuevo en el display
+        if historial and getattr(historial, 'proporcional_anterior', None) and extras_diferidos > 0:
+            extras_diferidos = 0.0
+            detalle_extras_diferidos = []
 
         total_mes = abono_mes + extras + extras_diferidos
 
@@ -1212,8 +1219,10 @@ def sync_abonos():
                         _sem += 1
                     prop = round(float(casa.precio_base or 0) / 4 * max(0, 5 - _sem), 2)
 
+        extras_dif_sync, _ = _calcular_extras_diferidos(casa, mes, anio, _prop_cfg_sync)
+
         if not hist:
-            nuevo = AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=abono_a_guardar + prop)
+            nuevo = AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=abono_a_guardar + prop + extras_dif_sync)
             if prop > 0:
                 nuevo.proporcional_anterior = prop
                 casa.proporcional_pendiente = None
@@ -1222,7 +1231,7 @@ def sync_abonos():
             db.session.add(nuevo)
         else:
             if not getattr(hist, 'pagado', False) and float(hist.monto_pagado or 0) == 0:
-                nuevo_monto = abono_a_guardar + prop
+                nuevo_monto = abono_a_guardar + prop + extras_dif_sync
                 if float(hist.monto or 0) != nuevo_monto:
                     hist.monto = nuevo_monto
                 if prop > 0 and not getattr(hist, 'proporcional_anterior', None):
