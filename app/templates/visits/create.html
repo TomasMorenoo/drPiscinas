@@ -87,10 +87,21 @@
 </div>
 
 <template id="producto-template">
-    <div class="producto-row border rounded p-3 mb-2 bg-light shadow-sm">
+    <div class="producto-row border-0 rounded-3 p-3 mb-2 shadow-sm" style="background:#f8fafc;">
         <div class="row g-2 align-items-center">
             <div class="col-7">
-                <select name="product_id[]" class="form-select form-select-sm product-select" required>
+                <div class="dropdown product-picker">
+                    <button type="button" class="form-select form-select-sm text-start product-pick-btn"
+                            style="cursor:pointer;"
+                            data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false">
+                        <span class="product-pick-label text-muted">
+                            <i class="bi bi-box-seam me-1 opacity-50"></i>Seleccioná un producto...
+                        </span>
+                    </button>
+                    <ul class="dropdown-menu w-100 border-0 shadow-lg rounded-3 p-1 product-pick-menu" style="max-height:320px;overflow-y:auto;"></ul>
+                </div>
+                <select name="product_id[]" class="product-select"
+                        style="position:absolute;opacity:0;pointer-events:none;height:1px;width:1px;overflow:hidden;">
                     <option value="">-- Producto --</option>
                     {% for product in products %}
                         <option value="{{ product.id }}"
@@ -227,12 +238,90 @@
             autocompleteList.style.display = 'none';
     });
 
+    const PINNED_SEARCHES = [['pastilla'], ['granulado', 'lento'], ['granulado', 'rapid'], ['clarificador']];
+    function normStr(s) { return s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, ''); }
+    function matchesPinned(text, terms) { const n = normStr(text); return terms.every(t => n.includes(normStr(t))); }
+
+    function buildMenuItems(ul, opts, sel, btn, allOpts, pinnedOpts) {
+        ul.innerHTML = '';
+        opts.forEach(opt => {
+            const name = opt.text.replace(/\s*\([^)]+\)$/, '');
+            const unit = (opt.text.match(/\(([^)]+)\)$/) || [])[1] || '';
+            const li = document.createElement('li');
+            const a  = document.createElement('a');
+            a.className = 'dropdown-item rounded-2 py-2 px-3 d-flex align-items-center gap-2';
+            a.href = '#';
+            a.innerHTML = `<i class="bi bi-droplet-fill text-primary opacity-75 flex-shrink-0" style="font-size:.75rem;"></i>
+                           <span class="flex-grow-1">${name}</span>
+                           ${unit ? `<span class="text-muted small">${unit}</span>` : ''}`;
+            a.onclick = e => {
+                e.preventDefault();
+                sel.value = opt.value;
+                sel.dispatchEvent(new Event('change', { bubbles: true }));
+                const lbl = btn.querySelector('.product-pick-label');
+                lbl.innerHTML = `<i class="bi bi-check-circle-fill text-success me-1" style="font-size:.8rem;"></i>${name}`;
+                lbl.classList.remove('text-muted');
+            };
+            li.appendChild(a);
+            ul.appendChild(li);
+        });
+        const otherOpts = allOpts.filter(o => !pinnedOpts.includes(o));
+        if (otherOpts.length && opts !== allOpts) {
+            const divLi = document.createElement('li');
+            divLi.innerHTML = '<hr class="dropdown-divider my-1 mx-2">';
+            ul.appendChild(divLi);
+            const verMasLi = document.createElement('li');
+            const verMasA  = document.createElement('a');
+            verMasA.className = 'dropdown-item rounded-2 py-2 px-3 d-flex align-items-center gap-2 text-muted';
+            verMasA.href = '#';
+            verMasA.innerHTML = '<i class="bi bi-grid-3x3-gap-fill flex-shrink-0" style="font-size:.75rem;"></i><span class="small">Ver todos los productos</span><i class="bi bi-chevron-right ms-auto" style="font-size:.7rem;"></i>';
+            verMasA.onclick = e => {
+                e.preventDefault();
+                e.stopPropagation();
+                buildMenuItems(ul, allOpts, sel, btn, allOpts, pinnedOpts);
+            };
+            verMasLi.appendChild(verMasA);
+            ul.appendChild(verMasLi);
+        }
+    }
+
+    function initProductPicker(row) {
+        const sel = row.querySelector('.product-select');
+        const btn = row.querySelector('.product-pick-btn');
+        const ul  = row.querySelector('.product-pick-menu');
+        const allOpts    = Array.from(sel.options).filter(o => o.value);
+        const pinnedOpts = PINNED_SEARCHES.map(s => allOpts.find(o => matchesPinned(o.text, s))).filter(Boolean);
+
+        if (sel.value) {
+            const cur = allOpts.find(o => o.value === sel.value);
+            if (cur) {
+                const lbl = btn.querySelector('.product-pick-label');
+                lbl.innerHTML = `<i class="bi bi-check-circle-fill text-success me-1" style="font-size:.8rem;"></i>${cur.text.replace(/\s*\([^)]+\)$/, '')}`;
+                lbl.classList.remove('text-muted');
+            }
+        }
+
+        buildMenuItems(ul, pinnedOpts, sel, btn, allOpts, pinnedOpts);
+        btn.addEventListener('hidden.bs.dropdown', () =>
+            buildMenuItems(ul, pinnedOpts, sel, btn, allOpts, pinnedOpts));
+    }
+
     function agregarProducto() {
         document.getElementById("empty-products").classList.add("d-none");
         const container = document.getElementById("productos-container");
-        const template = document.getElementById("producto-template");
-        container.appendChild(template.content.cloneNode(true));
+        container.appendChild(document.getElementById("producto-template").content.cloneNode(true));
+        initProductPicker(container.lastElementChild);
     }
+
+    document.getElementById('visitForm').addEventListener('submit', function(e) {
+        for (const row of document.querySelectorAll('.producto-row')) {
+            if (!row.querySelector('.product-select').value) {
+                e.preventDefault();
+                row.querySelector('.product-pick-btn').classList.add('is-invalid');
+                return;
+            }
+        }
+    });
 
     function quitarProducto(btn) {
         btn.closest('.producto-row').remove();

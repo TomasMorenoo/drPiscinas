@@ -367,7 +367,18 @@
                     
                     <div class="mb-3">
                         <label class="form-label fw-bold">Producto</label>
-                        <select name="product_id" class="form-select border-secondary fw-bold" required>
+                        <div class="dropdown product-picker" id="extraProductPicker">
+                            <button type="button" class="form-select text-start product-pick-btn"
+                                    style="cursor:pointer;"
+                                    data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false">
+                                <span class="product-pick-label text-muted">
+                                    <i class="bi bi-box-seam me-1 opacity-50"></i>Seleccioná un producto...
+                                </span>
+                            </button>
+                            <ul class="dropdown-menu w-100 border-0 shadow-lg rounded-3 p-1 product-pick-menu" style="max-height:300px;overflow-y:auto;"></ul>
+                        </div>
+                        <select name="product_id" id="extraProductSelect"
+                                style="position:absolute;opacity:0;pointer-events:none;height:1px;width:1px;overflow:hidden;" required>
                             <option value="">Seleccionar...</option>
                             {% for p in productos %}
                             <option value="{{ p.id }}">{{ p.nombre }} (${{ p.precio | pesos }})</option>
@@ -405,6 +416,65 @@
 </div>
 
 <script>
+    (function() {
+        const PINNED_SEARCHES = [['pastilla'], ['granulado', 'lento'], ['granulado', 'rapid'], ['clarificador']];
+        function normStr(s) { return s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, ''); }
+        function matchesPinned(text, terms) { const n = normStr(text); return terms.every(t => n.includes(normStr(t))); }
+
+        function buildExtraMenu(ul, opts, sel, btn, allOpts, pinnedOpts) {
+            ul.innerHTML = '';
+            opts.forEach(opt => {
+                const name = opt.text.replace(/\s*\(?\$[\d.,]+\)?$/, '').trim();
+                const price = (opt.text.match(/\(\$([^)]+)\)$/) || [])[1] || '';
+                const li = document.createElement('li');
+                const a  = document.createElement('a');
+                a.className = 'dropdown-item rounded-2 py-2 px-3 d-flex align-items-center gap-2';
+                a.href = '#';
+                a.innerHTML = `<i class="bi bi-droplet-fill text-primary opacity-75 flex-shrink-0" style="font-size:.75rem;"></i>
+                               <span class="flex-grow-1">${name}</span>
+                               ${price ? `<span class="text-muted small">$${price}</span>` : ''}`;
+                a.onclick = e => {
+                    e.preventDefault();
+                    sel.value = opt.value;
+                    const lbl = btn.querySelector('.product-pick-label');
+                    lbl.innerHTML = `<i class="bi bi-check-circle-fill text-success me-1" style="font-size:.8rem;"></i>${name}`;
+                    lbl.classList.remove('text-muted');
+                };
+                li.appendChild(a);
+                ul.appendChild(li);
+            });
+            const otherOpts = allOpts.filter(o => !pinnedOpts.includes(o));
+            if (otherOpts.length && opts !== allOpts) {
+                ul.insertAdjacentHTML('beforeend', '<li><hr class="dropdown-divider my-1 mx-2"></li>');
+                const verMasLi = document.createElement('li');
+                const verMasA  = document.createElement('a');
+                verMasA.className = 'dropdown-item rounded-2 py-2 px-3 d-flex align-items-center gap-2 text-muted';
+                verMasA.href = '#';
+                verMasA.innerHTML = '<i class="bi bi-grid-3x3-gap-fill flex-shrink-0" style="font-size:.75rem;"></i><span class="small">Ver todos los productos</span><i class="bi bi-chevron-right ms-auto" style="font-size:.7rem;"></i>';
+                verMasA.onclick = e => { e.preventDefault(); e.stopPropagation(); buildExtraMenu(ul, allOpts, sel, btn, allOpts, pinnedOpts); };
+                verMasLi.appendChild(verMasA);
+                ul.appendChild(verMasLi);
+            }
+        }
+
+        const sel = document.getElementById('extraProductSelect');
+        const btn = document.querySelector('#extraProductPicker .product-pick-btn');
+        const ul  = document.querySelector('#extraProductPicker .product-pick-menu');
+        const allOpts    = Array.from(sel.options).filter(o => o.value);
+        const pinnedOpts = PINNED_SEARCHES.map(s => allOpts.find(o => matchesPinned(o.text, s))).filter(Boolean);
+
+        buildExtraMenu(ul, pinnedOpts, sel, btn, allOpts, pinnedOpts);
+        btn.addEventListener('hidden.bs.dropdown', () => buildExtraMenu(ul, pinnedOpts, sel, btn, allOpts, pinnedOpts));
+
+        document.getElementById('modalExtra').addEventListener('hidden.bs.modal', () => {
+            sel.value = '';
+            const lbl = btn.querySelector('.product-pick-label');
+            lbl.innerHTML = '<i class="bi bi-box-seam me-1 opacity-50"></i>Seleccioná un producto...';
+            lbl.classList.add('text-muted');
+            buildExtraMenu(ul, pinnedOpts, sel, btn, allOpts, pinnedOpts);
+        });
+    })();
+
     document.addEventListener("DOMContentLoaded", function() {
         const d = new Date();
         document.getElementById('extraMes').value = d.getMonth() + 1;
