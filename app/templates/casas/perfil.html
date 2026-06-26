@@ -277,6 +277,9 @@
                                                 {% if d.proporcional_anterior > 0 %}
                                                 <br><small class="text-warning fw-normal" style="white-space: normal;">incl. prop. mes ant.: ${{ d.proporcional_anterior | pesos }}</small>
                                                 {% endif %}
+                                                {% if d.prop_pendiente > 0 %}
+                                                <br><span class="badge bg-warning text-dark fw-normal" style="white-space: normal; font-size:0.72rem;"><i class="bi bi-arrow-right me-1"></i>Prop. próx. mes: ${{ d.prop_pendiente | pesos }}</span>
+                                                {% endif %}
                                             </td>
                                             <td class="font-monospace text-success fw-bold" style="white-space: nowrap;">${{ d.pagado | pesos }}</td>
                                             <td>

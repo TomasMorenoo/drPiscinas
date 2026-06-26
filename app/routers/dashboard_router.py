@@ -791,7 +791,8 @@ def index():
             "estado": estado_item,
             "tiene_telefono": bool(casa.telefono),
             "pausado": pausado_mes,
-            "pagado_atrasado": bool(_txn and (casa.id, _txn) in _cascade_txns)
+            "pagado_atrasado": bool(_txn and (casa.id, _txn) in _cascade_txns),
+            "prop_pendiente": float(casa.proporcional_pendiente) if (casa.proporcional_pendiente and float(casa.proporcional_pendiente) > 0 and casa.fecha_reactivacion and casa.fecha_reactivacion.month == mes and casa.fecha_reactivacion.year == anio) else 0.0,
         }
 
         if casa.grupo_id:

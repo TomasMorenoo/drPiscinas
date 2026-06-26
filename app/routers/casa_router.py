@@ -647,6 +647,13 @@ def perfil(id):
 
         baja = getattr(h, 'cobrado_por', None) == 'BAJA'
 
+        prop_pend = 0.0
+        if (casa.proporcional_pendiente and float(casa.proporcional_pendiente) > 0
+                and casa.fecha_reactivacion
+                and h.mes == casa.fecha_reactivacion.month
+                and h.anio == casa.fecha_reactivacion.year):
+            prop_pend = float(casa.proporcional_pendiente)
+
         detalles_pagos.append({
             "periodo": f"{nombre_mes(h.mes)} {h.anio}",
             "anio": h.anio,
@@ -657,6 +664,7 @@ def perfil(id):
             "historial": h,
             "pausada": pausada,
             "baja": baja,
+            "prop_pendiente": prop_pend,
             "proporcional_anterior": float(getattr(h, 'proporcional_anterior', 0) or 0),
         })
         

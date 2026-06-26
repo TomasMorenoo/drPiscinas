@@ -570,6 +570,9 @@
                                 {% elif not item.casa.activo %}
                                     <span class="badge bg-secondary ms-1 badge-baja" title="Dado de baja">BAJA</span>
                                 {% endif %}
+                                {% if item.prop_pendiente > 0 %}
+                                    <span class="badge bg-warning text-dark ms-1" title="Proporcional diferido al mes siguiente: ${{ item.prop_pendiente | pesos }}"><i class="bi bi-arrow-right me-1"></i>Prop. ${{ item.prop_pendiente | pesos }}</span>
+                                {% endif %}
                             </td>
 
                             {# 2. ABONO #}
@@ -1010,6 +1013,9 @@
                                     </a>
                                     {% if item.pausado %}
                                         <span class="badge bg-secondary ms-1" title="Pausado"><i class="bi bi-pause-circle-fill me-1"></i>PAUSADA</span>
+                                    {% endif %}
+                                    {% if item.prop_pendiente > 0 %}
+                                        <span class="badge bg-warning text-dark ms-1" title="Proporcional diferido al mes siguiente: ${{ item.prop_pendiente | pesos }}"><i class="bi bi-arrow-right me-1"></i>Prop. ${{ item.prop_pendiente | pesos }}</span>
                                     {% endif %}
                                 </td>
 
