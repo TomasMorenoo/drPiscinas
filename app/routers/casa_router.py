@@ -638,7 +638,7 @@ def perfil(id):
         saldo_acumulado += total_mes
         saldo_acumulado -= pagado_real
 
-        if getattr(h, 'pagado', False) and pagado_real == 0 and saldo_acumulado > 0.01:
+        if getattr(h, 'pagado', False) and pagado_real == 0 and total_mes == 0 and saldo_acumulado > 0.01 and not pausada:
             pagado_simulado = saldo_acumulado
             saldo_acumulado = 0.0
             dinero_mostrado = pagado_simulado

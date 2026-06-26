@@ -566,6 +566,7 @@
                                     {{ item.casa.nombre_formateado() }}
                                 </a>
                                 {% if item.pausado %}
+                                    <span class="badge bg-secondary ms-1" title="Pausado"><i class="bi bi-pause-circle-fill me-1"></i>PAUSADA</span>
                                 {% elif not item.casa.activo %}
                                     <span class="badge bg-secondary ms-1 badge-baja" title="Dado de baja">BAJA</span>
                                 {% endif %}
@@ -668,7 +669,7 @@
 
                                 {# Acciones inline en mobile #}
                                 <div class="acciones-mobile-inline d-md-none d-print-none mt-1 justify-content-end">
-                                    {% if item.pausado and item.total_mes <= 0 %}
+                                    {% if item.pausado %}
                                         <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
                                                 class="btn btn-sm btn-secondary">
                                             <i class="bi bi-pause-circle-fill"></i>
@@ -721,7 +722,7 @@
 
                             {# 6. ACCIONES DESKTOP #}
                             <td class="p-1 align-middle d-none d-md-table-cell d-print-none" style="width: 140px;">
-                                {% if item.pausado and item.total_mes <= 0 %}
+                                {% if item.pausado %}
                                     <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
                                             class="btn btn-secondary btn-sm w-100 d-flex flex-column justify-content-center align-items-center shadow-sm fw-bold"
                                             style="height: 74px; border-style: dashed;">
@@ -1007,6 +1008,9 @@
                                        style="max-width: 100%;">
                                         {{ item.casa.nombre_formateado() }}
                                     </a>
+                                    {% if item.pausado %}
+                                        <span class="badge bg-secondary ms-1" title="Pausado"><i class="bi bi-pause-circle-fill me-1"></i>PAUSADA</span>
+                                    {% endif %}
                                 </td>
 
                                 {# Montos desktop #}
@@ -1098,7 +1102,7 @@
                                     {% endif %}
 
                                     <div class="acciones-mobile-inline d-md-none d-print-none mt-1 justify-content-end">
-                                        {% if item.pausado and item.total_mes <= 0 %}
+                                        {% if item.pausado %}
                                             <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
                                                     class="btn btn-sm btn-secondary">
                                                 <i class="bi bi-pause-circle-fill"></i>
@@ -1148,7 +1152,7 @@
 
                                 {# Estado desktop #}
                                 <td class="p-1 align-middle text-center pe-3 d-none d-md-table-cell d-print-none" style="width: 140px;">
-                                    {% if item.pausado and item.total_mes <= 0 %}
+                                    {% if item.pausado %}
                                         <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
                                                 class="btn btn-secondary btn-sm w-100 shadow-sm"
                                                 style="border-style: dashed;">

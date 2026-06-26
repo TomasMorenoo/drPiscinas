@@ -87,7 +87,7 @@ class Casa(db.Model):
         es_mes_alta = bool(_fref and _fref.month == mes and _fref.year == anio)
         if pausa_en_mes or es_mes_alta:
             abono_final = 0.0
-            if _fref and _fref.day > 14:
+            if es_mes_alta and _fref and _fref.day > 14:
                 total_extras = 0.0
         elif hist:
             abono_final = float(hist.monto)
@@ -178,7 +178,7 @@ class Casa(db.Model):
         es_mes_alta = bool(_fref and _fref.month == mes and _fref.year == anio)
         if pausa_en_mes or es_mes_alta:
             abono_final = 0.0
-            if _fref and _fref.day > 14:
+            if es_mes_alta and _fref and _fref.day > 14:
                 total_extras = 0.0
         elif hist:
             abono_final = float(hist.monto)

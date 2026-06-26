@@ -280,7 +280,11 @@
                                             </td>
                                             <td class="font-monospace text-success fw-bold" style="white-space: nowrap;">${{ d.pagado | pesos }}</td>
                                             <td>
-                                                {% if d.saldo > 0.1 %}
+                                                {% if d.pausada %}
+                                                    <span class="badge bg-secondary fs-6 w-100 py-2 text-uppercase shadow-sm">
+                                                        <i class="bi bi-pause-circle me-1"></i>PAUSADA
+                                                    </span>
+                                                {% elif d.saldo > 0.1 %}
                                                     <span class="badge bg-danger fs-6 w-100 py-2 shadow-sm" style="white-space: nowrap;">Debe: ${{ d.saldo | pesos }}</span>
                                                 {% elif d.saldo < -0.1 %}
                                                     <span class="badge bg-info fs-6 w-100 py-2 shadow-sm"
