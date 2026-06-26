@@ -340,19 +340,22 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 {# Modal Pausar desde Lista #}
 <div class="modal fade" id="modalPausarLista" tabindex="-1">
-    <div class="modal-dialog modal-sm modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold"><i class="bi bi-pause-circle me-2"></i>Pausar Servicio</h5>
-                <small class="text-muted ms-2" id="pausarListaNombre"></small>
-                <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+        <div class="modal-content border-0 shadow overflow-hidden">
+            <div class="modal-header border-0 text-white py-4" style="background: linear-gradient(135deg, #1e3a5f, #2563eb);">
+                <div class="w-100 text-center">
+                    <i class="bi bi-pause-circle-fill fs-1 mb-2 d-block opacity-90"></i>
+                    <h5 class="modal-title fw-bold mb-0">Pausar Servicio</h5>
+                    <small class="opacity-75" id="pausarListaNombre"></small>
+                </div>
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-2" data-bs-dismiss="modal"></button>
             </div>
             <form id="formPausarLista" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="_next" value="lista">
-                <div class="modal-body d-flex flex-column gap-3">
+                <div class="modal-body px-4 py-3 d-flex flex-column gap-3">
                     <div>
-                        <label class="form-label fw-bold mb-1">Desde</label>
+                        <label class="form-label fw-bold small text-uppercase text-muted mb-2">Desde</label>
                         <div class="row g-2">
                             <div class="col-7">
                                 <select name="desde_mes" class="form-select" required>
@@ -371,19 +374,22 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
                     <div>
-                        <label class="form-label fw-bold mb-1">Hasta <span class="text-muted fw-normal">(opcional)</span></label>
-                        <div class="row g-2">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="toggleHastaLista" onchange="toggleHasta('lista')" style="width:1.2em;height:1.2em;border:2px solid #2563eb;cursor:pointer;">
+                            <label class="form-check-label fw-bold small text-uppercase" style="color:#495057;" for="toggleHastaLista">Definir fecha de fin</label>
+                        </div>
+                        <div id="hastaFieldsLista" class="row g-2" style="display:none!important;">
                             <div class="col-7">
-                                <select name="hasta_mes" class="form-select">
-                                    <option value="">-- Sin fin --</option>
+                                <select name="hasta_mes" id="hastaMesLista" class="form-select">
+                                    <option value="">-- Mes --</option>
                                     {% for m in range(1, 13) %}
                                     <option value="{{ m }}">{{ MESES_LARGO[m-1] }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
                             <div class="col-5">
-                                <select name="hasta_anio" class="form-select">
-                                    <option value="">--</option>
+                                <select name="hasta_anio" id="hastaAnioLista" class="form-select">
+                                    <option value="">-- Año --</option>
                                     {% for y in range(now.year - 1, now.year + 3) %}
                                     <option value="{{ y }}">{{ y }}</option>
                                     {% endfor %}
@@ -392,9 +398,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-secondary fw-bold btn-sm">Pausar</button>
+                <div class="modal-footer border-0 px-4 pb-4 pt-0 d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm fw-bold flex-fill" style="background:#2563eb;border-color:#2563eb;color:#fff;"><i class="bi bi-pause-circle me-1"></i>Pausar</button>
                 </div>
             </form>
         </div>
@@ -442,9 +448,20 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <script>
+function toggleHasta(ctx) {
+    var cb = document.getElementById('toggleHasta' + (ctx === 'lista' ? 'Lista' : 'Perfil'));
+    var fields = document.getElementById('hastaFields' + (ctx === 'lista' ? 'Lista' : 'Perfil'));
+    fields.style.setProperty('display', cb.checked ? 'flex' : 'none', 'important');
+    if (!cb.checked) {
+        fields.querySelectorAll('select').forEach(function(s){ s.value = ''; });
+    }
+}
 function abrirModalPausarLista(id, nombre) {
     document.getElementById('pausarListaNombre').textContent = nombre;
     document.getElementById('formPausarLista').action = '/casas/' + id + '/pausar';
+    var cb = document.getElementById('toggleHastaLista');
+    cb.checked = false;
+    toggleHasta('lista');
     new bootstrap.Modal(document.getElementById('modalPausarLista')).show();
 }
 function abrirModalReanudarLista(id, nombre, diasActuales) {

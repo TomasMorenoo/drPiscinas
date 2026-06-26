@@ -645,6 +645,8 @@ def perfil(id):
         else:
             dinero_mostrado = pagado_real
 
+        baja = getattr(h, 'cobrado_por', None) == 'BAJA'
+
         detalles_pagos.append({
             "periodo": f"{nombre_mes(h.mes)} {h.anio}",
             "anio": h.anio,
@@ -654,6 +656,7 @@ def perfil(id):
             "saldo": saldo_acumulado,
             "historial": h,
             "pausada": pausada,
+            "baja": baja,
             "proporcional_anterior": float(getattr(h, 'proporcional_anterior', 0) or 0),
         })
         
@@ -697,6 +700,7 @@ def toggle_casa(id):
         if dias_sel:
             casa.dia_visita = ','.join(sorted(dias_sel, key=int))
         fecha_reac = datetime.now()
+        fecha_inac = casa.fecha_inactivacion
         casa.fecha_reactivacion = fecha_reac
         casa.activo = True
         casa.inactivado_por = None
@@ -707,6 +711,21 @@ def toggle_casa(id):
             pb = 0.0
         _prop = _calcular_proporcional(fecha_reac, casa.dia_visita, pb)
         casa.proporcional_pendiente = _prop if _prop > 0 else None
+        # Crear registros BAJA para los meses inactivos
+        if fecha_inac:
+            m, y = fecha_inac.month, fecha_inac.year
+            while (y, m) < (fecha_reac.year, fecha_reac.month):
+                existe = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=m, anio=y).first()
+                if not existe:
+                    db.session.add(AbonoHistorico(
+                        casa_id=casa.id, mes=m, anio=y,
+                        monto=0.0, monto_pagado=0.0, pagado=True,
+                        cobrado_por='BAJA'
+                    ))
+                m += 1
+                if m > 12:
+                    m = 1
+                    y += 1
         registrar_auditoria(
             current_user.username,
             'ACTIVAR_CLIENTE',

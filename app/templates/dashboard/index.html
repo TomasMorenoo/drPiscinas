@@ -2101,10 +2101,18 @@ document.getElementById('modalCerrarMesActual').addEventListener('show.bs.modal'
 
 document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(t => new bootstrap.Tooltip(t));
 
+document.getElementById('modalCerrarMesActual').addEventListener('hide.bs.modal', function () {
+    const btn = document.getElementById('btnConfirmarCierreActual');
+    btn.disabled = true;
+    document.getElementById('cuentaRegresivaCierre').textContent = '3';
+    document.getElementById('cuentaRegresivaCierre').classList.remove('d-none');
+});
+</script>
+{% endif %}
+<script>
 function fmt(n) {
     return '$' + Math.round(n).toLocaleString('es-AR').replace(/,/g, '.');
 }
-
 document.addEventListener('click', function(e) {
     const icon = e.target.closest('.js-desglose-icon');
     if (!icon) return;
@@ -2115,7 +2123,6 @@ document.addEventListener('click', function(e) {
     const extd  = parseFloat(d.extdif)|| 0;
     const deuda = parseFloat(d.deuda) || 0;
     const total = parseFloat(d.total) || 0;
-
     let rows = '';
     if (abono > 0) rows += `<tr><td class="text-muted py-1 pe-4">Abono base</td><td class="text-end font-monospace py-1">${fmt(abono)}</td></tr>`;
     if (prop  > 0) rows += `<tr><td class="text-muted py-1 pe-4">Proporcional</td><td class="text-end font-monospace py-1 text-warning fw-bold">+${fmt(prop)}</td></tr>`;
@@ -2123,19 +2130,10 @@ document.addEventListener('click', function(e) {
     if (extd  > 0) rows += `<tr><td class="text-muted py-1 pe-4">Prod. diferidos</td><td class="text-end font-monospace py-1 text-warning fw-bold">+${fmt(extd)}</td></tr>`;
     if (deuda > 0.1) rows += `<tr><td class="text-muted py-1 pe-4">Deuda anterior</td><td class="text-end font-monospace py-1 text-danger">+${fmt(deuda)}</td></tr>`;
     rows += `<tr class="border-top"><td class="py-2 pe-4 fw-bold">Total</td><td class="text-end font-monospace py-2 fw-bold">${fmt(total)}</td></tr>`;
-
     document.getElementById('modalDesgloseCuerpo').innerHTML = `<table class="table table-sm mb-0 align-middle">${rows}</table>`;
     const modalEl = document.getElementById('modalDesglose');
     (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).show();
 });
-
-document.getElementById('modalCerrarMesActual').addEventListener('hide.bs.modal', function () {
-    const btn = document.getElementById('btnConfirmarCierreActual');
-    btn.disabled = true;
-    document.getElementById('cuentaRegresivaCierre').textContent = '3';
-    document.getElementById('cuentaRegresivaCierre').classList.remove('d-none');
-});
 </script>
-{% endif %}
 
 {% endblock %}         
