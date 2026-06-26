@@ -190,15 +190,15 @@
 
                             {% if casa.activo %}
                             <a href="{{ url_for('casas.toggle_casa', id=casa.id) }}"
-                               class="btn btn-sm border-0 text-danger"
+                               class="btn btn-sm border-0 text-secondary"
                                title="Dar de baja">
-                                <i class="bi bi-pause-circle-fill fs-5"></i>
+                                <i class="bi bi-eye-fill fs-5"></i>
                             </a>
                             {% else %}
-                            <button type="button" class="btn btn-sm border-0 text-success"
+                            <button type="button" class="btn btn-sm border-0 text-secondary"
                                     title="Reactivar servicio"
                                     onclick="abrirModalActivar({{ casa.id }}, '{{ casa.nombre_formateado() }}', '{{ casa.dia_visita or '' }}')">
-                                <i class="bi bi-play-circle-fill fs-5"></i>
+                                <i class="bi bi-eye-slash-fill fs-5"></i>
                             </button>
                             {% endif %}
 
