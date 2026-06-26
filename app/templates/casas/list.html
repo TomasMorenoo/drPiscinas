@@ -202,6 +202,22 @@
                             </button>
                             {% endif %}
 
+                            {% if casa.activo %}
+                                {% if casa.pausado %}
+                                <button type="button" class="btn btn-sm border-0 text-warning"
+                                        title="Reanudar servicio"
+                                        onclick="abrirModalReanudarLista({{ casa.id }}, '{{ casa.nombre_formateado() }}', '{{ casa.dia_visita or '' }}')">
+                                    <i class="bi bi-pause-fill fs-5"></i>
+                                </button>
+                                {% else %}
+                                <button type="button" class="btn btn-sm border-0 text-secondary"
+                                        title="Pausar servicio"
+                                        onclick="abrirModalPausarLista({{ casa.id }}, '{{ casa.nombre_formateado() }}')">
+                                    <i class="bi bi-pause-circle fs-5"></i>
+                                </button>
+                                {% endif %}
+                            {% endif %}
+
                             {% if borrado_activado %}
                             <form action="{{ url_for('casas.eliminar_casa', id=casa.id) }}" method="POST" class="d-inline" onsubmit="return confirm('⚠️ ATENCIÓN: ¿Estás seguro de querer borrar este cliente de la base de datos para siempre?');">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -322,6 +338,127 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 </div>
+{# Modal Pausar desde Lista #}
+<div class="modal fade" id="modalPausarLista" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pause-circle me-2"></i>Pausar Servicio</h5>
+                <small class="text-muted ms-2" id="pausarListaNombre"></small>
+                <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formPausarLista" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="_next" value="lista">
+                <div class="modal-body d-flex flex-column gap-3">
+                    <div>
+                        <label class="form-label fw-bold mb-1">Desde</label>
+                        <div class="row g-2">
+                            <div class="col-7">
+                                <select name="desde_mes" class="form-select" required>
+                                    {% for m in range(1, 13) %}
+                                    <option value="{{ m }}" {% if m == now.month %}selected{% endif %}>{{ MESES_LARGO[m-1] }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-5">
+                                <select name="desde_anio" class="form-select" required>
+                                    {% for y in range(now.year - 1, now.year + 3) %}
+                                    <option value="{{ y }}" {% if y == now.year %}selected{% endif %}>{{ y }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label fw-bold mb-1">Hasta <span class="text-muted fw-normal">(opcional)</span></label>
+                        <div class="row g-2">
+                            <div class="col-7">
+                                <select name="hasta_mes" class="form-select">
+                                    <option value="">-- Sin fin --</option>
+                                    {% for m in range(1, 13) %}
+                                    <option value="{{ m }}">{{ MESES_LARGO[m-1] }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-5">
+                                <select name="hasta_anio" class="form-select">
+                                    <option value="">--</option>
+                                    {% for y in range(now.year - 1, now.year + 3) %}
+                                    <option value="{{ y }}">{{ y }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-secondary fw-bold btn-sm">Pausar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# Modal Reanudar desde Lista #}
+<div class="modal fade" id="modalReanudarLista" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 shadow overflow-hidden">
+            <div class="modal-header border-0 text-white py-3" style="background: linear-gradient(135deg, #198754, #20c997);">
+                <div class="w-100 text-center">
+                    <i class="bi bi-play-circle-fill fs-2 mb-1 d-block"></i>
+                    <h5 class="modal-title fw-bold mb-0">Reanudar Servicio</h5>
+                    <small class="opacity-75" id="reanudarListaNombre"></small>
+                </div>
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-2" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formReanudarLista" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="_next" value="lista">
+                <div class="modal-body px-4 py-3 d-flex flex-column gap-3">
+                    <div>
+                        <label class="form-label fw-bold small text-uppercase text-muted mb-2">Días de Visita</label>
+                        <div class="d-flex gap-2 flex-wrap" id="diasReanudarLista">
+                            {% for val, lbl in [('0','L'),('1','M'),('2','X'),('3','J'),('4','V'),('5','S'),('6','D')] %}
+                            <div>
+                                <input type="checkbox" class="btn-check" name="dia_visita" value="{{ val }}" id="dv_rl_{{ val }}">
+                                <label class="btn btn-outline-success btn-sm fw-bold" for="dv_rl_{{ val }}">{{ lbl }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-text small text-muted mt-1">Para calcular el proporcional del mes de reactivación.</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 pb-3 pt-0 d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success btn-sm fw-bold flex-fill">
+                        <i class="bi bi-play-circle me-1"></i>Reanudar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function abrirModalPausarLista(id, nombre) {
+    document.getElementById('pausarListaNombre').textContent = nombre;
+    document.getElementById('formPausarLista').action = '/casas/' + id + '/pausar';
+    new bootstrap.Modal(document.getElementById('modalPausarLista')).show();
+}
+function abrirModalReanudarLista(id, nombre, diasActuales) {
+    document.getElementById('reanudarListaNombre').textContent = nombre;
+    document.getElementById('formReanudarLista').action = '/casas/' + id + '/reanudar';
+    var dias = diasActuales ? diasActuales.split(',') : [];
+    ['0','1','2','3','4','5','6'].forEach(function(v) {
+        var cb = document.getElementById('dv_rl_' + v);
+        if (cb) cb.checked = dias.includes(v);
+    });
+    new bootstrap.Modal(document.getElementById('modalReanudarLista')).show();
+}
+</script>
+
 <script>
 function abrirModalActivar(id, nombre, diasActuales) {
     document.getElementById('modalActivarNombre').textContent = nombre;

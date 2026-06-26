@@ -841,6 +841,8 @@ def pausar_casa(id):
     db.session.commit()
 
     flash("Servicio pausado.", "warning")
+    if request.form.get("_next") == "lista":
+        return redirect(url_for("casas.listar_casas"))
     return redirect(url_for("casas.perfil", id=id))
 
 
@@ -905,6 +907,8 @@ def reanudar_casa(id):
     registrar_auditoria(current_user.username, "REANUDAR", f"{casa.nombre_formateado()} — hasta {hasta}")
     db.session.commit()
     flash("Servicio reanudado.", "success")
+    if request.form.get("_next") == "lista":
+        return redirect(url_for("casas.listar_casas"))
     return redirect(url_for("casas.perfil", id=id))
 
 
