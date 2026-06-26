@@ -3,31 +3,52 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
-        <h1 class="h3 mb-0 text-gray-800 fw-bold">
-            <i class="bi bi-house-door me-2"></i>{{ casa.nombre_formateado() }}
-        </h1>
-        <div class="d-flex flex-wrap gap-2">
-            {% if not request.referrer or '/dashboard' not in request.referrer %}
-            <form method="POST" action="{{ url_for('casas.eliminar_casa', id=casa.id) }}" onsubmit="return confirm('ATENCIÓN: ¿Estás seguro de eliminar este cliente por completo? Se borrará todo su historial y pagos. Esta acción NO se puede deshacer.');">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-danger fw-bold shadow-sm">
-                    <i class="bi bi-trash me-1"></i> Borrar
-                </button>
-            </form>
-            {% endif %}
-
-            <button type="button" class="btn btn-info text-white fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalAumentoIndividual">
-                <i class="bi bi-graph-up-arrow me-1"></i> Aumento Indiv.
-            </button>
-
-            <button type="button" class="btn btn-warning fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalExtra">
-                <i class="bi bi-box-seam me-1"></i> Producto Extra
-            </button>
-
-            <a href="javascript:void(0);" onclick="if(document.referrer) { window.history.back(); } else { window.location.href='{{ url_for('casas.listar_casas') }}'; }" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left"></i> Volver
+    <div class="mb-4">
+        {# Desktop #}
+        <div class="d-none d-md-flex justify-content-between align-items-center gap-2">
+            <h1 class="h3 mb-0 text-gray-800 fw-bold d-flex align-items-center gap-2">
+                <a href="javascript:void(0);" onclick="if(document.referrer) { window.history.back(); } else { window.location.href='{{ url_for('casas.listar_casas') }}'; }" class="btn btn-sm btn-outline-secondary px-2">
+                    <i class="bi bi-arrow-left"></i>
+                </a>
+                <i class="bi bi-house-door me-1"></i>{{ casa.nombre_formateado() }}
+            </h1>
+            <div class="d-flex gap-2">
+                {% if not request.referrer or '/dashboard' not in request.referrer %}
+                <form method="POST" action="{{ url_for('casas.eliminar_casa', id=casa.id) }}" onsubmit="return confirm('ATENCIÓN: ¿Estás seguro de eliminar este cliente por completo? Se borrará todo su historial y pagos. Esta acción NO se puede deshacer.');" class="d-contents">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-danger fw-semibold" style="width:110px;"><i class="bi bi-trash me-1"></i>Borrar</button>
+                </form>
+                {% endif %}
+                <button type="button" class="btn btn-sm btn-info text-white fw-semibold" style="width:110px;" data-bs-toggle="modal" data-bs-target="#modalAumentoIndividual"><i class="bi bi-graph-up-arrow me-1"></i>Aumento</button>
+                <button type="button" class="btn btn-sm btn-warning fw-semibold" style="width:110px;" data-bs-toggle="modal" data-bs-target="#modalExtra"><i class="bi bi-box-seam me-1"></i>Producto</button>
+            </div>
+        </div>
+        {# Mobile #}
+        <div class="d-flex d-md-none align-items-center gap-1">
+            <a href="javascript:void(0);" onclick="if(document.referrer) { window.history.back(); } else { window.location.href='{{ url_for('casas.listar_casas') }}'; }" class="text-secondary text-decoration-none d-flex align-items-center" style="font-size:1.3rem;">
+                <i class="bi bi-arrow-left-short"></i>
             </a>
+            <h1 class="h4 mb-0 text-gray-800 fw-bold d-flex align-items-center gap-1">
+                <i class="bi bi-house-door me-1"></i>{{ casa.nombre_formateado() }}
+            </h1>
+            <div class="dropdown d-flex align-items-center ms-1">
+                <button class="text-secondary bg-transparent border-0 p-0 d-flex align-items-center" type="button" data-bs-toggle="dropdown" style="font-size:1rem;">
+                    <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <ul class="dropdown-menu shadow border-0">
+                    <li><button type="button" class="dropdown-item fw-semibold" data-bs-toggle="modal" data-bs-target="#modalAumentoIndividual"><i class="bi bi-graph-up-arrow me-2 text-info"></i>Aumento individual</button></li>
+                    <li><button type="button" class="dropdown-item fw-semibold" data-bs-toggle="modal" data-bs-target="#modalExtra"><i class="bi bi-box-seam me-2 text-warning"></i>Cargar producto extra</button></li>
+                    {% if not request.referrer or '/dashboard' not in request.referrer %}
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form method="POST" action="{{ url_for('casas.eliminar_casa', id=casa.id) }}" onsubmit="return confirm('ATENCIÓN: ¿Estás seguro de eliminar este cliente por completo? Se borrará todo su historial y pagos. Esta acción NO se puede deshacer.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="dropdown-item fw-semibold text-danger"><i class="bi bi-trash me-2"></i>Eliminar cliente</button>
+                        </form>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
         </div>
     </div>
 
@@ -37,61 +58,65 @@
                 <div class="card-body">
                     <h5 class="fw-bold mb-4"><i class="bi bi-person-badge text-primary me-2"></i>Datos del Cliente</h5>
                     
-                    <div class="mb-3">
+                    <div class="perfil-field mb-3">
                         <small class="text-muted d-block text-uppercase fw-bold">Nombre</small>
-                        <span class="fs-5">{{ casa.nombre_cliente if casa.nombre_cliente else 'No registrado' }}</span>
+                        <span class="fs-5 perfil-val">{{ casa.nombre_cliente if casa.nombre_cliente else 'No registrado' }}</span>
                     </div>
-                    
-                    <div class="mb-3">
+
+                    <div class="perfil-field mb-3">
                         <small class="text-muted d-block text-uppercase fw-bold">WhatsApp</small>
                         {% if casa.telefono %}
-                            <span class="fs-5"><i class="bi bi-whatsapp text-success me-1"></i> {{ casa.telefono }}</span>
+                            <span class="fs-5 perfil-val"><i class="bi bi-whatsapp text-success me-2" style="width:1em;display:inline-block;"></i>{{ casa.telefono | telefono }}</span>
                         {% else %}
-                            <span class="fs-5 text-danger"><i class="bi bi-exclamation-triangle me-1"></i> Faltante</span>
+                            <span class="fs-5 perfil-val text-danger"><i class="bi bi-exclamation-triangle me-1"></i>Faltante</span>
                         {% endif %}
                     </div>
 
-                    <div class="mb-3">
+                    <div class="perfil-field mb-3">
                         <small class="text-muted d-block text-uppercase fw-bold">Email</small>
                         {% if casa.email %}
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="fs-5 text-truncate" style="max-width: min(200px, 100%)" title="{{ casa.email }}"><i class="bi bi-envelope text-primary me-1"></i> {{ casa.email }}</span>
-                                <a href="mailto:{{ casa.email }}?subject=Facturación%20Mantenimiento%20-%20Dr.%20Piscinas" class="btn btn-sm btn-outline-primary shadow-sm" title="Enviar correo">
-                                    <i class="bi bi-send-fill"></i> Enviar
+                            <div class="d-flex align-items-center gap-2 min-w-0">
+                                <span class="fs-5 perfil-val text-truncate" title="{{ casa.email }}"><i class="bi bi-envelope text-primary me-2" style="width:1em;display:inline-block;"></i>{{ casa.email }}</span>
+                                <a href="mailto:{{ casa.email }}?subject=Facturación%20Mantenimiento%20-%20Dr.%20Piscinas" class="btn btn-sm btn-outline-primary shadow-sm flex-shrink-0" title="Enviar correo">
+                                    <i class="bi bi-send-fill"></i>
                                 </a>
                             </div>
                         {% else %}
-                            <span class="fs-5 text-muted"><i class="bi bi-envelope-x me-1"></i> No registrado</span>
+                            <span class="fs-5 perfil-val text-muted"><i class="bi bi-envelope-x me-1"></i>No registrado</span>
                         {% endif %}
                     </div>
 
-                    <div class="mb-3">
-                        <small class="text-muted d-block text-uppercase fw-bold">Abono Base Actual</small>
-                        <span class="fs-5 text-success fw-bold">${{ casa.precio_base | pesos }}</span>
+                    <div class="perfil-field mb-3">
+                        <small class="text-muted d-block text-uppercase fw-bold">Abono Base</small>
+                        <span class="fs-5 perfil-val text-success fw-bold">${{ casa.precio_base | pesos }}</span>
                     </div>
 
                     {% if casa.fecha_creacion %}
-                    <div class="mb-3">
+                    <div class="perfil-field mb-3">
                         <small class="text-muted d-block text-uppercase fw-bold">Cliente desde</small>
-                        <span class="text-muted">{{ casa.fecha_creacion.day }} de {{ MESES_LARGO[casa.fecha_creacion.month - 1] }} {{ casa.fecha_creacion.year }}</span>
+                        <span class="perfil-val text-muted">{{ casa.fecha_creacion.day }} de {{ MESES_LARGO[casa.fecha_creacion.month - 1] }} {{ casa.fecha_creacion.year }}</span>
                     </div>
                     {% endif %}
 
                     {% if casa.dia_visita %}
-                    <div class="mb-3">
-                        <small class="text-muted d-block text-uppercase fw-bold">Días de Visita</small>
-                        {% set dias_map = {'0':'Lun','1':'Mar','2':'Mié','3':'Jue','4':'Vie','5':'Sáb','6':'Dom'} %}
-                        {% for d in casa.dia_visita.split(',') %}
-                            <span class="badge bg-primary me-1">{{ dias_map.get(d, d) }}</span>
-                        {% endfor %}
+                    <div class="perfil-field mb-3">
+                        <small class="text-muted d-block text-uppercase fw-bold">Días Visita</small>
+                        <div class="perfil-val">
+                            {% set dias_map = {'0':'Lun','1':'Mar','2':'Mié','3':'Jue','4':'Vie','5':'Sáb','6':'Dom'} %}
+                            {% for d in casa.dia_visita.split(',') %}
+                                <span class="badge bg-primary me-1">{{ dias_map.get(d, d) }}</span>
+                            {% endfor %}
+                        </div>
                     </div>
                     {% endif %}
 
                     {% if casa.proporcional_pendiente and casa.proporcional_pendiente > 0 %}
-                    <div class="mb-3">
-                        <small class="text-muted d-block text-uppercase fw-bold">Proporcional Pendiente</small>
-                        <span class="badge bg-warning text-dark">${{ casa.proporcional_pendiente | pesos }}</span>
-                        <div class="form-text small text-muted">Se sumará al próximo cierre de mes.</div>
+                    <div class="perfil-field mb-3">
+                        <small class="text-muted d-block text-uppercase fw-bold">Prop. Pendiente</small>
+                        <div class="perfil-val">
+                            <span class="badge bg-warning text-dark">${{ casa.proporcional_pendiente | pesos }}</span>
+                            <div class="form-text small text-muted">Próximo cierre.</div>
+                        </div>
                     </div>
                     {% endif %}
 
@@ -106,24 +131,24 @@
                     </div>
                     {% endif %}
 
-                    <div class="mt-4 d-flex flex-column gap-2">
-                        <a href="{{ url_for('casas.editar_casa', id=casa.id) }}" class="btn btn-warning w-100 fw-bold">
-                            <i class="bi bi-pencil"></i> Editar Datos
+                    <div class="mt-4 d-flex gap-2">
+                        <a href="{{ url_for('casas.editar_casa', id=casa.id) }}" class="btn btn-sm btn-warning fw-semibold d-flex align-items-center justify-content-center" style="width:90px;">
+                            <i class="bi bi-pencil me-1"></i>Editar
                         </a>
 
                         {% if not casa.pausado %}
-                        <button type="button" class="btn btn-secondary w-100 fw-bold"
+                        <button type="button" class="btn btn-sm btn-secondary fw-semibold" style="width:90px;"
                                 data-bs-toggle="modal" data-bs-target="#modalPausar">
-                            <i class="bi bi-pause-circle me-1"></i> Pausar Servicio
+                            <i class="bi bi-pause-circle me-1"></i>Pausar
                         </button>
                         {% else %}
-                        <button type="button" class="btn btn-success w-100 fw-bold"
+                        <button type="button" class="btn btn-sm btn-success fw-semibold" style="width:90px;"
                                 data-bs-toggle="modal" data-bs-target="#modalReanudar">
-                            <i class="bi bi-play-circle me-1"></i> Reanudar Servicio
+                            <i class="bi bi-play-circle me-1"></i>Reanudar
                         </button>
-                        <button type="button" class="btn btn-outline-danger w-100 btn-sm"
+                        <button type="button" class="btn btn-sm btn-outline-danger" style="width:90px;"
                                 data-bs-toggle="modal" data-bs-target="#modalDeshacerPausa">
-                            <i class="bi bi-x-circle me-1"></i> Deshacer Pausa
+                            <i class="bi bi-x-circle me-1"></i>Deshacer
                         </button>
                         {% endif %}
                     </div>
@@ -181,80 +206,85 @@
 
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white pt-3 pb-0" style="border-bottom: 2px solid #dee2e6;">
-                    <ul class="nav nav-tabs border-0" id="perfilTabs" role="tablist">
+                    <ul class="nav nav-tabs nav-justified border-0" id="perfilTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link active fw-bold border-0 text-dark" id="visitas-tab" data-bs-toggle="tab" data-bs-target="#visitas" type="button" role="tab"><i class="bi bi-calendar-check me-1"></i> Historial de Visitas</button>
+                            <button class="nav-link fw-bold border-0 text-muted" id="visitas-tab" data-bs-toggle="tab" data-bs-target="#visitas" type="button" role="tab"><i class="bi bi-calendar-check me-1"></i> <span class="d-none d-sm-inline">Historial de </span>Visitas</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link fw-bold border-0 text-muted" id="pagos-tab" data-bs-toggle="tab" data-bs-target="#pagos" type="button" role="tab"><i class="bi bi-receipt me-1"></i> Estado de Cuenta</button>
+                            <button class="nav-link active fw-bold border-0 text-dark" id="pagos-tab" data-bs-toggle="tab" data-bs-target="#pagos" type="button" role="tab"><i class="bi bi-receipt me-1"></i> <span class="d-none d-sm-inline">Estado de </span>Cuenta</button>
                         </li>
                     </ul>
                 </div>
                 <div class="card-body bg-light rounded-bottom p-0">
                     <div class="tab-content" id="perfilTabsContent">
                         
-                        <div class="tab-pane fade show active p-3" id="visitas" role="tabpanel">
+                        <div class="tab-pane fade p-3" id="visitas" role="tabpanel">
                             <ul class="list-group list-group-flush rounded shadow-sm">
-                                {% set has_visitas_reales = false %}
+                                {% set ns = namespace(count=0) %}
                                 {% for visit in visitas %}
                                     {% if visit.observaciones != '[EXTRA_MANUAL]' %}
-                                        {% set has_visitas_reales = true %}
-                                        <li class="list-group-item d-flex justify-content-between align-items-center p-3">
-                                            <div>
+                                        {% set ns.count = ns.count + 1 %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center p-3 gap-2 visita-item">
+                                            <div class="min-w-0">
                                                 <h6 class="mb-0 fw-bold">{{ visit.fecha.strftime('%d/%m/%Y') }}</h6>
-                                                <small class="text-muted">
+                                                <small class="text-muted d-block text-truncate" style="max-width: 220px;">
                                                     {% for vp in visit.productos %}{{ vp.product.nombre }} ({{ vp.cantidad | num }}) {% endfor %}
                                                 </small>
                                             </div>
-                                            <span class="badge bg-primary rounded-pill fs-6">${{ visit.calcular_total() | pesos }}</span>
+                                            <span class="badge bg-primary rounded-pill fs-6 flex-shrink-0">${{ visit.calcular_total() | pesos }}</span>
                                         </li>
                                     {% endif %}
                                 {% endfor %}
-                                
-                                {% if not has_visitas_reales %}
+                                {% if ns.count == 0 %}
                                     <li class="list-group-item text-center text-muted p-4">No hay visitas de mantenimiento registradas.</li>
                                 {% endif %}
                             </ul>
+                            <div id="visitasPager" class="d-flex justify-content-between align-items-center px-1 pt-2 pb-1" style="display:none!important;">
+                                <button id="visitasPrev" style="border:none;background:none;color:#444;font-size:1.4rem;line-height:1;padding:0 6px;">&#8249;</button>
+                                <span id="visitasInfo" style="font-size:0.9rem;font-weight:600;margin:0 4px;"></span>
+                                <button id="visitasNext" style="border:none;background:none;color:#444;font-size:1.4rem;line-height:1;padding:0 6px;">&#8250;</button>
+                            </div>
                         </div>
 
-                        <div class="tab-pane fade" id="pagos" role="tabpanel">
+                        <div class="tab-pane fade show active" id="pagos" role="tabpanel">
                             <div class="table-responsive">
-                                <table class="table table-hover mb-0 align-middle bg-white" style="font-size: 0.95rem;">
+                                <table class="table table-hover mb-0 align-middle bg-white text-center" style="font-size: 0.95rem;">
                                     <thead class="table-dark">
                                         <tr>
-                                            <th class="ps-4 py-3 text-white text-uppercase small fw-bold">Período</th>
-                                            <th class="text-end py-3 text-white text-uppercase small fw-bold">Saldo Anterior</th>
-                                            <th class="text-end py-3 text-white text-uppercase small fw-bold">Costo del Mes</th>
-                                            <th class="text-end py-3 text-white text-uppercase small fw-bold">Dinero Entregado</th>
-                                            <th class="text-end pe-4 py-3 text-white text-uppercase small fw-bold" style="width: 160px;">Estado</th>
+                                            <th class="py-3 text-white text-uppercase small fw-bold">Período</th>
+                                            <th class="py-3 text-white text-uppercase small fw-bold">Saldo Anterior</th>
+                                            <th class="py-3 text-white text-uppercase small fw-bold">Costo del Mes</th>
+                                            <th class="py-3 text-white text-uppercase small fw-bold">Dinero Entregado</th>
+                                            <th class="py-3 text-white text-uppercase small fw-bold" style="width: 160px;">Estado</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {% for d in detalles_pagos %}
-                                        <tr>
-                                            <td class="ps-4 fw-bold text-dark text-uppercase">{{ d.periodo }}</td>
-                                            <td class="text-end font-monospace">
+                                        {% for anio, filas in detalles_pagos | groupby('anio') %}
+                                        {% for d in filas %}
+                                        <tr data-anio="{{ anio }}">
+                                            <td class="fw-bold text-dark text-uppercase">{{ d.periodo }}</td>
+                                            <td class="font-monospace" style="white-space: nowrap;">
                                                 {% if d.saldo_anterior < -0.1 %}
-                                                    <span class="text-success fw-bold">A favor: ${{ d.saldo_anterior | abs | pesos }}</span>
+                                                    <span class="text-success fw-bold">+${{ d.saldo_anterior | abs | pesos }}</span>
                                                 {% elif d.saldo_anterior > 0.1 %}
                                                     <span class="text-danger fw-bold">Deuda: ${{ d.saldo_anterior | pesos }}</span>
                                                 {% else %}
                                                     <span class="text-muted">$0</span>
                                                 {% endif %}
                                             </td>
-                                            <td class="text-end font-monospace fw-bold text-dark">
+                                            <td class="font-monospace fw-bold text-dark" style="white-space: nowrap;">
                                                 ${{ d.costo_mes | pesos }}
                                                 {% if d.proporcional_anterior > 0 %}
-                                                <br><small class="text-warning fw-normal">incl. Saldo proporcional mes ant.: ${{ d.proporcional_anterior | pesos }}</small>
+                                                <br><small class="text-warning fw-normal" style="white-space: normal;">incl. prop. mes ant.: ${{ d.proporcional_anterior | pesos }}</small>
                                                 {% endif %}
                                             </td>
-                                            <td class="text-end font-monospace text-success fw-bold">${{ d.pagado | pesos }}</td>
-                                            <td class="text-end pe-4">
+                                            <td class="font-monospace text-success fw-bold" style="white-space: nowrap;">${{ d.pagado | pesos }}</td>
+                                            <td>
                                                 {% if d.saldo > 0.1 %}
-                                                    <span class="badge bg-danger fs-6 w-100 py-2 shadow-sm">Debe: ${{ d.saldo | pesos }}</span>
+                                                    <span class="badge bg-danger fs-6 w-100 py-2 shadow-sm" style="white-space: nowrap;">Debe: ${{ d.saldo | pesos }}</span>
                                                 {% elif d.saldo < -0.1 %}
                                                     <span class="badge bg-info fs-6 w-100 py-2 shadow-sm"
-                                                        style="cursor: help;"
+                                                        style="cursor: help; white-space: nowrap;"
                                                         data-bs-toggle="tooltip"
                                                         data-bs-placement="top"
                                                         {% if d.historial and d.historial.cobrado_por and d.historial.fecha_pago %}
@@ -262,7 +292,7 @@
                                                         {% else %}
                                                         title="Pago registrado antes de la implementación del auditor"
                                                         {% endif %}>
-                                                        A favor: ${{ d.saldo | abs | pesos }}
+                                                        +${{ d.saldo | abs | pesos }}
                                                     </span>
                                                 {% elif d.pausada %}
                                                     <span class="badge bg-secondary fs-6 w-100 py-2 text-uppercase shadow-sm">
@@ -284,9 +314,11 @@
                                             </td>
                                         </tr>
                                         {% endfor %}
+                                        {% endfor %}
                                     </tbody>
                                 </table>
                             </div>
+                            <div id="cuentaAnioNav" class="d-flex justify-content-between align-items-center px-1 pt-2 pb-1"></div>
                         </div>
 
                     </div>
@@ -495,6 +527,17 @@
 </script>
 
 <style>
+    .d-contents { display: contents; }
+    .min-w-0 { min-width: 0; }
+    @media (max-width: 767px) {
+        .table { font-size: 0.78rem; }
+        .table th, .table td { padding: 0.4rem 0.5rem; }
+        .table td .badge { font-size: 0.7rem !important; padding: 0.3rem 0.4rem; }
+        #perfilTabs .nav-link { font-size: 0.82rem; padding-left: 0.5rem; padding-right: 0.5rem; }
+        .perfil-field { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; border-bottom: 1px solid #f0f0f0; padding-bottom: 0.5rem; margin-bottom: 0.5rem !important; }
+        .perfil-field small { white-space: nowrap; flex-shrink: 0; }
+        .perfil-val { font-size: 0.95rem !important; text-align: right; }
+    }
     #perfilTabs .nav-link {
         color: #6c757d;
         padding-bottom: 10px;
@@ -512,6 +555,69 @@
         border-bottom: 3px solid #dee2e6 !important;
     }
 </style>
+
+<script>
+// --- Paginación Visitas ---
+(function initVisitas() {
+    var POR_PAG = 12;
+    var pagina = 0;
+    var items = Array.from(document.querySelectorAll('.visita-item'));
+    var total = items.length;
+    var totalPags = Math.ceil(total / POR_PAG);
+    if (total <= POR_PAG) return;
+
+    var pager = document.getElementById('visitasPager');
+    var info  = document.getElementById('visitasInfo');
+    var prev  = document.getElementById('visitasPrev');
+    var next  = document.getElementById('visitasNext');
+
+    function mostrar() {
+        for (var i = 0; i < items.length; i++) {
+            items[i].style.cssText = (i >= pagina * POR_PAG && i < (pagina + 1) * POR_PAG)
+                ? '' : 'display:none !important';
+        }
+        info.textContent = (pagina + 1) + '/' + totalPags;
+        prev.style.opacity = pagina === 0 ? '0.3' : '1';
+        next.style.opacity = pagina >= totalPags - 1 ? '0.3' : '1';
+        prev.disabled = pagina === 0;
+        next.disabled = pagina >= totalPags - 1;
+    }
+
+    pager.style.cssText = 'display:flex!important;';
+    prev.addEventListener('click', function() { if (pagina > 0) { pagina--; mostrar(); } });
+    next.addEventListener('click', function() { if (pagina < totalPags - 1) { pagina++; mostrar(); } });
+    mostrar();
+})();
+
+// --- Navegación por año en Cuenta ---
+(function initCuenta() {
+    const rows = Array.from(document.querySelectorAll('#pagos table tbody tr[data-anio]'));
+    if (!rows.length) return;
+
+    const anios = [];
+    rows.forEach(function(r) { if (anios.indexOf(r.dataset.anio) === -1) anios.push(r.dataset.anio); });
+
+    let idx = 0;
+
+    const nav = document.getElementById('cuentaAnioNav');
+    nav.innerHTML =
+        '<button id="cuentaAnioPrev" style="border:none;background:none;color:#444;font-size:1.4rem;line-height:1;padding:0 6px;">&#8249;</button>' +
+        '<span id="cuentaAnioInfo" style="font-size:0.9rem;font-weight:600;margin:0 4px;"></span>' +
+        '<button id="cuentaAnioNext" style="border:none;background:none;color:#444;font-size:1.4rem;line-height:1;padding:0 6px;">&#8250;</button>';
+
+    function mostrarAnio(i) {
+        idx = i;
+        rows.forEach(function(r) { r.style.display = r.dataset.anio === anios[i] ? '' : 'none'; });
+        document.getElementById('cuentaAnioInfo').textContent = anios[i];
+        document.getElementById('cuentaAnioPrev').disabled = i === 0;
+        document.getElementById('cuentaAnioNext').disabled = i === anios.length - 1;
+    }
+
+    document.getElementById('cuentaAnioPrev').addEventListener('click', function() { mostrarAnio(idx - 1); });
+    document.getElementById('cuentaAnioNext').addEventListener('click', function() { mostrarAnio(idx + 1); });
+    mostrarAnio(0);
+})();
+</script>
 
 {# Modal Pausar Servicio #}
 <div class="modal fade" id="modalPausar" tabindex="-1">
@@ -576,7 +682,7 @@
 
 {# Modal Reanudar Servicio #}
 <div class="modal fade" id="modalReanudar" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width: 360px;">
         <div class="modal-content border-0 shadow overflow-hidden">
             <div class="modal-header border-0 text-white py-4" style="background: linear-gradient(135deg, #198754, #20c997);">
                 <div class="w-100 text-center">
@@ -589,51 +695,28 @@
             <form method="POST" action="{{ url_for('casas.reanudar_casa', id=casa.id) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body px-4 py-3 d-flex flex-column gap-3">
-                    <p class="mb-0 text-center text-muted small">¿Confirma que desea reanudar el servicio?</p>
-                    <div class="bg-light rounded p-3">
-                        <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" id="toggleFechaReanudar">
-                            <label class="form-check-label fw-semibold small" for="toggleFechaReanudar">Fecha de finalización personalizada</label>
+                    <div class="text-center">
+                        <div id="calendarioReanudar" class="mx-auto"></div>
+                        <div class="mt-2 small text-muted">
+                            <i class="bi bi-calendar-check text-success me-1"></i>
+                            Fecha seleccionada: <strong id="labelFechaReanudar" class="text-success"></strong>
                         </div>
-                        <div id="fechaReanudar" class="d-none">
-                            <div class="row g-2 mt-1">
-                                <div class="col-3">
-                                    <select name="hasta_dia" class="form-select form-select-sm">
-                                        {% for d in range(1, 32) %}
-                                        <option value="{{ d }}" {% if d == now.day %}selected{% endif %}>{{ d }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-5">
-                                    <select name="hasta_mes" class="form-select form-select-sm">
-                                        {% for m in range(1, 13) %}
-                                        <option value="{{ m }}" {% if m == now.month %}selected{% endif %}>{{ MESES_LARGO[m-1] }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-4">
-                                    <select name="hasta_anio" class="form-select form-select-sm">
-                                        {% for y in range(now.year - 1, now.year + 3) %}
-                                        <option value="{{ y }}" {% if y == now.year %}selected{% endif %}>{{ y }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <small class="text-muted" id="textoFechaReanudar"><i class="bi bi-calendar-check me-1"></i>Se usará el mes actual.</small>
+                        <input type="hidden" name="hasta_dia" id="hasta_dia_hidden">
+                        <input type="hidden" name="hasta_mes" id="hasta_mes_hidden">
+                        <input type="hidden" name="hasta_anio" id="hasta_anio_hidden">
                     </div>
-                    <div class="bg-light rounded p-3">
+                    <div class="border-top pt-3">
                         <label class="form-label fw-bold small text-uppercase text-muted mb-2">Días de Visita</label>
-                        <div class="d-flex gap-2 flex-wrap">
+                        <div class="d-flex gap-2 flex-wrap justify-content-center">
                             {% set dias_act = (casa.dia_visita or '').split(',') %}
                             {% for val, lbl in [('0','L'),('1','M'),('2','X'),('3','J'),('4','V'),('5','S'),('6','D')] %}
                             <div>
                                 <input type="checkbox" class="btn-check" name="dia_visita" value="{{ val }}" id="dv_r_{{ val }}" {% if val in dias_act %}checked{% endif %}>
-                                <label class="btn btn-outline-primary btn-sm fw-bold" for="dv_r_{{ val }}">{{ lbl }}</label>
+                                <label class="btn btn-outline-success btn-sm fw-bold px-3" for="dv_r_{{ val }}">{{ lbl }}</label>
                             </div>
                             {% endfor %}
                         </div>
-                        <div class="form-text small text-muted mt-1">Para calcular el proporcional del mes de reactivación.</div>
+                        <div class="form-text small text-muted text-center mt-1">Para calcular el proporcional del mes de reactivación.</div>
                     </div>
                 </div>
                 <div class="modal-footer border-0 px-4 pb-4 pt-0 d-flex gap-2">
@@ -720,19 +803,72 @@ function confirmarEliminarExtra(url, nombre, mes) {
 }
 </script>
 
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+<style>
+#calendarioReanudar .flatpickr-calendar {
+    box-shadow: none;
+    border: none;
+    background: transparent;
+    width: 100%;
+}
+#calendarioReanudar .flatpickr-day.selected,
+#calendarioReanudar .flatpickr-day.selected:hover {
+    background: #198754;
+    border-color: #198754;
+}
+#calendarioReanudar .flatpickr-day.today {
+    border-color: #20c997;
+}
+#calendarioReanudar .flatpickr-day:hover {
+    background: #d1e7dd;
+    border-color: #d1e7dd;
+}
+#calendarioReanudar .flatpickr-months .flatpickr-month,
+#calendarioReanudar .flatpickr-weekdays,
+#calendarioReanudar span.flatpickr-weekday {
+    background: transparent;
+    color: #198754;
+    fill: #198754;
+}
+#calendarioReanudar .flatpickr-current-month .flatpickr-monthDropdown-months,
+#calendarioReanudar .flatpickr-current-month input.cur-year {
+    color: #198754;
+    font-weight: 700;
+}
+#calendarioReanudar .flatpickr-prev-month svg,
+#calendarioReanudar .flatpickr-next-month svg {
+    fill: #198754;
+}
+#calendarioReanudar .flatpickr-innerContainer {
+    justify-content: center;
+}
+</style>
 <script>
-document.getElementById('toggleFechaReanudar').addEventListener('change', function() {
-    const input = document.getElementById('fechaReanudar');
-    const texto = document.getElementById('textoFechaReanudar');
-    if (this.checked) {
-        input.classList.remove('d-none');
-        texto.classList.add('d-none');
-    } else {
-        input.classList.add('d-none');
-        texto.classList.remove('d-none');
-        input.value = '{{ now.strftime("%Y-%m-%d") }}';
+(function() {
+    const hoy = '{{ now.strftime("%Y-%m-%d") }}';
+    const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+    function setFecha(dateStr) {
+        const parts = dateStr.split('-');
+        document.getElementById('hasta_anio_hidden').value = parts[0];
+        document.getElementById('hasta_mes_hidden').value = parseInt(parts[1]);
+        document.getElementById('hasta_dia_hidden').value = parseInt(parts[2]);
+        const label = parseInt(parts[2]) + ' de ' + meses[parseInt(parts[1])-1] + ' de ' + parts[0];
+        document.getElementById('labelFechaReanudar').textContent = label;
     }
-});
+
+    setFecha(hoy);
+    flatpickr('#calendarioReanudar', {
+        inline: true,
+        defaultDate: hoy,
+        locale: 'es',
+        onChange: function(selectedDates, dateStr) {
+            setFecha(dateStr);
+        }
+    });
+})();
 </script>
 
 {% endblock %}

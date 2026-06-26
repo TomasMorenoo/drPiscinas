@@ -647,6 +647,7 @@ def perfil(id):
 
         detalles_pagos.append({
             "periodo": f"{nombre_mes(h.mes)} {h.anio}",
+            "anio": h.anio,
             "saldo_anterior": saldo_anterior_iter,
             "costo_mes": total_mes,
             "pagado": dinero_mostrado,
@@ -877,6 +878,29 @@ def reanudar_casa(id):
         pb = 0.0
     _prop = _calcular_proporcional(fecha_reac, casa.dia_visita, pb)
     casa.proporcional_pendiente = _prop if _prop > 0 else None
+
+    pausas_actualizadas = Pausa.query.filter_by(casa_id=casa.id).all()
+    hists_cero = AbonoHistorico.query.filter_by(
+        casa_id=casa.id, pagado=False
+    ).filter(
+        AbonoHistorico.monto == 0,
+        AbonoHistorico.monto_pagado == 0
+    ).all()
+    for h in hists_cero:
+        mes_h = (h.anio, h.mes)
+        sigue_pausado = False
+        for p in pausas_actualizadas:
+            inicio = (p.desde.year, p.desde.month)
+            if p.hasta:
+                fin = (p.hasta.year, p.hasta.month)
+                cond_fin = fin >= mes_h if p.hasta.day == 1 else fin > mes_h
+            else:
+                cond_fin = True
+            if inicio <= mes_h and cond_fin:
+                sigue_pausado = True
+                break
+        if not sigue_pausado and casa.activo:
+            h.monto = float(casa.precio_base or 0)
 
     registrar_auditoria(current_user.username, "REANUDAR", f"{casa.nombre_formateado()} — hasta {hasta}")
     db.session.commit()

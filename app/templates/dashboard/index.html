@@ -426,6 +426,30 @@
         </div>
     </div>
 
+    {# ---- MODAL DESGLOSE ---- #}
+    <div class="modal fade" id="modalDesglose" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                <div class="modal-header border-0 pb-3 pt-4 px-4 text-white" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);">
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px;background:rgba(255,255,255,0.15);">
+                                <i class="bi bi-receipt fs-6 text-white"></i>
+                            </div>
+                            <h6 class="modal-title fw-bold text-white mb-0">Desglose del total</h6>
+                        </div>
+                        <p class="mb-0 mt-1 opacity-75" style="font-size:0.78rem;">Composición del monto a cobrar</p>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body px-4 py-3" id="modalDesgloseCuerpo"></div>
+                <div class="modal-footer border-0 pt-0 pb-3 px-4">
+                    <button type="button" class="btn btn-sm btn-dark w-100 rounded-3" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {# ---- EMPTY STATE ---- #}
     {% if (not reporte_sueltas and not reporte_grupos) or kpi_clientes == 0 %}
     <div class="empty-state d-print-none">
@@ -550,17 +574,11 @@
                             {# 2. ABONO #}
                             <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">
                                 ${{ item.abono | pesos }}
-                                {% if item.proporcional_preview > 0 %}
-                                    <br><span class="badge bg-warning text-dark font-monospace mt-1" title="Proporcional del mes de alta">+${{ item.proporcional_preview | pesos }}</span>
-                                {% endif %}
                             </td>
-                            
+
                             {# 3. PRODUCTOS #}
                             <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">
                                 ${{ item.extras | pesos }}
-                                {% if item.extras_diferidos > 0 %}
-                                    <br><span class="badge bg-warning text-dark font-monospace mt-1" title="{{ item.detalle_extras_diferidos | join(', ') }}">+${{ item.extras_diferidos | pesos }}</span>
-                                {% endif %}
                             </td>
 
                             {# 4. DEBE #}
@@ -613,6 +631,17 @@
                             {# 5. TOTAL A PAGAR #}
                             <td class="td-total-acciones text-md-center font-monospace fw-bold text-dark align-middle">
                                 {% set deuda_actual = item.total_mes + item.saldo_anterior + item.proporcional_preview - item.monto_pagado %}
+                                {% set tiene_desglose = item.proporcional_preview > 0 or item.extras_diferidos > 0 %}
+                                {% if tiene_desglose %}
+                                {% set total_final = item.total_mes + item.saldo_anterior + item.proporcional_preview %}
+                                {% set rows = [] %}
+                                {% if item.abono > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Abono</td><td class=\'text-end font-monospace\'>$' ~ (item.abono | pesos) ~ '</td></tr>') %}{% endif %}
+                                {% if item.proporcional_preview > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Proporcional</td><td class=\'text-end font-monospace text-warning fw-bold\'>+$' ~ (item.proporcional_preview | pesos) ~ '</td></tr>') %}{% endif %}
+                                {% if item.extras > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Productos</td><td class=\'text-end font-monospace\'>$' ~ (item.extras | pesos) ~ '</td></tr>') %}{% endif %}
+                                {% if item.extras_diferidos > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Productos</td><td class=\'text-end font-monospace text-warning fw-bold\'>+$' ~ (item.extras_diferidos | pesos) ~ '</td></tr>') %}{% endif %}
+                                {% if item.saldo_anterior > 0.1 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Deuda ant.</td><td class=\'text-end font-monospace text-danger\'>+$' ~ (item.saldo_anterior | pesos) ~ '</td></tr>') %}{% endif %}
+                                {% set pop_content = '<table class=\'mb-0 small\'>' ~ rows | join('') ~ '<tr class=\'border-top\'><td class=\'text-muted pe-3 pt-1\'>Total</td><td class=\'text-end font-monospace fw-bold pt-1\'>$' ~ (total_final | pesos) ~ '</td></tr></table>' %}
+                                {% endif %}
 
                                 {% if item.pagos_en_este_dashboard > 0 and not item.pagado %}
                                     <div class="d-flex flex-column align-items-end align-items-md-center">
@@ -622,7 +651,19 @@
                                         <span class="total-valor text-danger" style="font-size: 0.9rem;">Restan: ${{ deuda_actual | pesos }}</span>
                                     </div>
                                 {% else %}
-                                    <span class="total-valor">${{ (item.total_mes + item.saldo_anterior + item.proporcional_preview) | pesos }}</span>
+                                    <span class="total-valor">
+                                        ${{ (item.total_mes + item.saldo_anterior + item.proporcional_preview) | pesos }}
+                                        {% if tiene_desglose %}
+                                        <i class="bi bi-info-circle ms-1 js-desglose-icon" style="font-size:0.85rem; cursor:pointer; color:#f0a500;"
+                                           title="Click para ver detalle"
+                                           data-abono="{{ item.abono }}"
+                                           data-prop="{{ item.proporcional_preview }}"
+                                           data-extras="{{ item.extras }}"
+                                           data-extdif="{{ item.extras_diferidos }}"
+                                           data-deuda="{{ item.saldo_anterior }}"
+                                           data-total="{{ item.total_mes + item.saldo_anterior + item.proporcional_preview }}"></i>
+                                        {% endif %}
+                                    </span>
                                 {% endif %}
 
                                 {# Acciones inline en mobile #}
@@ -991,10 +1032,16 @@
                                         <div class="monto-item">
                                             <span class="monto-label">Abono</span>
                                             <span class="monto-valor">${{ item.abono | pesos }}</span>
+                                            {% if item.proporcional_preview > 0 %}
+                                                <span class="badge bg-warning text-dark font-monospace ms-1">+${{ item.proporcional_preview | pesos }}</span>
+                                            {% endif %}
                                         </div>
                                         <div class="monto-item">
                                             <span class="monto-label">Productos</span>
                                             <span class="monto-valor">${{ item.extras | pesos }}</span>
+                                            {% if item.extras_diferidos > 0 %}
+                                                <span class="badge bg-warning text-dark font-monospace ms-1">+${{ item.extras_diferidos | pesos }}</span>
+                                            {% endif %}
                                         </div>
                                         <div class="monto-item">
                                             <span class="monto-label">Debe</span>
@@ -1011,8 +1058,19 @@
 
                                 {# Total + acciones inline mobile #}
                                 <td class="td-total-acciones font-monospace fw-bold text-dark text-md-center align-middle">
-                                    {% set deuda_actual = item.total_mes + item.saldo_anterior - item.monto_pagado %}
-                                    
+                                    {% set deuda_actual = item.total_mes + item.saldo_anterior + item.proporcional_preview - item.monto_pagado %}
+                                    {% set tiene_desglose = item.proporcional_preview > 0 or item.extras_diferidos > 0 %}
+                                    {% if tiene_desglose %}
+                                    {% set total_final = item.total_mes + item.saldo_anterior + item.proporcional_preview %}
+                                    {% set rows = [] %}
+                                    {% if item.abono > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Abono</td><td class=\'text-end font-monospace\'>$' ~ (item.abono | pesos) ~ '</td></tr>') %}{% endif %}
+                                    {% if item.proporcional_preview > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Proporcional</td><td class=\'text-end font-monospace text-warning fw-bold\'>+$' ~ (item.proporcional_preview | pesos) ~ '</td></tr>') %}{% endif %}
+                                    {% if item.extras > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Productos</td><td class=\'text-end font-monospace\'>$' ~ (item.extras | pesos) ~ '</td></tr>') %}{% endif %}
+                                    {% if item.extras_diferidos > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Productos</td><td class=\'text-end font-monospace text-warning fw-bold\'>+$' ~ (item.extras_diferidos | pesos) ~ '</td></tr>') %}{% endif %}
+                                    {% if item.saldo_anterior > 0.1 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Deuda ant.</td><td class=\'text-end font-monospace text-danger\'>+$' ~ (item.saldo_anterior | pesos) ~ '</td></tr>') %}{% endif %}
+                                    {% set pop_content = '<table class=\'mb-0 small\'>' ~ rows | join('') ~ '<tr class=\'border-top\'><td class=\'text-muted pe-3 pt-1\'>Total</td><td class=\'text-end font-monospace fw-bold pt-1\'>$' ~ (total_final | pesos) ~ '</td></tr></table>' %}
+                                    {% endif %}
+
                                     {% if item.pagos_en_este_dashboard > 0 and not item.pagado %}
                                         <div class="d-flex flex-column align-items-end align-items-md-center">
                                             <span class="badge bg-warning text-dark mb-1 shadow-sm" style="font-size: 0.75rem;">
@@ -1023,7 +1081,20 @@
                                     {% elif item.pagado and item.monto_pagado > 0 %}
                                         <span class="total-valor text-success">${{ item.monto_pagado | pesos }}</span>
                                     {% else %}
-                                        <span class="total-valor">${{ (item.total_mes + item.saldo_anterior) | pesos }}</span>
+                                        <span class="total-valor">
+                                            ${{ (item.total_mes + item.saldo_anterior + item.proporcional_preview) | pesos }}
+                                            {% if tiene_desglose %}
+                                            <i class="bi bi-info-circle ms-1 js-desglose-icon"
+                                               style="font-size:0.85rem; cursor:pointer; color:#f0a500;"
+                                               title="Click para ver detalle"
+                                               data-abono="{{ item.abono }}"
+                                               data-prop="{{ item.proporcional_preview }}"
+                                               data-extras="{{ item.extras }}"
+                                               data-extdif="{{ item.extras_diferidos }}"
+                                               data-deuda="{{ item.saldo_anterior }}"
+                                               data-total="{{ item.total_mes + item.saldo_anterior + item.proporcional_preview }}"></i>
+                                            {% endif %}
+                                        </span>
                                     {% endif %}
 
                                     <div class="acciones-mobile-inline d-md-none d-print-none mt-1 justify-content-end">
@@ -1353,8 +1424,8 @@ function recargarPanel() {
             // Reaplicar filtro de búsqueda
             filtrarDashboard();
 
-            // Reiniciar tooltips
             document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(t => new bootstrap.Tooltip(t));
+document.querySelectorAll('[data-bs-toggle="popover"]').forEach(p => new bootstrap.Popover(p));
 
             // Restaurar scroll
             window.scrollTo(0, scrollY);
@@ -2026,6 +2097,36 @@ document.getElementById('modalCerrarMesActual').addEventListener('show.bs.modal'
             cuenta.textContent = segundos;
         }
     }, 1000);
+});
+
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(t => new bootstrap.Tooltip(t));
+
+function fmt(n) {
+    return '$' + Math.round(n).toLocaleString('es-AR').replace(/,/g, '.');
+}
+
+document.addEventListener('click', function(e) {
+    const icon = e.target.closest('.js-desglose-icon');
+    if (!icon) return;
+    const d = icon.dataset;
+    const abono = parseFloat(d.abono) || 0;
+    const prop  = parseFloat(d.prop)  || 0;
+    const ext   = parseFloat(d.extras)|| 0;
+    const extd  = parseFloat(d.extdif)|| 0;
+    const deuda = parseFloat(d.deuda) || 0;
+    const total = parseFloat(d.total) || 0;
+
+    let rows = '';
+    if (abono > 0) rows += `<tr><td class="text-muted py-1 pe-4">Abono base</td><td class="text-end font-monospace py-1">${fmt(abono)}</td></tr>`;
+    if (prop  > 0) rows += `<tr><td class="text-muted py-1 pe-4">Proporcional</td><td class="text-end font-monospace py-1 text-warning fw-bold">+${fmt(prop)}</td></tr>`;
+    if (ext   > 0) rows += `<tr><td class="text-muted py-1 pe-4">Productos</td><td class="text-end font-monospace py-1">${fmt(ext)}</td></tr>`;
+    if (extd  > 0) rows += `<tr><td class="text-muted py-1 pe-4">Prod. diferidos</td><td class="text-end font-monospace py-1 text-warning fw-bold">+${fmt(extd)}</td></tr>`;
+    if (deuda > 0.1) rows += `<tr><td class="text-muted py-1 pe-4">Deuda anterior</td><td class="text-end font-monospace py-1 text-danger">+${fmt(deuda)}</td></tr>`;
+    rows += `<tr class="border-top"><td class="py-2 pe-4 fw-bold">Total</td><td class="text-end font-monospace py-2 fw-bold">${fmt(total)}</td></tr>`;
+
+    document.getElementById('modalDesgloseCuerpo').innerHTML = `<table class="table table-sm mb-0 align-middle">${rows}</table>`;
+    const modalEl = document.getElementById('modalDesglose');
+    (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).show();
 });
 
 document.getElementById('modalCerrarMesActual').addEventListener('hide.bs.modal', function () {

@@ -119,17 +119,17 @@
                         Configuración
                     </a>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item fw-bold text-primary" href="{{ url_for('users.listar_usuarios') }}"><i class="bi bi-person-badge-fill me-1"></i> Empleados</a></li>
+                        <li><a class="dropdown-item fw-semibold text-dark" href="{{ url_for('users.listar_usuarios') }}"><i class="bi bi-person-badge-fill me-2 text-secondary"></i>Empleados</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="{{ url_for('products.listar_products') }}">Productos</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('promo.listar_promos') }}">Promociones</a></li>
+                        <li><a class="dropdown-item fw-semibold text-dark" href="{{ url_for('products.listar_products') }}"><i class="bi bi-box-seam-fill me-2 text-secondary"></i>Productos</a></li>
+                        <li><a class="dropdown-item fw-semibold text-dark" href="{{ url_for('promo.listar_promos') }}"><i class="bi bi-tag-fill me-2 text-secondary"></i>Promociones</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item fw-bold text-success" href="{{ url_for('grupos.listar_grupos') }}"><i class="bi bi-collection-fill me-1"></i> Grupos de Clientes</a></li>
+                        <li><a class="dropdown-item fw-semibold text-dark" href="{{ url_for('grupos.listar_grupos') }}"><i class="bi bi-collection-fill me-2 text-secondary"></i>Grupos de Clientes</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="{{ url_for('country.listar_countries') }}">Countries</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('barrio.listar_barrios') }}">Barrios</a></li>
+                        <li><a class="dropdown-item fw-semibold text-dark" href="{{ url_for('country.listar_countries') }}"><i class="bi bi-geo-alt-fill me-2 text-secondary"></i>Countries</a></li>
+                        <li><a class="dropdown-item fw-semibold text-dark" href="{{ url_for('barrio.listar_barrios') }}"><i class="bi bi-map-fill me-2 text-secondary"></i>Barrios</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item fw-bold text-success" href="{{ url_for('config.listar_plantillas') }}"><i class="bi bi-whatsapp me-1"></i> Mensajes WhatsApp</a></li>
+                        <li><a class="dropdown-item fw-semibold text-dark" href="{{ url_for('config.listar_plantillas') }}"><i class="bi bi-whatsapp me-2 text-secondary"></i>Mensajes WhatsApp</a></li>
                     </ul>
                 </li>
                 {% endif %}

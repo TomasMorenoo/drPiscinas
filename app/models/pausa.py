@@ -10,4 +10,4 @@ class Pausa(db.Model):
     hasta = db.Column(db.Date, nullable=True)
     pausado_por = db.Column(db.String(100), nullable=True)
 
-    casa = db.relationship("Casa", backref=db.backref("historial_pausas", lazy=True))
+    casa = db.relationship("Casa", backref=db.backref("historial_pausas", lazy=True, cascade="all, delete-orphan"))

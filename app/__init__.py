@@ -84,6 +84,19 @@ def create_app():
     from app.utils import MESES_CORTO, MESES_LARGO, nombre_mes
     app.jinja_env.globals.update(MESES_CORTO=MESES_CORTO, MESES_LARGO=MESES_LARGO, nombre_mes=nombre_mes)
 
+    # --- FILTRO JINJA2: formato teléfono argentino (ej: 1141426771 → 11 4142-6771) ---
+    @app.template_filter('telefono')
+    def format_telefono(value):
+        if not value:
+            return value
+        digits = ''.join(c for c in str(value) if c.isdigit())
+        if len(digits) == 10:
+            return f"{digits[:2]} {digits[2:6]}-{digits[6:]}"
+        if len(digits) == 11 and digits.startswith('0'):
+            digits = digits[1:]
+            return f"{digits[:2]} {digits[2:6]}-{digits[6:]}"
+        return value
+
     # --- FILTRO JINJA2: formato pesos argentinos (punto como separador de miles) ---
     @app.template_filter('pesos')
     def format_pesos(value):

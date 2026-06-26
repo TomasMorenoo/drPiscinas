@@ -806,7 +806,7 @@ def index():
                 }
             g = reporte_grupos[casa.grupo_id]
             g["casas"].append(item_casa)
-            g["total_mes"] += total_mes
+            g["total_mes"] += total_mes + _prop_preview
             g["saldo_anterior"] += saldo_anterior_visual
             g["saldo_restante"] += saldo_restante
             g["monto_pagado"] += pagos_en_este_dashboard
@@ -1931,6 +1931,7 @@ def auditoria():
     accion  = request.args.get("accion", "").strip()
     fecha_d = request.args.get("fecha_desde", "").strip()
     fecha_h = request.args.get("fecha_hasta", "").strip()
+    casa    = request.args.get("casa", "").strip()
 
     q = AuditoriaLog.query.order_by(AuditoriaLog.fecha.desc())
 
@@ -1951,6 +1952,8 @@ def auditoria():
             q = q.filter(AuditoriaLog.fecha < _dt.strptime(fecha_h, "%Y-%m-%d") + _td(days=1))
         except ValueError:
             pass
+    if casa:
+        q = q.filter(AuditoriaLog.detalle.ilike(f"%{casa}%"))
 
     paginacion = q.paginate(page=page, per_page=50, error_out=False)
     acciones_disponibles = [r[0] for r in db.session.query(AuditoriaLog.accion).distinct().order_by(AuditoriaLog.accion).all()]
@@ -1964,6 +1967,7 @@ def auditoria():
         filtro_accion=accion,
         filtro_fecha_desde=fecha_d,
         filtro_fecha_hasta=fecha_h,
+        filtro_casa=casa,
     )
 
 
