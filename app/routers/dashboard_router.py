@@ -483,33 +483,44 @@ def calcular_saldos_anteriores_batch(mes, anio):
                     WHERE p.casa_id = ah.casa_id
                       AND p.desde <= make_date(ah.anio, ah.mes, 1)
                       AND (p.hasta IS NULL OR p.hasta >= make_date(ah.anio, ah.mes, 1))
-                ) THEN 0
+                ) THEN -COALESCE(ah.monto_pagado, 0)
                      WHEN c.fecha_creacion IS NOT NULL
-                      AND :prop_anio IS NOT NULL
-                      AND :prop_mes IS NOT NULL
                       AND (
-                          EXTRACT(YEAR  FROM c.fecha_creacion)::int > :prop_anio
-                          OR (EXTRACT(YEAR  FROM c.fecha_creacion)::int = :prop_anio
-                              AND EXTRACT(MONTH FROM c.fecha_creacion)::int >= :prop_mes)
+                          (
+                              :prop_anio IS NOT NULL
+                              AND :prop_mes IS NOT NULL
+                              AND (
+                                  EXTRACT(YEAR  FROM c.fecha_creacion)::int > :prop_anio
+                                  OR (EXTRACT(YEAR  FROM c.fecha_creacion)::int = :prop_anio
+                                      AND EXTRACT(MONTH FROM c.fecha_creacion)::int >= :prop_mes)
+                              )
+                          )
+                          OR COALESCE(c.proporcional_pendiente, 0) > 0
                       )
                       AND EXTRACT(YEAR  FROM c.fecha_creacion)::int = ah.anio
                       AND EXTRACT(MONTH FROM c.fecha_creacion)::int = ah.mes
-                     THEN 0
+                     THEN -COALESCE(ah.monto_pagado, 0)
                      WHEN c.fecha_reactivacion IS NOT NULL
-                      AND :prop_anio IS NOT NULL
-                      AND :prop_mes IS NOT NULL
                       AND (
-                          EXTRACT(YEAR  FROM c.fecha_reactivacion)::int > :prop_anio
-                          OR (EXTRACT(YEAR  FROM c.fecha_reactivacion)::int = :prop_anio
-                              AND EXTRACT(MONTH FROM c.fecha_reactivacion)::int >= :prop_mes)
+                          (
+                              :prop_anio IS NOT NULL
+                              AND :prop_mes IS NOT NULL
+                              AND (
+                                  EXTRACT(YEAR  FROM c.fecha_reactivacion)::int > :prop_anio
+                                  OR (EXTRACT(YEAR  FROM c.fecha_reactivacion)::int = :prop_anio
+                                      AND EXTRACT(MONTH FROM c.fecha_reactivacion)::int >= :prop_mes)
+                              )
+                          )
+                          OR COALESCE(c.proporcional_pendiente, 0) > 0
                       )
                       AND EXTRACT(YEAR  FROM c.fecha_reactivacion)::int = ah.anio
                       AND EXTRACT(MONTH FROM c.fecha_reactivacion)::int = ah.mes
-                     THEN 0
-                     ELSE ah.monto END
-                + COALESCE(prod_ext.extras, 0)
-                + COALESCE(promo_ext.extras, 0)
-                - COALESCE(ah.monto_pagado, 0)
+                     THEN -COALESCE(ah.monto_pagado, 0)
+                     ELSE ah.monto
+                          + COALESCE(prod_ext.extras, 0)
+                          + COALESCE(promo_ext.extras, 0)
+                          - COALESCE(ah.monto_pagado, 0)
+                     END
             ) AS saldo
         FROM abonos_historicos ah
         JOIN casas c ON c.id = ah.casa_id
