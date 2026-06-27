@@ -499,6 +499,21 @@ def calcular_saldos_anteriores_batch(mes, anio):
                       )
                       AND EXTRACT(YEAR  FROM c.fecha_creacion)::int = ah.anio
                       AND EXTRACT(MONTH FROM c.fecha_creacion)::int = ah.mes
+                      AND NOT (
+                          c.fecha_reactivacion IS NOT NULL
+                          AND (
+                              (
+                                  :prop_anio IS NOT NULL
+                                  AND :prop_mes IS NOT NULL
+                                  AND (
+                                      EXTRACT(YEAR  FROM c.fecha_reactivacion)::int > :prop_anio
+                                      OR (EXTRACT(YEAR  FROM c.fecha_reactivacion)::int = :prop_anio
+                                          AND EXTRACT(MONTH FROM c.fecha_reactivacion)::int >= :prop_mes)
+                                  )
+                              )
+                              OR COALESCE(c.proporcional_pendiente, 0) > 0
+                          )
+                      )
                      THEN -COALESCE(ah.monto_pagado, 0)
                      WHEN c.fecha_reactivacion IS NOT NULL
                       AND (
