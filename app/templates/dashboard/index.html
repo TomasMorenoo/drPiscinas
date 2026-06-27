@@ -1017,7 +1017,7 @@
                         <tbody>
                             {% for item in g.casas %}
                                 {% set pagado_atrasado = item.pagado_atrasado %}
-                            <tr class="{% if item.pausado %}table-secondary{% endif %}">
+                            <tr class="fila-casa-grupo {% if item.pausado %}table-secondary{% endif %}" data-estado="{{ item.estado }}">
 
                                 {# Nombre #}
                                 <td class="ps-3 ps-md-4 td-nombre fw-bold" style="max-width: 180px;">
@@ -1607,20 +1607,51 @@ function filtrarDashboard() {
     let texto = document.getElementById('busquedaRealTime').value.toLowerCase();
     let estado = document.getElementById('filtroEstado').value;
     let ocultas = 0;
+
     document.querySelectorAll('.fila-busqueda').forEach(fila => {
-        let txt = fila.textContent.toLowerCase();
         let est = fila.getAttribute('data-estado');
-        let visible = txt.includes(texto);
-        if (visible && estado !== 'todos') {
-            if (estado === 'no_pagado') {
-                visible = est !== 'pagado';
+        let esGrupo = fila.classList.contains('card');
+
+        if (esGrupo) {
+            // Filtrar filas internas del grupo
+            let casasGrupo = fila.querySelectorAll('tr.fila-casa-grupo');
+            let algunaVisible = false;
+            casasGrupo.forEach(tr => {
+                let txt = tr.textContent.toLowerCase();
+                let visible = texto === '' || txt.includes(texto);
+                if (visible && estado !== 'todos') {
+                    let estCasa = tr.getAttribute('data-estado');
+                    if (estado === 'no_pagado') visible = estCasa !== 'pagado';
+                    else visible = estCasa === estado;
+                }
+                tr.style.display = visible ? '' : 'none';
+                if (visible) algunaVisible = true;
+            });
+            // Si no hay texto ni filtro de estado, mostrar siempre el grupo
+            if (texto === '' && estado === 'todos') {
+                fila.style.display = '';
             } else {
-                visible = est === estado;
+                // Filtrar el grupo también por estado si aplica
+                let grupoVisible = algunaVisible;
+                if (grupoVisible && estado !== 'todos') {
+                    if (estado === 'no_pagado') grupoVisible = est !== 'pagado';
+                    else grupoVisible = est === estado;
+                }
+                fila.style.display = grupoVisible ? '' : 'none';
+                if (!grupoVisible) ocultas++;
             }
+        } else {
+            let txt = fila.textContent.toLowerCase();
+            let visible = texto === '' || txt.includes(texto);
+            if (visible && estado !== 'todos') {
+                if (estado === 'no_pagado') visible = est !== 'pagado';
+                else visible = est === estado;
+            }
+            fila.style.display = visible ? '' : 'none';
+            if (!visible) ocultas++;
         }
-        fila.style.display = visible ? '' : 'none';
-        if (!visible) ocultas++;
     });
+
     const banner = document.getElementById('banner-ocultas');
     if (banner) {
         if (ocultas > 0) {
