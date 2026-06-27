@@ -265,9 +265,9 @@
                                             <td class="fw-bold text-dark text-uppercase">{{ d.periodo }}</td>
                                             <td class="font-monospace" style="white-space: nowrap;">
                                                 {% if d.saldo_anterior < -0.1 %}
-                                                    <span class="text-success fw-bold">+${{ d.saldo_anterior | abs | pesos }}</span>
+                                                    <span class="text-success fw-bold">-${{ d.saldo_anterior | abs | pesos }}</span>
                                                 {% elif d.saldo_anterior > 0.1 %}
-                                                    <span class="text-danger fw-bold">Deuda: ${{ d.saldo_anterior | pesos }}</span>
+                                                    <span class="text-danger fw-bold">+${{ d.saldo_anterior | pesos }}</span>
                                                 {% else %}
                                                     <span class="text-muted">$0</span>
                                                 {% endif %}
