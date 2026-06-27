@@ -655,11 +655,13 @@
                                 {% endif %}
 
                                 {% if item.pagos_en_este_dashboard > 0 and not item.pagado %}
-                                    <div class="d-flex flex-column align-items-end align-items-md-center">
-                                        <span class="badge bg-warning text-dark mb-1 shadow-sm" style="font-size: 0.75rem;">
-                                            <i class="bi bi-coin me-1"></i>Entregó: ${{ item.pagos_en_este_dashboard | pesos }}
-                                        </span>
+                                    <div class="d-flex align-items-center justify-content-end justify-content-md-center gap-1">
                                         <span class="total-valor text-danger" style="font-size: 0.9rem;">Restan: ${{ deuda_actual | pesos }}</span>
+                                        <i class="bi bi-info-circle text-warning"
+                                           style="font-size:0.85rem; cursor:help;"
+                                           data-bs-toggle="tooltip"
+                                           data-bs-placement="top"
+                                           title="Entregó: ${{ item.pagos_en_este_dashboard | pesos }}"></i>
                                     </div>
                                 {% else %}
                                     <span class="total-valor">
