@@ -611,6 +611,8 @@ def index():
         mes = _default_mes
         anio = _default_anio
 
+    ver_inactivas = request.args.get("ver_inactivas", "0") == "1"
+
     registro_congelado = CierreMes.query.filter_by(mes=mes, anio=anio).first()
     mes_congelado = True if registro_congelado else False
 
@@ -655,7 +657,7 @@ def index():
 
         saldo_anterior_v = saldos_batch.get(c.id, 0.0) if saldos_batch else c.obtener_saldo_anterior(mes, anio)
 
-        if not c.activo and (ab_v + extras_v + saldo_anterior_v) <= 0.1:
+        if not c.activo and not ver_inactivas:
             continue
 
         _cache_datos[c.id] = {"datos": datos_v, "saldo_anterior": saldo_anterior_v}
@@ -902,7 +904,8 @@ def index():
         kpi_clientes=total_clientes, kpi_abono=total_abono, kpi_extras=total_extras,
         kpi_deuda=total_deuda_anterior, kpi_recaudado=total_recaudado,
         kpi_pendiente=total_general - total_recaudado, kpi_total=total_general,
-        kpi_saldar_count=kpi_saldar_count, kpi_saldar_monto=kpi_saldar_monto
+        kpi_saldar_count=kpi_saldar_count, kpi_saldar_monto=kpi_saldar_monto,
+        ver_inactivas=ver_inactivas
     )
 
 @dashboard_bp.route("/marcar-mensaje/<int:id>", methods=["POST"])

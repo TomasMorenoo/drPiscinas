@@ -506,7 +506,7 @@
                     <input type="text" id="busquedaRealTime" class="form-control border-start-0" placeholder="Filtrar por lote, barrio o country...">
                 </div>
             </div>
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-md-3">
                 <select id="filtroEstado" class="form-select fw-semibold" style="color: #495057; border-color: #dee2e6;">
                     <option value="todos">— Todos los estados</option>
                     <option value="pagado">✅ Pagados</option>
@@ -516,6 +516,13 @@
                     <option value="notificado">↳ 📨 Notificados</option>
                     <option value="saldar">↳ ⚠️ Falta saldar</option>
                 </select>
+            </div>
+            <div class="col-12 col-md-1 text-center">
+                <a href="{{ url_for('dashboard.index', mes=mes, anio=anio, ver_inactivas='0' if ver_inactivas else '1') }}"
+                   class="btn btn-sm w-100 fw-semibold {{ 'btn-warning' if ver_inactivas else 'btn-outline-secondary' }}"
+                   title="{{ 'Ocultar bajas' if ver_inactivas else 'Mostrar bajas' }}">
+                    <i class="bi bi-{{ 'eye-slash' if ver_inactivas else 'eye' }} me-1"></i>Bajas
+                </a>
             </div>
         </div>
     </div>
