@@ -80,9 +80,10 @@ class Casa(db.Model):
                 break
 
         _fref = None
-        if self.fecha_reactivacion and proporcional_aplica(self.fecha_reactivacion):
+        _has_pend = self.proporcional_pendiente is not None and float(self.proporcional_pendiente or 0) > 0
+        if self.fecha_reactivacion and (proporcional_aplica(self.fecha_reactivacion) or _has_pend):
             _fref = self.fecha_reactivacion
-        elif self.fecha_creacion and proporcional_aplica(self.fecha_creacion):
+        elif self.fecha_creacion and (proporcional_aplica(self.fecha_creacion) or _has_pend):
             _fref = self.fecha_creacion
         es_mes_alta = bool(_fref and _fref.month == mes and _fref.year == anio)
         if pausa_en_mes or es_mes_alta:
@@ -171,9 +172,10 @@ class Casa(db.Model):
                 break
 
         _fref = None
-        if self.fecha_reactivacion and proporcional_aplica(self.fecha_reactivacion):
+        _has_pend = self.proporcional_pendiente is not None and float(self.proporcional_pendiente or 0) > 0
+        if self.fecha_reactivacion and (proporcional_aplica(self.fecha_reactivacion) or _has_pend):
             _fref = self.fecha_reactivacion
-        elif self.fecha_creacion and proporcional_aplica(self.fecha_creacion):
+        elif self.fecha_creacion and (proporcional_aplica(self.fecha_creacion) or _has_pend):
             _fref = self.fecha_creacion
         es_mes_alta = bool(_fref and _fref.month == mes and _fref.year == anio)
         if pausa_en_mes or es_mes_alta:
