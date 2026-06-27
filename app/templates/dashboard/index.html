@@ -570,9 +570,6 @@
                                 {% elif not item.casa.activo %}
                                     <span class="badge bg-secondary ms-1 badge-baja" title="Dado de baja">BAJA</span>
                                 {% endif %}
-                                {% if item.prop_pendiente > 0 %}
-                                    <span class="badge bg-warning text-dark ms-1" title="Proporcional diferido al mes siguiente: ${{ item.prop_pendiente | pesos }}"><i class="bi bi-arrow-right me-1"></i>Prop. ${{ item.prop_pendiente | pesos }}</span>
-                                {% endif %}
                             </td>
 
                             {# 2. ABONO #}
@@ -610,10 +607,13 @@
                                     <div class="monto-item">
                                         <span class="monto-label">Productos</span>
                                         <span class="monto-valor">${{ item.extras | pesos }}</span>
-                                        {% if item.extras_diferidos > 0 %}
-                                            <span class="badge bg-warning text-dark font-monospace ms-1">+${{ item.extras_diferidos | pesos }}</span>
-                                        {% endif %}
                                     </div>
+                                    {% if item.extras_diferidos > 0 %}
+                                    <div class="monto-item">
+                                        <span class="monto-label text-warning">Prod. ant.</span>
+                                        <span class="monto-valor text-warning font-monospace">+${{ item.extras_diferidos | pesos }}</span>
+                                    </div>
+                                    {% endif %}
                                     <div class="monto-item">
                                         <span class="monto-label">Debe</span>
                                         <span>
@@ -642,7 +642,7 @@
                                 {% if item.abono > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Abono</td><td class=\'text-end font-monospace\'>$' ~ (item.abono | pesos) ~ '</td></tr>') %}{% endif %}
                                 {% if item.proporcional_preview > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Proporcional</td><td class=\'text-end font-monospace text-warning fw-bold\'>+$' ~ (item.proporcional_preview | pesos) ~ '</td></tr>') %}{% endif %}
                                 {% if item.extras > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Productos</td><td class=\'text-end font-monospace\'>$' ~ (item.extras | pesos) ~ '</td></tr>') %}{% endif %}
-                                {% if item.extras_diferidos > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Productos</td><td class=\'text-end font-monospace text-warning fw-bold\'>+$' ~ (item.extras_diferidos | pesos) ~ '</td></tr>') %}{% endif %}
+                                {% if item.extras_diferidos > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Prod. mes ant.</td><td class=\'text-end font-monospace text-warning fw-bold\'>+$' ~ (item.extras_diferidos | pesos) ~ '</td></tr>') %}{% endif %}
                                 {% if item.saldo_anterior > 0.1 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Deuda ant.</td><td class=\'text-end font-monospace text-danger\'>+$' ~ (item.saldo_anterior | pesos) ~ '</td></tr>') %}{% endif %}
                                 {% set pop_content = '<table class=\'mb-0 small\'>' ~ rows | join('') ~ '<tr class=\'border-top\'><td class=\'text-muted pe-3 pt-1\'>Total</td><td class=\'text-end font-monospace fw-bold pt-1\'>$' ~ (total_final | pesos) ~ '</td></tr></table>' %}
                                 {% endif %}
@@ -681,6 +681,7 @@
                                         {% if item.pagado %}
                                             <button onclick="togglePago({{ item.id_historial }}, 'undo')" class="btn btn-sm {% if pagado_atrasado %}btn-secondary{% else %}btn-success{% endif %}" title="Pagado">
                                                 <i class="bi {% if pagado_atrasado %}bi-clock-history{% else %}bi-check-circle-fill{% endif %}"></i>
+                                                {% if item.prop_pendiente > 0 %}<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem;">Prop →</span>{% endif %}
                                             </button>
                                         {% else %}
                                             {% if item.tiene_telefono %}
@@ -743,6 +744,9 @@
                                             {% else %}
                                                 <i class="bi bi-check-circle-fill fs-4 mb-1" id="icon-bloqueo-{{ item.id_historial }}"></i>
                                                 <small class="fw-bold" style="font-size: 0.7rem;">PAGADO</small>
+                                                {% if item.prop_pendiente > 0 %}
+                                                    <span class="badge bg-warning text-dark mt-1" style="font-size:0.6rem;" title="Proporcional diferido al próximo mes: ${{ item.prop_pendiente | pesos }}">Prop →</span>
+                                                {% endif %}
                                             {% endif %}
                                         </button>
                                     </div>
@@ -1014,9 +1018,6 @@
                                     {% if item.pausado %}
                                         <span class="badge bg-secondary ms-1" title="Pausado"><i class="bi bi-pause-circle-fill me-1"></i>PAUSADA</span>
                                     {% endif %}
-                                    {% if item.prop_pendiente > 0 %}
-                                        <span class="badge bg-warning text-dark ms-1" title="Proporcional diferido al mes siguiente: ${{ item.prop_pendiente | pesos }}"><i class="bi bi-arrow-right me-1"></i>Prop. ${{ item.prop_pendiente | pesos }}</span>
-                                    {% endif %}
                                 </td>
 
                                 {# Montos desktop #}
@@ -1076,7 +1077,7 @@
                                     {% if item.abono > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Abono</td><td class=\'text-end font-monospace\'>$' ~ (item.abono | pesos) ~ '</td></tr>') %}{% endif %}
                                     {% if item.proporcional_preview > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Proporcional</td><td class=\'text-end font-monospace text-warning fw-bold\'>+$' ~ (item.proporcional_preview | pesos) ~ '</td></tr>') %}{% endif %}
                                     {% if item.extras > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Productos</td><td class=\'text-end font-monospace\'>$' ~ (item.extras | pesos) ~ '</td></tr>') %}{% endif %}
-                                    {% if item.extras_diferidos > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Productos</td><td class=\'text-end font-monospace text-warning fw-bold\'>+$' ~ (item.extras_diferidos | pesos) ~ '</td></tr>') %}{% endif %}
+                                    {% if item.extras_diferidos > 0 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Prod. mes ant.</td><td class=\'text-end font-monospace text-warning fw-bold\'>+$' ~ (item.extras_diferidos | pesos) ~ '</td></tr>') %}{% endif %}
                                     {% if item.saldo_anterior > 0.1 %}{% set _ = rows.append('<tr><td class=\'text-muted pe-3\'>Deuda ant.</td><td class=\'text-end font-monospace text-danger\'>+$' ~ (item.saldo_anterior | pesos) ~ '</td></tr>') %}{% endif %}
                                     {% set pop_content = '<table class=\'mb-0 small\'>' ~ rows | join('') ~ '<tr class=\'border-top\'><td class=\'text-muted pe-3 pt-1\'>Total</td><td class=\'text-end font-monospace fw-bold pt-1\'>$' ~ (total_final | pesos) ~ '</td></tr></table>' %}
                                     {% endif %}
@@ -1117,6 +1118,7 @@
                                             {% if item.pagado %}
                                                 <button onclick="togglePagoSimple({{ item.id_historial }}, this)" class="btn btn-sm {% if pagado_atrasado %}btn-secondary{% else %}btn-success{% endif %}" title="Deshacer estado">
                                                     <i class="bi {% if pagado_atrasado %}bi-clock-history{% else %}bi-check-circle-fill{% endif %}"></i>
+                                                    {% if item.prop_pendiente > 0 %}<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem;">Prop →</span>{% endif %}
                                                 </button>
                                             {% else %}
                                                 {% if item.monto_pagado > 0 or item.pagos_en_este_dashboard > 0 %}
@@ -1174,6 +1176,9 @@
                                                         <i class="bi bi-clock-history"></i>
                                                     {% else %}
                                                         <i class="bi bi-check-circle-fill"></i>
+                                                    {% endif %}
+                                                    {% if item.prop_pendiente > 0 %}
+                                                        <span class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;" title="Proporcional diferido al próximo mes: ${{ item.prop_pendiente | pesos }}">Prop →</span>
                                                     {% endif %}
                                                 </button>
                                             {% else %}
