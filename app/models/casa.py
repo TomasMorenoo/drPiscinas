@@ -132,7 +132,9 @@ class Casa(db.Model):
                 pagado_hist = float(getattr(hist, 'monto_pagado', 0) or 0)
 
                 if getattr(hist, 'pagado', False) and pagado_hist == 0:
-                    continue
+                    cobrado_por = getattr(hist, 'cobrado_por', '') or ''
+                    if 'SISTEMA' not in cobrado_por:
+                        continue
 
                 gastos = self._calcular_gastos_mensuales(hist.mes, hist.anio, hist=hist, visitas_mes=_visitas_por_mes.get((hist.anio, hist.mes), []))
                 total_hist = gastos['total']

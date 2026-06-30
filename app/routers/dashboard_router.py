@@ -568,7 +568,8 @@ def calcular_saldos_anteriores_batch(mes, anio):
                    AND promo_ext.mes      = ah.mes
         WHERE NOT (ah.pagado = TRUE AND COALESCE(ah.monto_pagado, 0) = 0
                    AND COALESCE(prod_ext.extras, 0) = 0
-                   AND COALESCE(promo_ext.extras, 0) = 0)
+                   AND COALESCE(promo_ext.extras, 0) = 0
+                   AND (ah.cobrado_por IS NULL OR ah.cobrado_por NOT LIKE '%SISTEMA%'))
           AND (ah.anio < :anio OR (ah.anio = :anio AND ah.mes < :mes))
           AND (
               c.fecha_creacion IS NULL
