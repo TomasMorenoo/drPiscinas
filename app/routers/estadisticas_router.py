@@ -8,7 +8,7 @@ from app.models.country import Country
 from app.models.visit_product import VisitProduct
 from app.models.configuracion import Configuracion
 from app import db
-from sqlalchemy import extract, func
+from sqlalchemy import extract, func, distinct
 from sqlalchemy.orm import selectinload, joinedload
 from datetime import datetime
 import json
@@ -23,9 +23,9 @@ estadisticas_bp = Blueprint("estadisticas", __name__, url_prefix="/estadisticas"
 @admin_required
 def guardar_prefs():
     data = request.get_json(silent=True) or {}
-    if 'meses_alta' in data:
-        Configuracion.set('meses_alta', data['meses_alta'])
-        db.session.commit()
+    if 'productos_ocultos' in data:
+        Configuracion.set('productos_ocultos', data['productos_ocultos'])
+    db.session.commit()
     return jsonify({"success": True})
 
 
@@ -33,8 +33,12 @@ def guardar_prefs():
 @login_required
 @admin_required
 def index():
-    anio_actual = datetime.now().year
+    anio_actual = request.args.get('anio', datetime.now().year, type=int)
     anio_anterior = anio_actual - 1
+
+    years_abonos = [r[0] for r in db.session.query(distinct(AbonoHistorico.anio)).all()]
+    years_visits  = [int(r[0]) for r in db.session.query(distinct(extract('year', Visit.fecha))).all()]
+    available_years = sorted(set(years_abonos + years_visits), reverse=True)
     
     # 1. KPI Clientes (Solo los activos)
     kpi_clientes = Casa.query.filter_by(activo=True).count()
@@ -88,6 +92,17 @@ def index():
 
     total_anual_abonos = sum(meses_abonos)
 
+    # Nov-Dic del año anterior (para modo temporada)
+    meses_cerrados_anterior = set(
+        row[0] for row in db.session.query(CierreMes.mes).filter(CierreMes.anio == anio_anterior).all()
+    )
+    abonos_nov_dic = db.session.query(AbonoHistorico.mes, func.sum(AbonoHistorico.monto)).filter(
+        AbonoHistorico.anio == anio_anterior,
+        AbonoHistorico.mes.in_([11, 12]),
+        AbonoHistorico.mes.in_(meses_cerrados_anterior)
+    ).group_by(AbonoHistorico.mes).all()
+    abono_temporada_anterior = {mes: float(total) for mes, total in abonos_nov_dic}
+
     # 4. Eager Loading
     visitas_rango = Visit.query.options(
         selectinload(Visit.promo),
@@ -95,41 +110,47 @@ def index():
     ).filter(extract('year', Visit.fecha).in_([anio_actual, anio_anterior])).all()
     
     uso_productos_mes = {}
-    
+    meses_productos_anterior = {11: 0.0, 12: 0.0}
+
     for v in visitas_rango:
         v_anio = v.fecha.year
         v_mes = v.fecha.month
-        llave_mes = f"{v_anio}-{v_mes:02d}" 
-        
+        llave_mes = f"{v_anio}-{v_mes:02d}"
+
         if llave_mes not in uso_productos_mes:
             uso_productos_mes[llave_mes] = {}
-            
+
         total_v_dinero = 0.0
-        
+
         if v_anio == anio_actual and v.promo and v.promo.precio:
             total_v_dinero += float(v.promo.precio)
-            
+        elif v_anio == anio_anterior and v_mes in (11, 12) and v.promo and v.promo.precio:
+            total_v_dinero += float(v.promo.precio)
+
         for vp in v.productos:
             nombre_prod = vp.product.nombre
             unidad_prod = vp.product.unidad if vp.product.unidad else "unidades"
             cantidad = float(vp.cantidad)
-            
+            precio = vp.precio_unitario if vp.precio_unitario else vp.product.precio
+
             if v_anio == anio_actual:
-                precio = vp.precio_unitario if vp.precio_unitario else vp.product.precio
                 total_v_dinero += cantidad * float(precio)
-                
+            elif v_anio == anio_anterior and v_mes in (11, 12):
+                total_v_dinero += cantidad * float(precio)
+
             if nombre_prod not in uso_productos_mes[llave_mes]:
                 uso_productos_mes[llave_mes][nombre_prod] = {"cantidad": 0.0, "unidad": unidad_prod}
-                
             uso_productos_mes[llave_mes][nombre_prod]["cantidad"] += cantidad
-            
+
         if v_anio == anio_actual:
             meses_productos[v_mes - 1] += total_v_dinero
+        elif v_anio == anio_anterior and v_mes in (11, 12):
+            meses_productos_anterior[v_mes] += total_v_dinero
             
     total_anual_productos = sum(meses_productos)
 
-    # --- LEEMOS LA PREFERENCIA GUARDADA EN LA BASE DE DATOS ---
-    meses_alta_guardados = Configuracion.get('meses_alta', None)
+    # --- LEEMOS LAS PREFERENCIAS GUARDADAS EN LA BASE DE DATOS ---
+    productos_ocultos_guardados = Configuracion.get('productos_ocultos', None)
 
     return render_template(
         "estadisticas/index.html",
@@ -144,5 +165,9 @@ def index():
         total_anual_abonos=total_anual_abonos,
         total_anual_productos=total_anual_productos,
         uso_productos_mes=json.dumps(uso_productos_mes),
-        meses_alta_session=json.dumps(meses_alta_guardados) if meses_alta_guardados is not None else "null"
+        productos_ocultos_session=json.dumps(productos_ocultos_guardados) if productos_ocultos_guardados is not None else "null",
+        abono_temporada_anterior=json.dumps(abono_temporada_anterior),
+        meses_productos_anterior=json.dumps(meses_productos_anterior),
+        anio_seleccionado=anio_actual,
+        available_years=available_years,
     )

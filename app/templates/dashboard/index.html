@@ -691,8 +691,8 @@
                                         </button>
                                     {% elif mes_congelado and item.id_historial %}
                                         {% if item.pagado %}
-                                            <button onclick="togglePago({{ item.id_historial }}, 'undo')" class="btn btn-sm {% if pagado_atrasado %}btn-secondary{% else %}btn-success{% endif %}" title="Pagado">
-                                                <i class="bi {% if pagado_atrasado %}bi-clock-history{% else %}bi-check-circle-fill{% endif %}"></i>
+                                            <button onclick="togglePago({{ item.id_historial }}, 'undo')" class="btn btn-sm {% if pagado_atrasado %}btn-secondary{% elif item.es_proporcional_diferido %}btn-warning text-dark{% else %}btn-success{% endif %}" title="{% if item.es_proporcional_diferido %}Proporcional diferido al mes siguiente{% else %}Pagado{% endif %}">
+                                                <i class="bi {% if pagado_atrasado %}bi-clock-history{% elif item.es_proporcional_diferido %}bi-arrow-right-circle-fill{% else %}bi-check-circle-fill{% endif %}"></i>
                                                 {% if item.prop_pendiente > 0 %}<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem;">Prop →</span>{% endif %}
                                             </button>
                                         {% else %}
@@ -748,11 +748,14 @@
                                     <div id="bloqueo-{{ item.id_historial }}" class="{% if not item.pagado %}d-none{% endif %}">
                                         <button id="btn-deshacer-{{ item.id_historial }}"
                                                 onclick="togglePago({{ item.id_historial }}, 'undo')"
-                                                class="btn btn-sm {% if pagado_atrasado %}btn-outline-secondary{% else %}btn-outline-success{% endif %} w-100 d-flex flex-column justify-content-center align-items-center shadow-sm"
+                                                class="btn btn-sm {% if pagado_atrasado %}btn-outline-secondary{% elif item.es_proporcional_diferido %}btn-outline-warning{% else %}btn-outline-success{% endif %} w-100 d-flex flex-column justify-content-center align-items-center shadow-sm"
                                                 style="border-style: dashed; height: 74px;" title="Clic para deshacer el pago">
                                             {% if pagado_atrasado %}
                                                 <i class="bi bi-clock-history fs-4 mb-1 text-secondary" id="icon-bloqueo-{{ item.id_historial }}"></i>
                                                 <small class="fw-bold text-secondary" style="font-size: 0.65rem; line-height: 1;">SALDADO<br>EN {{ MESES_LARGO[item.historial_obj.fecha_pago.month - 1] | upper }}</small>
+                                            {% elif item.es_proporcional_diferido %}
+                                                <i class="bi bi-arrow-right-circle-fill fs-4 mb-1" id="icon-bloqueo-{{ item.id_historial }}"></i>
+                                                <small class="fw-bold" style="font-size: 0.65rem; line-height: 1.2;">PROPORCIONAL<br>→ MES SIG.</small>
                                             {% else %}
                                                 <i class="bi bi-check-circle-fill fs-4 mb-1" id="icon-bloqueo-{{ item.id_historial }}"></i>
                                                 <small class="fw-bold" style="font-size: 0.7rem;">PAGADO</small>
@@ -1133,8 +1136,8 @@
                                             </button>
                                         {% elif mes_congelado and item.id_historial %}
                                             {% if item.pagado %}
-                                                <button onclick="togglePagoSimple({{ item.id_historial }}, this)" class="btn btn-sm {% if pagado_atrasado %}btn-secondary{% else %}btn-success{% endif %}" title="Deshacer estado">
-                                                    <i class="bi {% if pagado_atrasado %}bi-clock-history{% else %}bi-check-circle-fill{% endif %}"></i>
+                                                <button onclick="togglePagoSimple({{ item.id_historial }}, this)" class="btn btn-sm {% if pagado_atrasado %}btn-secondary{% elif item.es_proporcional_diferido %}btn-warning text-dark{% else %}btn-success{% endif %}" title="{% if item.es_proporcional_diferido %}Proporcional diferido al mes siguiente{% else %}Deshacer estado{% endif %}">
+                                                    <i class="bi {% if pagado_atrasado %}bi-clock-history{% elif item.es_proporcional_diferido %}bi-arrow-right-circle-fill{% else %}bi-check-circle-fill{% endif %}"></i>
                                                     {% if item.prop_pendiente > 0 %}<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem;">Prop →</span>{% endif %}
                                                 </button>
                                             {% else %}
@@ -1187,10 +1190,12 @@
                                         <div class="d-flex justify-content-center gap-1">
                                             {% if item.pagado %}
                                                 <button onclick="togglePagoSimple({{ item.id_historial }}, this)"
-                                                        class="btn btn-sm shadow-sm py-1 px-2 {% if pagado_atrasado %}btn-secondary{% else %}btn-success{% endif %}"
-                                                        title="{% if pagado_atrasado %}Saldado en {{ MESES_LARGO[item.historial_obj.fecha_pago.month - 1] }}{% else %}Pagado a tiempo{% endif %} - Clic para deshacer">
+                                                        class="btn btn-sm shadow-sm py-1 px-2 {% if pagado_atrasado %}btn-secondary{% elif item.es_proporcional_diferido %}btn-warning text-dark{% else %}btn-success{% endif %}"
+                                                        title="{% if pagado_atrasado %}Saldado en {{ MESES_LARGO[item.historial_obj.fecha_pago.month - 1] }}{% elif item.es_proporcional_diferido %}Proporcional diferido al mes siguiente{% else %}Pagado a tiempo{% endif %} - Clic para deshacer">
                                                     {% if pagado_atrasado %}
                                                         <i class="bi bi-clock-history"></i>
+                                                    {% elif item.es_proporcional_diferido %}
+                                                        <i class="bi bi-arrow-right-circle-fill"></i> Prop →
                                                     {% else %}
                                                         <i class="bi bi-check-circle-fill"></i>
                                                     {% endif %}

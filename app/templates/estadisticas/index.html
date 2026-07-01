@@ -5,8 +5,18 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <div class="container-fluid py-4">
-    <div class="mb-4">
-        <h1 class="h3 mb-0 text-gray-800 fw-bold"><i class="bi bi-bar-chart-fill me-2 text-primary"></i>Estadísticas {{ anio_actual }}</h1>
+    <div class="mb-4 d-flex align-items-center gap-2">
+        <h1 class="h3 mb-0 fw-bold"><i class="bi bi-bar-chart-fill me-2 text-primary"></i>Estadísticas</h1>
+        <div class="dropdown">
+            <button class="btn p-0 border-0 fw-bold text-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="font-size:1.75rem; line-height:1.2;">
+                {{ anio_seleccionado }}
+            </button>
+            <ul class="dropdown-menu shadow-sm">
+                {% for y in available_years %}
+                <li><a class="dropdown-item fw-bold {% if y == anio_seleccionado %}active{% endif %}" href="?anio={{ y }}">{{ y }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
     </div>
 
     <div class="row g-3 mb-4">
@@ -55,7 +65,14 @@
         </div>
     </div>
 
-    <div class="d-flex justify-content-end mb-3">
+    <div class="d-flex justify-content-end gap-2 mb-3">
+        <label for="switchTemporada" class="d-flex align-items-center gap-2 bg-white shadow-sm rounded-pill px-3 py-2 border" style="cursor:pointer;">
+            <i class="bi bi-sun-fill text-danger" style="font-size:0.85rem;"></i>
+            <span class="text-secondary fw-bold text-uppercase" style="font-size:0.75rem; letter-spacing:0.05em;">Ver por temporada</span>
+            <div class="form-check form-switch mb-0 ms-1">
+                <input class="form-check-input" type="checkbox" role="switch" id="switchTemporada" onchange="toggleModoTemporada(this.checked)" style="cursor:pointer;">
+            </div>
+        </label>
         <label for="switchProyeccion" class="d-flex align-items-center gap-2 bg-white shadow-sm rounded-pill px-3 py-2 border" style="cursor:pointer;">
             <i class="bi bi-graph-up-arrow text-secondary" style="font-size:0.85rem;"></i>
             <span class="text-secondary fw-bold text-uppercase" style="font-size:0.75rem; letter-spacing:0.05em;">Proyección anual</span>
@@ -122,22 +139,6 @@
 
     <div class="row g-3">
         
-        <div class="col-12">
-            <div class="card border-0 shadow-sm bg-dark text-white">
-                <div class="card-body py-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-calendar-range me-2"></i>Gestión de Consumo por Temporadas:</h6>
-                    
-                    <div class="dropdown">
-                        <button class="btn btn-light dropdown-toggle fw-bold shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
-                            <i class="bi bi-funnel-fill me-1 text-primary"></i> Seleccionar Meses Temporada Alta
-                        </button>
-                        <div class="dropdown-menu dropdown-menu-end p-3 shadow" style="min-width: 250px; max-height: 350px; overflow-y: auto;" id="listaMesesSelector">
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <div class="col-12 col-md-6">
             <div class="card border-0 shadow-sm border-top border-4 border-danger h-100">
                 <div class="card-header bg-white border-0 pt-4 pb-2 d-flex flex-column gap-2">
@@ -175,6 +176,67 @@
         </div>
 
     </div>
+
+    {# ===== CONSUMO PROMEDIO DE PRODUCTOS ===== #}
+    <div class="row g-3 mt-1">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 pt-4 pb-2 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold text-dark mb-0"><i class="bi bi-cart3 me-2 text-primary"></i>Promedio de consumo por producto</h5>
+                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="offcanvas" data-bs-target="#offcanvasProductos" title="Configurar productos visibles">
+                        <i class="bi bi-gear-fill"></i>
+                    </button>
+                </div>
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Producto</th>
+                                <th class="text-end text-danger"><i class="bi bi-sun-fill me-1"></i>Alta / mes</th>
+                                <th class="text-end text-primary"><i class="bi bi-snow me-1"></i>Baja / mes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaConsumoPromedio"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        {# MES A MES #}
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 pt-4 pb-2 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold text-dark mb-0"><i class="bi bi-calendar3 me-2 text-secondary"></i>Consumo mes a mes</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="cambiarMesConsumo(-1)"><i class="bi bi-chevron-left"></i></button>
+                        <span class="fw-bold text-dark" id="labelMesConsumo" style="width:160px; text-align:center; display:inline-block;">-</span>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="cambiarMesConsumo(1)"><i class="bi bi-chevron-right"></i></button>
+                    </div>
+                </div>
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Producto</th>
+                                <th class="text-end">Cantidad</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaConsumoMes"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# OFFCANVAS CONFIG PRODUCTOS #}
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasProductos">
+        <div class="offcanvas-header border-bottom">
+            <h5 class="offcanvas-title fw-bold"><i class="bi bi-gear-fill me-2"></i>Productos visibles</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body" id="listaProductosConfig"></div>
+    </div>
+
 </div>
 
 <script>
@@ -218,10 +280,33 @@
 
     // --- 2. GRÁFICOS ANUALES DE DINERO ---
     const nombresMeses = {{ MESES_CORTO | tojson }};
+    const nombresMesesLargo = {{ MESES_LARGO | tojson }};
     const datosAbonos = JSON.parse('{{ meses_abonos | safe }}');
     const datosProductos = JSON.parse('{{ meses_productos | safe }}');
-
     const mesesProyectados = JSON.parse('{{ meses_proyectados | safe }}');
+
+    // Años (definidos aquí para uso en secciones 2 y 3)
+    const anioActual   = {{ anio_seleccionado }};
+    const anioAnterior = {{ anio_seleccionado }} - 1;
+
+    // Datos Nov-Dic año anterior para modo temporada
+    const _abonoAnt = JSON.parse('{{ abono_temporada_anterior | safe }}');
+    const _prodAnt  = JSON.parse('{{ meses_productos_anterior | safe }}');
+    // Construir arrays temporada: [Nov(año-1), Dic(año-1), Ene..Oct(año)]
+    const labelsTemporada = [
+        nombresMeses[10] + ' \'' + String(anioAnterior).slice(2),
+        nombresMeses[11] + ' \'' + String(anioAnterior).slice(2),
+        ...nombresMeses.slice(0, 10)
+    ];
+    const abonosTemporada = [
+        _abonoAnt['11'] || 0, _abonoAnt['12'] || 0,
+        ...datosAbonos.slice(0, 10)
+    ];
+    const productosTemporada = [
+        _prodAnt['11'] || 0, _prodAnt['12'] || 0,
+        ...datosProductos.slice(0, 10)
+    ];
+    const proyectadosTemporada = [false, false, ...mesesProyectados.slice(0, 10)];
 
     const chartConfig = {
         type: 'line',
@@ -283,7 +368,7 @@
         }
     });
 
-    new Chart(document.getElementById('chartProductos'), { ...chartConfig, data: { labels: nombresMeses, datasets: [{ label: 'Productos', data: datosProductos, borderColor: '#0dcaf0', backgroundColor: 'rgba(13, 202, 240, 0.2)', fill: true, tension: 0.4 }] }});
+    const chartProductosInstance = new Chart(document.getElementById('chartProductos'), { ...chartConfig, data: { labels: nombresMeses, datasets: [{ label: 'Productos', data: datosProductos, borderColor: '#0dcaf0', backgroundColor: 'rgba(13, 202, 240, 0.2)', fill: true, tension: 0.4 }] }});
 
     // Gráfico Total: dos datasets (real + proyectado), proyectado oculto por defecto
     const totalReales      = abonosReales.map((a, i) => a !== null ? a + datosProductos[i] : null);
@@ -388,111 +473,125 @@
         renderStatsTotal(checked);
     }
 
+    // --- TOGGLE MODO TEMPORADA ---
+    let modoTemporada = false;
+    function toggleModoTemporada(checked) {
+        modoTemporada = checked;
+        // Deshabilitar proyección en modo temporada (no tiene sentido)
+        document.getElementById('switchProyeccion').disabled = checked;
+
+        const labels   = checked ? labelsTemporada   : nombresMeses;
+        const abonos   = checked ? abonosTemporada   : datosAbonos;
+        const prods    = checked ? productosTemporada : datosProductos;
+        const proyect  = checked ? proyectadosTemporada : mesesProyectados;
+
+        // Recalcular datasets de abonos
+        const aR = abonos.map((v, i) => proyect[i] ? null : v);
+        const aP = abonos.map((v, i) => proyect[i] ? v : null);
+        const firstP = proyect.indexOf(true);
+        if (firstP > 0) aP[firstP - 1] = abonos[firstP - 1];
+
+        chartAbonosInstance.data.labels = labels;
+        chartAbonosInstance.data.datasets[0].data = aR;
+        chartAbonosInstance.data.datasets[1].data = aP;
+        chartAbonosInstance.data.datasets[1].hidden = true;
+        chartAbonosInstance.update();
+
+        const tR = aR.map((a, i) => a !== null ? a + prods[i] : null);
+        const tP = aP.map((a, i) => a !== null ? a + prods[i] : null);
+
+        chartProductosInstance.data.labels = labels;
+        chartProductosInstance.data.datasets[0].data = prods;
+        chartProductosInstance.update();
+
+        chartTotalInstance.data.labels = labels;
+        chartTotalInstance.data.datasets[0].data = tR;
+        chartTotalInstance.data.datasets[1].data = tP;
+        chartTotalInstance.data.datasets[1].hidden = true;
+        chartTotalInstance.update();
+
+        // Recalcular badges y stats con los nuevos datos
+        const totalRealAb  = aR.reduce((s, v) => s + (v ?? 0), 0);
+        const totalProd    = prods.reduce((s, v) => s + v, 0);
+        document.getElementById('badgeAbonos').textContent      = fmtPesos(totalRealAb);
+        document.getElementById('labelAbonos').textContent      = 'Total Acumulado';
+        document.getElementById('badgeTotalGlobal').textContent = fmtPesos(totalRealAb + totalProd);
+        document.getElementById('labelTotal').textContent       = 'Total Acumulado';
+        document.getElementById('switchProyeccion').checked     = false;
+
+        // Stats totales
+        const base = tR.map(v => v ?? 0);
+        renderStatsTotalConDatos(base, labels, proyect);
+    }
+
+    function renderStatsTotalConDatos(base, labels, proyect) {
+        const mesesConDatos = base.filter(v => v > 0);
+        if (!mesesConDatos.length) return;
+        const promedio = mesesConDatos.reduce((a, b) => a + b, 0) / mesesConDatos.length;
+        const maxVal = Math.max(...mesesConDatos);
+        const minVal = Math.min(...mesesConDatos);
+        const maxMes = labels[base.indexOf(maxVal)];
+        const minMes = labels[base.indexOf(minVal)];
+        const stats = [
+            { icon: 'bi-calendar-check',       label: 'Promedio mensual', valor: fmtPesos(promedio),                       color: 'text-primary' },
+            { icon: 'bi-arrow-up-circle-fill',  label: 'Mejor mes',        valor: fmtPesos(maxVal) + ' (' + maxMes + ')', color: 'text-success' },
+            { icon: 'bi-arrow-down-circle-fill', label: 'Mes más bajo',    valor: fmtPesos(minVal) + ' (' + minMes + ')', color: 'text-warning' },
+            { icon: 'bi-calendar2-range',       label: 'Meses con datos',  valor: mesesConDatos.length + ' de 12',         color: 'text-secondary' },
+        ];
+        document.getElementById('statsTotal').innerHTML = stats.map(s => `
+            <div class="col-6 col-md-3">
+                <div class="bg-light rounded p-2 h-100">
+                    <div class="small text-muted text-uppercase fw-bold mb-1"><i class="bi ${s.icon} me-1"></i>${s.label}</div>
+                    <div class="fw-bold fs-6 ${s.color}">${s.valor}</div>
+                </div>
+            </div>`).join('');
+    }
+
     // Inicializar con proyección desactivada
     actualizarBadges(false);
     renderStatsTotal(false);
 
-    // --- 3. LÓGICA DE TEMPORADA ALTA Y BAJA CON MEMORIA DE SERVIDOR ---
+    // --- 3. LÓGICA DE TEMPORADA ALTA Y BAJA ---
     const usoProductosDB = JSON.parse('{{ uso_productos_mes | safe }}');
-    
-    const anioActual = {{ anio_actual }};
-    const anioAnterior = {{ anio_anterior }};
 
-    const availableKeys = [
-        `${anioAnterior}-11`, `${anioAnterior}-12`, `${anioActual}-01`,
-        `${anioActual}-02`, `${anioActual}-03`, `${anioActual}-04`,
-        `${anioActual}-05`, `${anioActual}-06`, `${anioActual}-07`,
-        `${anioActual}-08`, `${anioActual}-09`, `${anioActual}-10`,
-        `${anioActual}-11`
+    const availableKeys = Object.keys(usoProductosDB).sort();
+
+    // Temporada fija: Alta = Nov(año-1) → Mar(año) | Baja = Abr(año) → Oct(año)
+    const mesesAlta = [
+        `${anioAnterior}-11`, `${anioAnterior}-12`,
+        `${anioActual}-01`, `${anioActual}-02`, `${anioActual}-03`
     ];
-    
-    // Recibimos los datos guardados desde Python
-    const mesesGuardados = JSON.parse('{{ meses_alta_session | safe }}');
-    let mesesAlta = [];
-    
-    if (mesesGuardados && Array.isArray(mesesGuardados) && mesesGuardados.length > 0) {
-        mesesAlta = mesesGuardados; // Usa lo que el servidor recuerda
-    } else {
-        // Por defecto: Si es la primera vez que entra
-        mesesAlta = [
-            `${anioAnterior}-12`,
-            `${anioActual}-01`,
-            `${anioActual}-02`
-        ];
-    }
+    const mesesBaja = [
+        `${anioActual}-04`, `${anioActual}-05`, `${anioActual}-06`,
+        `${anioActual}-07`, `${anioActual}-08`, `${anioActual}-09`, `${anioActual}-10`
+    ];
 
     function formatearMesCorto(key) {
         const [y, m] = key.split('-');
         return nombresMeses[parseInt(m)-1] + ' ' + y.slice(2);
     }
 
+    function formatearMesLargo(key) {
+        const [y, m] = key.split('-');
+        return nombresMesesLargo[parseInt(m)-1] + ' ' + y;
+    }
+
     function resumirRango(keysArray) {
         if (!keysArray || keysArray.length === 0) return 'Ningún mes';
-        if (keysArray.length === 1) return formatearMesCorto(keysArray[0]);
-        keysArray.sort();
-        return formatearMesCorto(keysArray[0]) + ' - ' + formatearMesCorto(keysArray[keysArray.length - 1]);
-    }
-
-    function renderizarSelector() {
-        const container = document.getElementById('listaMesesSelector');
-        container.innerHTML = '';
-        
-        availableKeys.forEach(key => {
-            const isChecked = mesesAlta.includes(key) ? 'checked' : '';
-            const nombreMes = formatearMesCorto(key);
-            const mesNum = key.split('-')[1];
-            const esMesClave = ['11', '12', '01', '02', '03'].includes(mesNum);
-            const labelStyle = esMesClave ? 'text-danger' : 'text-primary';
-            
-            container.innerHTML += `
-                <div class="form-check form-switch mb-2">
-                    <input class="form-check-input border-secondary" type="checkbox" role="switch" id="switch-${key}" value="${key}" ${isChecked} onchange="toggleMes('${key}')">
-                    <label class="form-check-label fw-bold ${labelStyle}" for="switch-${key}">${nombreMes}</label>
-                </div>
-            `;
-        });
-    }
-
-    function toggleMes(key) {
-        // 1. Modificar el Array local
-        if (mesesAlta.includes(key)) {
-            mesesAlta = mesesAlta.filter(k => k !== key);
-        } else {
-            mesesAlta.push(key);
-        }
-        
-        // 2. Refrescar las tablas
-        actualizarTablas();
-        
-        // 3. AVISARLE A PYTHON SILENCIOSAMENTE PARA QUE GUARDE LA PREFERENCIA
-        fetch("{{ url_for('estadisticas.guardar_prefs') }}", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": "{{ csrf_token() }}" // Seguridad obligatoria
-            },
-            body: JSON.stringify({ meses_alta: mesesAlta })
-        }).catch(err => console.log("Error guardando preferencia:", err));
+        const existentes = keysArray.filter(k => usoProductosDB[k]);
+        if (!existentes.length) return 'Sin datos';
+        existentes.sort();
+        return formatearMesCorto(existentes[0]) + ' - ' + formatearMesCorto(existentes[existentes.length - 1]);
     }
 
     function actualizarTablas() {
         let stockAlta = {};
         let stockBaja = {};
 
-        mesesAlta.sort();
-        
-        let mesesBaja = [];
-        if (mesesAlta.length > 0) {
-            let ultimoMesAlta = mesesAlta[mesesAlta.length - 1];
-            mesesBaja = availableKeys.filter(key => key > ultimoMesAlta);
-        } else {
-            mesesBaja = [...availableKeys];
-        }
-
         mesesAlta.forEach(key => {
             const productosDelMes = usoProductosDB[key] || {};
             for (const [producto, data] of Object.entries(productosDelMes)) {
-                if(!stockAlta[producto]) stockAlta[producto] = {cant: 0, uni: data.unidad};
+                if (!stockAlta[producto]) stockAlta[producto] = {cant: 0, uni: data.unidad};
                 stockAlta[producto].cant += data.cantidad;
             }
         });
@@ -500,7 +599,7 @@
         mesesBaja.forEach(key => {
             const productosDelMes = usoProductosDB[key] || {};
             for (const [producto, data] of Object.entries(productosDelMes)) {
-                if(!stockBaja[producto]) stockBaja[producto] = {cant: 0, uni: data.unidad};
+                if (!stockBaja[producto]) stockBaja[producto] = {cant: 0, uni: data.unidad};
                 stockBaja[producto].cant += data.cantidad;
             }
         });
@@ -537,7 +636,139 @@
     }
 
     // Inicializamos todo
-    renderizarSelector();
     actualizarTablas();
+
+    // --- 4. CONSUMO PROMEDIO DE PRODUCTOS ---
+    const _prodOcultosRaw = JSON.parse('{{ productos_ocultos_session | safe }}');
+    let productosOcultos = Array.isArray(_prodOcultosRaw) ? _prodOcultosRaw : [];
+
+    // Todos los productos conocidos (union de todos los meses)
+    function todosLosProductos() {
+        const set = new Set();
+        for (const prods of Object.values(usoProductosDB)) {
+            for (const nombre of Object.keys(prods)) set.add(nombre);
+        }
+        return [...set].sort();
+    }
+
+    function promedioTemporada(keys) {
+        const totales = {};
+        let mesesConDatos = 0;
+        for (const key of keys) {
+            const prods = usoProductosDB[key];
+            if (!prods || !Object.keys(prods).length) continue;
+            mesesConDatos++;
+            for (const [nombre, data] of Object.entries(prods)) {
+                if (!totales[nombre]) totales[nombre] = { total: 0, unidad: data.unidad, meses: 0 };
+                totales[nombre].total += data.cantidad;
+                totales[nombre].meses++;
+            }
+        }
+        const result = {};
+        for (const [nombre, d] of Object.entries(totales)) {
+            result[nombre] = { prom: d.meses ? d.total / d.meses : 0, unidad: d.unidad, meses: d.meses };
+        }
+        return { data: result, mesesConDatos };
+    }
+
+    function renderConsumoPromedio() {
+        const { data: alta, mesesConDatos: mesesAlta_ } = promedioTemporada(mesesAlta);
+        const { data: baja, mesesConDatos: mesesBaja_ } = promedioTemporada(mesesBaja);
+        const productos = new Set([...Object.keys(alta), ...Object.keys(baja)]);
+        const tbody = document.getElementById('tablaConsumoPromedio');
+        if (!productos.size) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted fst-italic">Sin datos.</td></tr>';
+            return;
+        }
+        const fmt = v => v > 0 ? v.toLocaleString('es-AR', {minimumFractionDigits:1, maximumFractionDigits:1}) : '<span class="text-muted">—</span>';
+        const rows = [...productos]
+            .filter(n => !productosOcultos.includes(n))
+            .sort((a, b) => {
+                const va = (alta[a]?.prom || 0) + (baja[a]?.prom || 0);
+                const vb = (alta[b]?.prom || 0) + (baja[b]?.prom || 0);
+                return vb - va;
+            });
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted fst-italic">Todos los productos están ocultos.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = rows.map(nombre => {
+            const a = alta[nombre] || { prom: 0, unidad: baja[nombre]?.unidad || '', meses: 0 };
+            const b = baja[nombre] || { prom: 0, unidad: a.unidad, meses: 0 };
+            return `<tr>
+                <td class="fw-bold text-dark">${nombre}</td>
+                <td class="text-end font-monospace text-danger fw-bold">${fmt(a.prom)} <span class="text-secondary small fw-normal">${a.unidad}</span></td>
+                <td class="text-end font-monospace text-primary fw-bold">${fmt(b.prom)} <span class="text-secondary small fw-normal">${b.unidad}</span></td>
+            </tr>`;
+        }).join('');
+    }
+
+    // Offcanvas config de productos
+    function renderConfigProductos() {
+        const container = document.getElementById('listaProductosConfig');
+        const todos = todosLosProductos();
+        if (!todos.length) { container.innerHTML = '<p class="text-muted">Sin productos.</p>'; return; }
+        container.innerHTML = todos.map(nombre => {
+            const visible = !productosOcultos.includes(nombre);
+            return `<div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" role="switch" id="prod-${nombre}"
+                       ${visible ? 'checked' : ''} onchange="toggleProducto('${nombre}', this.checked)">
+                <label class="form-check-label fw-bold" for="prod-${nombre}">${nombre}</label>
+            </div>`;
+        }).join('');
+    }
+
+    function toggleProducto(nombre, visible) {
+        if (visible) {
+            productosOcultos = productosOcultos.filter(p => p !== nombre);
+        } else {
+            if (!productosOcultos.includes(nombre)) productosOcultos.push(nombre);
+        }
+        renderConsumoPromedio();
+        renderConsumoMes();
+        fetch("{{ url_for('estadisticas.guardar_prefs') }}", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": "{{ csrf_token() }}" },
+            body: JSON.stringify({ productos_ocultos: productosOcultos })
+        }).catch(() => {});
+    }
+
+    document.getElementById('offcanvasProductos').addEventListener('show.bs.offcanvas', renderConfigProductos);
+
+    // Mes a mes
+    const _rangoMin = `${anioAnterior}-11`;
+    const _rangoMax = `${anioActual}-10`;
+    const todasLasKeys = Object.keys(usoProductosDB).sort().filter(k => k >= _rangoMin && k <= _rangoMax);
+    let idxMesConsumo = todasLasKeys.length - 1;
+
+    function renderConsumoMes() {
+        if (!todasLasKeys.length) return;
+        const key = todasLasKeys[idxMesConsumo];
+        document.getElementById('labelMesConsumo').textContent = formatearMesLargo(key);
+        const prods = usoProductosDB[key] || {};
+        const tbody = document.getElementById('tablaConsumoMes');
+        const rows = Object.entries(prods)
+            .filter(([n]) => !productosOcultos.includes(n))
+            .sort((a, b) => b[1].cantidad - a[1].cantidad);
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted fst-italic">Sin movimientos.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = rows.map(([nombre, d]) =>
+            `<tr>
+                <td class="fw-bold text-dark">${nombre}</td>
+                <td class="text-end font-monospace text-muted fs-5">${d.cantidad.toLocaleString('es-AR')} <span class="fs-6 fw-bold text-secondary ms-1">${d.unidad}</span></td>
+            </tr>`
+        ).join('');
+    }
+
+    function cambiarMesConsumo(dir) {
+        if (!todasLasKeys.length) return;
+        idxMesConsumo = (idxMesConsumo + dir + todasLasKeys.length) % todasLasKeys.length;
+        renderConsumoMes();
+    }
+
+    renderConsumoPromedio();
+    renderConsumoMes();
 </script>
 {% endblock %}
