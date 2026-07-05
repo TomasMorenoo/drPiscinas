@@ -413,6 +413,7 @@ def aplicar_pago_en_cascada(casa, monto_ingresado, username, mes_contexto, anio_
         if deficit > 0.01:
             a_aplicar = min(plata, deficit)
             ultimo.monto_pagado = float(ultimo.monto_pagado or 0) + a_aplicar
+            plata -= a_aplicar
             ultimo.pagado = True
             ultimo.mensaje_enviado = True
             ultimo.cobrado_por = username
@@ -421,16 +422,27 @@ def aplicar_pago_en_cascada(casa, monto_ingresado, username, mes_contexto, anio_
             detalle_str = f"{txn_id}:{a_aplicar}"
             actual = getattr(ultimo, 'detalle_pagos', None)
             ultimo.detalle_pagos = f"{actual}|{detalle_str}" if actual else detalle_str
-
     hist_actual = next((h for h in historiales if h.mes == mes_contexto and h.anio == anio_contexto), None)
     if hist_actual:
         hist_actual.transaccion_id = txn_id
-        detalle_str = f"{txn_id}:0.0"
-        actual = getattr(hist_actual, 'detalle_pagos', None)
-        if not actual:
-            hist_actual.detalle_pagos = detalle_str
-        elif txn_id not in actual:
-            hist_actual.detalle_pagos = f"{actual}|{detalle_str}"
+        actual = getattr(hist_actual, 'detalle_pagos', None) or ''
+        if plata > 0.01:
+            hist_actual.monto_pagado = float(hist_actual.monto_pagado or 0) + plata
+            if txn_id not in actual:
+                entry = f"{txn_id}:{plata}"
+                hist_actual.detalle_pagos = f"{actual}|{entry}" if actual else entry
+            else:
+                entries = actual.split('|')
+                for i, e in enumerate(entries):
+                    if e.startswith(txn_id + ':'):
+                        entries[i] = f"{txn_id}:{float(e.split(':')[1]) + plata}"
+                        break
+                hist_actual.detalle_pagos = '|'.join(entries)
+        else:
+            if not actual:
+                hist_actual.detalle_pagos = f"{txn_id}:0.0"
+            elif txn_id not in actual:
+                hist_actual.detalle_pagos = f"{actual}|{txn_id}:0.0"
 
 def _casa_pausada_en_mes(casa, mes, anio, extras=0.0):
     """True si la casa tiene una pausa que cubre el mes dado.

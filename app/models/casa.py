@@ -36,6 +36,7 @@ class Casa(db.Model):
     
     dia_visita = db.Column(db.String(20), nullable=True)
     proporcional_pendiente = db.Column(db.Numeric(10, 2), nullable=True)
+    saldo_a_favor = db.Column(db.Numeric(10, 2), default=0, nullable=True)
 
     inactivado_por = db.Column(db.String(100), nullable=True)
     fecha_inactivacion = db.Column(db.DateTime, nullable=True)

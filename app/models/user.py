@@ -22,7 +22,7 @@ class User(UserMixin, db.Model):
 
     # Función de ayuda para saber rápido si es el jefe
     def is_admin(self):
-        return self.rol == 'admin'
+        return self.rol in ('admin', 'demo')
 
     def __repr__(self):
         return f'<User {self.username} - Rol: {self.rol}>'
