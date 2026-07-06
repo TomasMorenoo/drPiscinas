@@ -115,7 +115,7 @@ def asegurar_historial_pasado(casa, precio_viejo, mes_desde, anio_desde):
             m_curr = 1
             y_curr += 1
 
-def actualizar_historial_futuro(casa, nuevo_precio, mes_desde, anio_desde):
+def actualizar_historial_futuro(casa, nuevo_precio, mes_desde, anio_desde, precio_viejo=None):
     futuros = AbonoHistorico.query.filter(
         AbonoHistorico.casa_id == casa.id,
         or_(
@@ -126,7 +126,14 @@ def actualizar_historial_futuro(casa, nuevo_precio, mes_desde, anio_desde):
         AbonoHistorico.monto_pagado == 0  # No tocar meses con pagos ya registrados
     ).all()
     for f in futuros:
-        f.monto = nuevo_precio
+        prop_ant = float(f.proporcional_anterior or 0)
+        if prop_ant > 0 and precio_viejo and precio_viejo > 0:
+            new_prop = round(prop_ant * nuevo_precio / precio_viejo)
+            extras = float(f.monto) - precio_viejo - prop_ant
+            f.monto = nuevo_precio + new_prop + extras
+            f.proporcional_anterior = new_prop
+        else:
+            f.monto = nuevo_precio
 
 # ==========================================
 # LISTADO
@@ -237,7 +244,7 @@ def herramienta_aumento():
                 casa.precio_base = nuevo_precio
                 
                 asegurar_historial_pasado(casa, precio_actual, mes_desde, anio_desde)
-                actualizar_historial_futuro(casa, nuevo_precio, mes_desde, anio_desde)
+                actualizar_historial_futuro(casa, nuevo_precio, mes_desde, anio_desde, precio_viejo=precio_actual)
                 count += 1
 
                 # --- GUARDAR EN EL TXT DE AUDITORÍA ---
@@ -803,8 +810,8 @@ def aumento_individual(id):
         casa.precio_base = nuevo_precio
         
         asegurar_historial_pasado(casa, precio_actual, mes_desde, anio_desde)
-        actualizar_historial_futuro(casa, nuevo_precio, mes_desde, anio_desde)
-            
+        actualizar_historial_futuro(casa, nuevo_precio, mes_desde, anio_desde, precio_viejo=precio_actual)
+
         db.session.commit()
         
         # --- GUARDAR EN EL TXT DE AUDITORÍA ---
