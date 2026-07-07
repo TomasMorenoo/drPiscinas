@@ -61,7 +61,7 @@ def get_ar_time():
 def obtener_saludo_tiempo(nombre):
     ahora = get_ar_time()
     saludo = "Buenos Días" if ahora.hour < 12 else "Buenas Tardes"
-    return f"{saludo} {nombre}"
+    return f"{saludo}, {nombre}"
 
 def get_nombre_limpio(casa):
     nombre = casa.nombre_formateado()
@@ -264,6 +264,8 @@ def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_vis
         'saldo_anterior':                   (format_money(saldo_deuda),                     saldo_deuda),
         'saldo_favor':                      (format_money(saldo_favor),                     saldo_favor),
         'pagado':                           (format_money(pagos_en_este_dashboard),         pagos_en_este_dashboard),
+        'mes':                              (MESES_LARGO[mes - 1],                          None),
+        'anio':                             (str(anio),                                     None),
     }
     return renderizar_template(pt.get_template_individual(), variables)
 
@@ -972,7 +974,7 @@ def api_wa_url_recordatorio_grupo(grupo_id):
         return jsonify({"url": None})
     from app.models.grupo import GrupoCliente
     grupo = GrupoCliente.query.get_or_404(grupo_id)
-    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).options(
+    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id, activo=True).options(
         selectinload(Casa.historial_abonos),
         selectinload(Casa.historial_pausas),
         selectinload(Casa.visitas).selectinload(Visit.productos).joinedload(VisitProduct.product),
@@ -1311,7 +1313,7 @@ def unsync_abonos():
 def marcar_mensaje_grupo(grupo_id):
     mes = request.json.get("mes")
     anio = request.json.get("anio")
-    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).all()
+    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id, activo=True).all()
     historiales = AbonoHistorico.query.filter(
         AbonoHistorico.casa_id.in_([c.id for c in casas_grupo]),
         AbonoHistorico.mes == mes,
@@ -1333,7 +1335,7 @@ def toggle_pago_grupo(grupo_id):
     action = request.json.get("action")
     _pcfg_tpg = Configuracion.get('proporcional_desde')
     
-    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).options(
+    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id, activo=True).options(
         joinedload(Casa.grupo),
         selectinload(Casa.historial_abonos),
         selectinload(Casa.historial_pausas),
@@ -1504,7 +1506,7 @@ def registrar_pago_grupo(grupo_id):
     cotizacion_usd = request.json.get("cotizacion_usd")
 
     from app.models.grupo import GrupoCliente
-    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).options(
+    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id, activo=True).options(
         selectinload(Casa.historial_abonos),
         selectinload(Casa.historial_pausas),
         selectinload(Casa.visitas).selectinload(Visit.productos).joinedload(VisitProduct.product),
@@ -1893,7 +1895,7 @@ def api_wa_url_grupo(grupo_id):
         return jsonify({"url": None})
     from app.models.grupo import GrupoCliente
     grupo = GrupoCliente.query.get_or_404(grupo_id)
-    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id).options(
+    casas_grupo = Casa.query.filter_by(grupo_id=grupo_id, activo=True).options(
         selectinload(Casa.historial_abonos),
         selectinload(Casa.historial_pausas),
         selectinload(Casa.visitas).selectinload(Visit.productos).joinedload(VisitProduct.product),

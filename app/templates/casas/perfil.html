@@ -98,6 +98,26 @@
                     </div>
                     {% endif %}
 
+                    {% if casa.fecha_reactivacion %}
+                    <div class="perfil-field mb-3">
+                        <small class="text-muted d-block text-uppercase fw-bold">Reactivado desde</small>
+                        <span class="perfil-val text-muted">{{ casa.fecha_reactivacion.day }} de {{ MESES_LARGO[casa.fecha_reactivacion.month - 1] }} {{ casa.fecha_reactivacion.year }}</span>
+                    </div>
+                    {% elif casa.historial_pausas %}
+                        {% set ultima_pausa = casa.historial_pausas | sort(attribute='desde') | last %}
+                        {% if not ultima_pausa.hasta %}
+                        <div class="perfil-field mb-3">
+                            <small class="text-muted d-block text-uppercase fw-bold">Pausado desde</small>
+                            <span class="perfil-val text-muted">{{ ultima_pausa.desde.day }} de {{ MESES_LARGO[ultima_pausa.desde.month - 1] }} {{ ultima_pausa.desde.year }}</span>
+                        </div>
+                        {% else %}
+                        <div class="perfil-field mb-3">
+                            <small class="text-muted d-block text-uppercase fw-bold">Despausado desde</small>
+                            <span class="perfil-val text-muted">{{ ultima_pausa.hasta.day }} de {{ MESES_LARGO[ultima_pausa.hasta.month - 1] }} {{ ultima_pausa.hasta.year }}</span>
+                        </div>
+                        {% endif %}
+                    {% endif %}
+
                     {% if casa.dia_visita %}
                     <div class="perfil-field mb-3">
                         <small class="text-muted d-block text-uppercase fw-bold">Días Visita</small>

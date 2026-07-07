@@ -2,7 +2,7 @@ from app import db
 from datetime import datetime
 import re
 
-DEFAULT_TEMPLATE_INDIVIDUAL = """{saludo} como te va, te recuerdo el abono de la pile
+DEFAULT_TEMPLATE_INDIVIDUAL = """{saludo} como te va, te recuerdo el abono de la pile de *{mes}*
 
 {resumen_total}
 
