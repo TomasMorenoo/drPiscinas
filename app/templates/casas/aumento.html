@@ -36,12 +36,30 @@
 
                     <div class="mb-4">
                         <label class="form-label fw-bold text-uppercase small text-muted">A qué clientes aplicar</label>
-                        <select name="country_id" class="form-select border-primary">
+                        <select name="country_id" class="form-select border-primary" id="countrySelect">
                             <option value="">A TODOS los Countries y Barrios</option>
                             {% for country in countries %}
                                 <option value="{{ country.id }}">Solo a: {{ country.nombre }}</option>
                             {% endfor %}
+                            <option value="personalizado">Personalizado (elegir casas)</option>
                         </select>
+                    </div>
+
+                    <div id="panelPersonalizado" class="mb-4 d-none">
+                        <label class="form-label fw-bold text-uppercase small text-muted">Seleccionar casas</label>
+                        <div class="d-flex gap-2 mb-2">
+                            <input type="text" id="buscarCasaAumento" class="form-control form-control-sm" placeholder="Buscar..." style="max-width:200px">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleCasas(true)">Todas</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleCasas(false)">Ninguna</button>
+                        </div>
+                        <div class="border rounded" style="max-height:280px;overflow-y:auto;">
+                            {% for casa in casas %}
+                            <label class="d-flex align-items-center gap-2 px-3 py-2 border-bottom item-casa-aumento" style="cursor:pointer;">
+                                <input type="checkbox" name="casa_ids" value="{{ casa.id }}" class="form-check-input flex-shrink-0" style="cursor:pointer;border:2px solid #adb5bd;">
+                                <span class="small fw-semibold">{{ casa.nombre_formateado() }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
                     </div>
 
                     <div class="row g-2 mb-4">
@@ -147,5 +165,27 @@
     const d = new Date();
     document.getElementById('mesDesde').value = d.getMonth() + 1;
     document.getElementById('anioDesde').value = d.getFullYear();
+
+    const countrySelect = document.getElementById('countrySelect');
+    const panelPersonalizado = document.getElementById('panelPersonalizado');
+
+    countrySelect.addEventListener('change', function() {
+        panelPersonalizado.classList.toggle('d-none', this.value !== 'personalizado');
+    });
+
+    function toggleCasas(checked) {
+        document.querySelectorAll('.item-casa-aumento').forEach(el => {
+            if (!el.classList.contains('d-none')) {
+                el.querySelector('input[type=checkbox]').checked = checked;
+            }
+        });
+    }
+
+    document.getElementById('buscarCasaAumento').addEventListener('input', function() {
+        const q = this.value.toLowerCase().trim();
+        document.querySelectorAll('.item-casa-aumento').forEach(el => {
+            el.classList.toggle('d-none', !el.querySelector('span').textContent.toLowerCase().includes(q));
+        });
+    });
 </script>
 {% endblock %}

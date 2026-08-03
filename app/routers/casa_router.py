@@ -222,11 +222,17 @@ def herramienta_aumento():
             flash("El aumento debe ser mayor a 0.", "error")
             return redirect(url_for("casas.herramienta_aumento"))
 
-        query = Casa.query.filter_by(activo=True)
-        if country_id:
-            query = query.filter_by(country_id=country_id)
-        
-        casas_afectadas = query.all()
+        if country_id == "personalizado":
+            casa_ids = request.form.getlist("casa_ids", type=int)
+            if not casa_ids:
+                flash("Seleccioná al menos una casa.", "error")
+                return redirect(url_for("casas.herramienta_aumento"))
+            casas_afectadas = Casa.query.filter(Casa.id.in_(casa_ids), Casa.activo == True).all()
+        else:
+            query = Casa.query.filter_by(activo=True)
+            if country_id:
+                query = query.filter_by(country_id=country_id)
+            casas_afectadas = query.all()
         count = 0
 
         db.session.query(Casa).update({Casa.precio_anterior: None})
@@ -256,7 +262,9 @@ def herramienta_aumento():
         # --- REGISTRO DEL AUMENTO ---
         if count > 0:
             target = "TODOS LOS CLIENTES"
-            if country_id:
+            if country_id == "personalizado":
+                target = "SELECCIÓN PERSONALIZADA"
+            elif country_id:
                 c_obj = Country.query.get(country_id)
                 if c_obj: target = f"COUNTRY {c_obj.nombre.upper()}"
 
@@ -286,11 +294,10 @@ def herramienta_aumento():
 
     countries = Country.query.filter_by(activo=True).order_by(Country.nombre).all()
     hay_backup = Casa.query.filter(Casa.precio_anterior.isnot(None), Casa.precio_anterior > 0).first() is not None
-    
-    # Límite de 15 restaurado para la vista web
     ultimos_aumentos = HistorialAumento.query.order_by(HistorialAumento.fecha.desc()).limit(15).all()
-    
-    return render_template("casas/aumento.html", countries=countries, hay_backup=hay_backup, ultimos_aumentos=ultimos_aumentos)
+    casas = sorted(Casa.query.filter_by(activo=True).all(), key=natural_sort_key)
+
+    return render_template("casas/aumento.html", countries=countries, hay_backup=hay_backup, ultimos_aumentos=ultimos_aumentos, casas=casas)
 
 # ==========================================
 # DESHACER EL ÚLTIMO AUMENTO

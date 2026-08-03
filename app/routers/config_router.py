@@ -1,9 +1,17 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask_login import login_required, current_user
+from datetime import datetime
+import calendar
 from app import db
 from app.decorators import admin_required, root_required
 from app.models.plantilla_mensaje import PlantillaMensaje, DEFAULT_TEMPLATE_INDIVIDUAL, DEFAULT_TEMPLATE_GRUPO, DEFAULT_TEMPLATE_RECORDATORIO
 from app.models.configuracion import Configuracion
+from app.models.casa import Casa
+from app.models.products import Product
+from app.models.visit import Visit
+from app.models.visit_product import VisitProduct
+from app.utils import mover_stock
+from app.routers.dashboard_router import natural_sort_key
 
 config_bp = Blueprint("config", __name__, url_prefix="/config")
 
@@ -122,3 +130,125 @@ def config_proporcional():
 
     cfg = Configuracion.get('proporcional_desde')
     return render_template("config/proporcional.html", cfg=cfg)
+
+
+@config_bp.route("/extras-masivos", methods=["GET", "POST"])
+@login_required
+@admin_required
+def extras_masivos():
+    _trim = db.func.trim(Product.nombre)
+    _priority = db.case(
+        (_trim.ilike('pastilla de cloro'), 0),
+        (_trim.ilike('clarificador'), 1),
+        (_trim.ilike('granulado lento'), 2),
+        (_trim.ilike('granulado rapido'), 3),
+        else_=4
+    )
+    productos = Product.query.filter(
+        Product.activo == True,
+        db.func.lower(Product.nombre) != 'deuda'
+    ).order_by(_priority, Product.nombre).all()
+    casas = sorted(Casa.query.filter_by(activo=True).all(), key=natural_sort_key)
+    now = datetime.now()
+
+    if request.method == "POST":
+        product_ids = request.form.getlist("product_id", type=int)
+        cantidad = request.form.get("cantidad", type=float)
+        mes = request.form.get("mes", type=int)
+        anio = request.form.get("anio", type=int)
+        casa_ids = request.form.getlist("casa_ids", type=int)
+
+        if not product_ids or not cantidad or not mes or not anio or not casa_ids:
+            flash("Completá todos los campos y seleccioná al menos una casa y un producto.", "error")
+            return render_template("config/extras_masivos.html", productos=productos, casas=casas, now=now)
+
+        ultimo_dia = calendar.monthrange(anio, mes)[1]
+        fecha_fantasma = datetime(anio, mes, ultimo_dia, 12, 0, 0)
+        productos_obj = {p.id: p for p in Product.query.filter(Product.id.in_(product_ids)).all()}
+
+        ya_tienen = []
+        agregadas = 0
+
+        for casa_id in casa_ids:
+            for product_id in product_ids:
+                existente = (
+                    Visit.query
+                    .join(VisitProduct)
+                    .filter(
+                        Visit.casa_id == casa_id,
+                        Visit.observaciones == "[EXTRA_MANUAL]",
+                        db.extract("month", Visit.fecha) == mes,
+                        db.extract("year", Visit.fecha) == anio,
+                        VisitProduct.product_id == product_id,
+                    )
+                    .first()
+                )
+                if existente:
+                    casa = Casa.query.get(casa_id)
+                    producto = productos_obj[product_id]
+                    ya_tienen.append(f"{casa.nombre_formateado()} ({producto.nombre})")
+                    continue
+
+                producto = productos_obj[product_id]
+                nueva_visita = Visit(
+                    casa_id=casa_id,
+                    usuario_id=current_user.id,
+                    fecha=fecha_fantasma,
+                    observaciones="[EXTRA_MANUAL]"
+                )
+                db.session.add(nueva_visita)
+                db.session.flush()
+
+                nuevo_vp = VisitProduct(
+                    visit_id=nueva_visita.id,
+                    product_id=product_id,
+                    cantidad=cantidad,
+                    precio_unitario=producto.precio
+                )
+                db.session.add(nuevo_vp)
+                mover_stock(product_id, -cantidad, 'visita', current_user.username, visit_id=nueva_visita.id, motivo='extra masivo')
+                agregadas += 1
+
+        db.session.commit()
+
+        if agregadas:
+            flash(f"{agregadas} extra(s) agregado(s) correctamente.", "success")
+        if ya_tienen:
+            flash(f"Ya existían: {', '.join(ya_tienen)}.", "warning")
+
+        return redirect(url_for("config.extras_masivos"))
+
+    return render_template("config/extras_masivos.html", productos=productos, casas=casas, now=now)
+
+
+@config_bp.route("/extras-masivos/check")
+@login_required
+@admin_required
+def extras_masivos_check():
+    casa_id = request.args.get("casa_id", type=int)
+    mes = request.args.get("mes", type=int)
+    anio = request.args.get("anio", type=int)
+    product_ids = request.args.getlist("product_ids", type=int)
+
+    if not casa_id or not mes or not anio or not product_ids:
+        return jsonify([])
+
+    conflictos = []
+    for product_id in product_ids:
+        existente = (
+            Visit.query
+            .join(VisitProduct)
+            .filter(
+                Visit.casa_id == casa_id,
+                Visit.observaciones == "[EXTRA_MANUAL]",
+                db.extract("month", Visit.fecha) == mes,
+                db.extract("year", Visit.fecha) == anio,
+                VisitProduct.product_id == product_id,
+            )
+            .first()
+        )
+        if existente:
+            producto = Product.query.get(product_id)
+            conflictos.append(producto.nombre if producto else str(product_id))
+
+    return jsonify(conflictos)
