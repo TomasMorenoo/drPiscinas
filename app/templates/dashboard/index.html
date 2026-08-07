@@ -721,9 +721,15 @@
                                                     {% elif item.mensaje_enviado %}<i class="bi bi-send-check-fill text-white"></i>
                                                     {% else %}<i class="bi bi-clock text-muted"></i>{% endif %}
                                                 </button>
+                                                {% if item.mensaje_enviado %}
+                                                <button onclick="togglePago({{ item.id_historial }}, 'undo_mensaje')" class="btn btn-sm btn-outline-danger" title="Deshacer mensaje enviado">
+                                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                                </button>
+                                                {% else %}
                                                 <button onclick="marcarPagadoDirecto({{ item.id_historial }})" class="btn btn-sm btn-success" title="Marcar pagado">
                                                     <i class="bi bi-check-lg"></i>
                                                 </button>
+                                                {% endif %}
                                             {% endif %}
                                             
                                             <button onclick="abrirModalPago('individual', {{ item.id_historial }}, '{{ item.casa.nombre_formateado() }}', {{ deuda_actual }})" class="btn btn-sm btn-outline-dark" title="Pago parcial">
@@ -786,12 +792,20 @@
                                                     {% elif item.mensaje_enviado %}<i class="bi bi-send-check-fill fs-5 text-white"></i>
                                                     {% else %}<i class="bi bi-clock-fill fs-5 text-danger"></i>{% endif %}
                                                 </button>
+                                                {% if item.mensaje_enviado %}
+                                                <button onclick="togglePago({{ item.id_historial }}, 'undo_mensaje')"
+                                                        class="btn btn-sm btn-outline-danger border shadow-sm py-2 px-3 flex-grow-0"
+                                                        title="Deshacer mensaje enviado">
+                                                    <i class="bi bi-arrow-counterclockwise fs-5"></i>
+                                                </button>
+                                                {% else %}
                                                 <button id="btn-directo-{{ item.id_historial }}"
                                                         onclick="marcarPagadoDirecto({{ item.id_historial }})"
                                                         class="btn btn-sm btn-success border shadow-sm py-2 px-3 flex-grow-0"
                                                         title="Marcar pagado directo">
                                                     <i class="bi bi-check-circle-fill fs-5"></i>
                                                 </button>
+                                                {% endif %}
                                             {% endif %}
                                         </div>
 
@@ -959,6 +973,12 @@
                                    style="width: 38px; height: 38px;" title="WhatsApp del Grupo">
                                     <i class="bi bi-whatsapp"></i>
                                 </a>
+                                <button id="undo-msg-grp-{{ g.grupo_id }}"
+                                        onclick="undoMensajeGrupo({{ g.grupo_id }}, {{ mes }}, {{ anio }})"
+                                        class="btn btn-outline-danger btn-sm rounded-circle d-flex align-items-center justify-content-center shadow-sm"
+                                        style="width: 38px; height: 38px;{% if not g.mensaje_enviado %} display: none !important;{% endif %}" title="Deshacer mensaje enviado">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </button>
                                 <a href="#"
                                    id="bell-grp-{{ g.grupo_id }}"
                                    onclick="{% if g.mensaje_enviado %}abrirWARecordatorioGrupo(event, {{ g.grupo_id }}, {{ mes }}, {{ anio }}){% else %}event.preventDefault(){% endif %}"
@@ -1487,7 +1507,12 @@ function togglePago(id, actionType) {
             _activarBell(id);
             const btnM = document.getElementById(`btn-estado-m-${id}`);
             if (btnM) { btnM.className = btnM.className.replace('btn-outline-secondary','btn-primary'); btnM.querySelector('i').className = 'bi bi-send-check-fill text-white'; }
-            fetch(`/dashboard/toggle-pago/${id}`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType }) });
+            fetch(`/dashboard/toggle-pago/${id}`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType }) })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.url_wa) window.location.href = data.url_wa;
+                    recargarPanel();
+                });
             return;
         } else {
             // Notificado -> Pagado: Ilusión visual instantánea
@@ -1504,6 +1529,11 @@ function togglePago(id, actionType) {
                 }
             }
         }
+    } else if (actionType === 'undo_mensaje') {
+        fetch(`/dashboard/toggle-pago/${id}`, {
+            method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'undo_mensaje' })
+        }).then(() => recargarPanel());
+        return;
     } else if (actionType === 'undo' && btnDeshacer) {
         const nombreFila = document.querySelector(`#fila-${id} .nombre-casa, [data-id="${id}"] .nombre-casa`) || null;
         confirmarDeshacer(nombreFila ? nombreFila.textContent.trim() : '', () => {
@@ -1833,6 +1863,30 @@ function abrirModalPago(tipo, id_referencia, nombre, deuda) {
    Siempre recarga el panel tras la respuesta para que el estado
    del grupo Y de cada casa interna queden sincronizados.
    ============================================================ */
+function undoMensajeGrupo(grupo_id, mes, anio) {
+    // Feedback visual inmediato — grupo
+    const undoBtn = document.getElementById(`undo-msg-grp-${grupo_id}`);
+    if (undoBtn) undoBtn.style.setProperty('display', 'none', 'important');
+    const bellGrp = document.getElementById(`bell-grp-${grupo_id}`);
+    if (bellGrp) {
+        bellGrp.classList.remove('btn-warning');
+        bellGrp.classList.add('btn-outline-secondary', 'opacity-25', 'disabled');
+        bellGrp.querySelector('i').className = 'bi bi-bell';
+        bellGrp.onclick = (e) => e.preventDefault();
+    }
+    const btnGrp = document.getElementById(`btn-pago-grp-${grupo_id}`);
+    if (btnGrp && !btnGrp.classList.contains('btn-success')) {
+        btnGrp.classList.remove('btn-primary', 'btn-warning');
+        btnGrp.classList.add('btn-outline-danger');
+        btnGrp.querySelector('i').className = 'bi bi-check-lg';
+    }
+    fetch(`/dashboard/toggle-pago-grupo/${grupo_id}`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'undo_mensaje', mes, anio })
+    }).then(() => recargarPanel());
+}
+
 function togglePagoGrupo(grupo_id, mes, anio, btn) {
     const isPagado = btn.classList.contains('btn-success');
     const action   = isPagado ? 'undo' : 'advance';
@@ -1960,6 +2014,9 @@ function abrirWAGrupo(event, grupoId, mes, anio) {
     event.preventDefault();
     const a = event.currentTarget;
     marcarEnviadoGrupo(grupoId, mes, anio);
+    // Mostrar botón undo_mensaje
+    const undoBtn = document.getElementById(`undo-msg-grp-${grupoId}`);
+    if (undoBtn) undoBtn.style.removeProperty('display');
     // Activar bell de grupo y estado
     const bellGrp = document.getElementById(`bell-grp-${grupoId}`);
     if (bellGrp) {
@@ -1973,6 +2030,29 @@ function abrirWAGrupo(event, grupoId, mes, anio) {
         btnGrp.classList.remove('btn-outline-danger');
         btnGrp.classList.add('btn-primary');
         btnGrp.querySelector('i').className = 'bi bi-send-check-fill text-white';
+    }
+    // Actualizar casas individuales dentro del grupo
+    const container = document.getElementById(`collapseGrupo${grupoId}`);
+    if (container) {
+        container.querySelectorAll('[id^="btn-estado-gd-"]').forEach(btn => {
+            if (!btn.classList.contains('btn-success') && !btn.classList.contains('btn-warning')) {
+                btn.classList.remove('btn-light', 'border', 'text-danger', 'btn-outline-secondary');
+                btn.classList.add('btn-primary');
+                btn.querySelector('i').className = 'bi bi-send-check-fill text-white';
+            }
+        });
+        container.querySelectorAll('[id^="btn-estado-gm-"]').forEach(btn => {
+            if (!btn.classList.contains('btn-success') && !btn.classList.contains('btn-warning')) {
+                btn.classList.remove('btn-outline-secondary', 'btn-light', 'border', 'text-danger');
+                btn.classList.add('btn-primary');
+                btn.querySelector('i').className = 'bi bi-send-check-fill text-white';
+            }
+        });
+        container.querySelectorAll('[id^="bell-grp-d-"], [id^="bell-grp-m-"]').forEach(bell => {
+            bell.classList.remove('btn-outline-secondary', 'opacity-25', 'disabled');
+            bell.classList.add('btn-warning');
+            bell.querySelector('i').className = 'bi bi-bell-fill';
+        });
     }
     if (a.dataset.url) { window.location.href = a.dataset.url; return; }
     fetch(`/dashboard/api/wa-url-grupo/${grupoId}?mes=${mes}&anio=${anio}`)

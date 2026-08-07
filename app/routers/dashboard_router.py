@@ -364,11 +364,12 @@ def revertir_transaccion(h, txn_id):
 def aplicar_pago_en_cascada(casa, monto_ingresado, username, mes_contexto, anio_contexto):
     from app.models.abono_historico import AbonoHistorico
     marca_tiempo = obtener_marca_tiempo(mes_contexto, anio_contexto)
-    
+    aplicaciones = {}  # (mes, anio) -> monto aplicado
+
     txn_id = f"TXN-{uuid.uuid4().hex[:8].upper()}"
     historiales = AbonoHistorico.query.filter_by(casa_id=casa.id).order_by(AbonoHistorico.anio.asc(), AbonoHistorico.mes.asc()).all()
     plata = float(monto_ingresado)
-    
+
     # Calcular el mes/anio mínimo a considerar según fecha_creacion de la casa
     _fa = None
     if casa.fecha_creacion:
@@ -376,38 +377,69 @@ def aplicar_pago_en_cascada(casa, monto_ingresado, username, mes_contexto, anio_
         _fa_raw = casa.fecha_creacion
         _fa = _fa_raw.date() if isinstance(_fa_raw, _dt) else _fa_raw
 
+    saldo_arrastrado = 0.0  # negativo = crédito a favor, positivo = deuda acumulada
+
     for h in historiales:
-        if plata <= 0.01:
-            break
-        # Saltar meses anteriores a la fecha de alta del cliente (mismo criterio que obtener_saldo_anterior)
+        # Saltar meses anteriores a la fecha de alta del cliente
         if _fa and (h.anio, h.mes) < (_fa.year, _fa.month):
             continue
-        if not h.pagado:
-            datos = casa.obtener_gastos_mensuales(h.mes, h.anio)
-            total_mes = float(datos['total'])
-            deuda = total_mes - float(h.monto_pagado or 0)
-            
-            monto_aplicado = 0.0
-            if deuda > 0.01:
-                if plata >= (deuda - 0.01):
-                    monto_aplicado = deuda
-                    h.monto_pagado = float(h.monto_pagado or 0) + deuda
-                    plata -= deuda
-                    h.pagado = True
-                    h.mensaje_enviado = True
-                else:
-                    monto_aplicado = plata
-                    h.monto_pagado = float(h.monto_pagado or 0) + plata
-                    plata = 0
-                
-                h.cobrado_por = username
-                h.fecha_pago = marca_tiempo
-                h.transaccion_id = txn_id
-                
-                detalle_str = f"{txn_id}:{monto_aplicado}"
-                actual = getattr(h, 'detalle_pagos', None)
-                h.detalle_pagos = f"{actual}|{detalle_str}" if actual else detalle_str
-                    
+
+        datos = casa.obtener_gastos_mensuales(h.mes, h.anio, hist=h)
+        total_mes = float(datos['total'])
+        pagado_hist = float(h.monto_pagado or 0)
+
+        if h.pagado:
+            # Acumular crédito/deuda de meses ya cerrados
+            saldo_arrastrado += total_mes - pagado_hist
+            continue
+
+        if plata <= 0.01 and saldo_arrastrado >= -0.01:
+            break
+
+        # Deuda real considerando crédito acumulado de meses anteriores
+        deuda_efectiva = total_mes + saldo_arrastrado - pagado_hist
+        saldo_arrastrado = 0.0
+
+        if deuda_efectiva <= 0.01:
+            # El crédito acumulado cubre este mes completo
+            h.pagado = True
+            h.mensaje_enviado = True
+            h.cobrado_por = username
+            h.fecha_pago = marca_tiempo
+            h.transaccion_id = txn_id
+            actual = getattr(h, 'detalle_pagos', None)
+            if not actual:
+                h.detalle_pagos = f"{txn_id}:0.0"
+            elif txn_id not in actual:
+                h.detalle_pagos = f"{actual}|{txn_id}:0.0"
+            saldo_arrastrado = deuda_efectiva  # crédito restante (negativo) para el próximo mes
+            continue
+
+        # deuda_efectiva > 0.01 — aplicar cash
+        if plata <= 0.01:
+            break
+
+        monto_aplicado = 0.0
+        if plata >= deuda_efectiva - 0.01:
+            monto_aplicado = deuda_efectiva
+            h.monto_pagado = pagado_hist + monto_aplicado
+            plata -= monto_aplicado
+            h.pagado = True
+            h.mensaje_enviado = True
+        else:
+            monto_aplicado = plata
+            h.monto_pagado = pagado_hist + monto_aplicado
+            plata = 0
+
+        h.cobrado_por = username
+        h.fecha_pago = marca_tiempo
+        h.transaccion_id = txn_id
+
+        detalle_str = f"{txn_id}:{monto_aplicado}"
+        actual = getattr(h, 'detalle_pagos', None)
+        h.detalle_pagos = f"{actual}|{detalle_str}" if actual else detalle_str
+        aplicaciones[(h.mes, h.anio)] = aplicaciones.get((h.mes, h.anio), 0) + monto_aplicado
+
     if plata > 0.01 and historiales:
         ultimo = historiales[-1]
         datos_ultimo = casa.obtener_gastos_mensuales(ultimo.mes, ultimo.anio)
@@ -424,6 +456,7 @@ def aplicar_pago_en_cascada(casa, monto_ingresado, username, mes_contexto, anio_
             detalle_str = f"{txn_id}:{a_aplicar}"
             actual = getattr(ultimo, 'detalle_pagos', None)
             ultimo.detalle_pagos = f"{actual}|{detalle_str}" if actual else detalle_str
+            aplicaciones[(ultimo.mes, ultimo.anio)] = aplicaciones.get((ultimo.mes, ultimo.anio), 0) + a_aplicar
     hist_actual = next((h for h in historiales if h.mes == mes_contexto and h.anio == anio_contexto), None)
     if hist_actual:
         hist_actual.transaccion_id = txn_id
@@ -440,11 +473,14 @@ def aplicar_pago_en_cascada(casa, monto_ingresado, username, mes_contexto, anio_
                         entries[i] = f"{txn_id}:{float(e.split(':')[1]) + plata}"
                         break
                 hist_actual.detalle_pagos = '|'.join(entries)
+            aplicaciones[(mes_contexto, anio_contexto)] = aplicaciones.get((mes_contexto, anio_contexto), 0) + plata
         else:
             if not actual:
                 hist_actual.detalle_pagos = f"{txn_id}:0.0"
             elif txn_id not in actual:
                 hist_actual.detalle_pagos = f"{actual}|{txn_id}:0.0"
+
+    return aplicaciones
 
 def _casa_pausada_en_mes(casa, mes, anio, extras=0.0):
     """True si la casa tiene una pausa que cubre el mes dado.
@@ -1063,6 +1099,13 @@ def toggle_pago(id):
     url_wa = None
     wa_chat_url = None
 
+    if action == 'undo_mensaje':
+        registro.mensaje_enviado = False
+        if hasattr(registro, 'doble_instancia_enviada'):
+            registro.doble_instancia_enviada = False
+        db.session.commit()
+        return jsonify({"success": True})
+
     if action == 'undo' or (pagado and action != 'advance'):
         # --- AUDITORÍA: deshacer pago ---
         casa_undo = registro.casa
@@ -1357,6 +1400,14 @@ def toggle_pago_grupo(grupo_id):
     url_wa = None
     wa_chat_url = None
 
+    if action == 'undo_mensaje':
+        for h in historiales:
+            h.mensaje_enviado = False
+            if hasattr(h, 'doble_instancia_enviada'):
+                h.doble_instancia_enviada = False
+        db.session.commit()
+        return jsonify({"success": True})
+
     if action == 'undo':
         # ── DESHACER PAGO ────────────────────────────────────────────
         from app.models.grupo import GrupoCliente
@@ -1602,14 +1653,23 @@ def registrar_pago_especial(id_historial):
     cotizacion_usd = request.json.get("cotizacion_usd")
 
     if monto_ingresado > 0:
+        aplicaciones = aplicar_pago_en_cascada(registro.casa, monto_ingresado, current_user.username, registro.mes, registro.anio)
+
         # --- AUDITORÍA ---
         mes_nombre_e = nombre_mes(registro.mes)
         if monto_usd and cotizacion_usd:
-            detalle_e = f"{registro.casa.nombre_formateado()} — {mes_nombre_e} {registro.anio} — {format_money(float(monto_usd))} USD X ${format_money(float(cotizacion_usd))} = ${format_money(monto_ingresado)}"
+            base_e = f"{registro.casa.nombre_formateado()} — {mes_nombre_e} {registro.anio} — {format_money(float(monto_usd))} USD X ${format_money(float(cotizacion_usd))} = ${format_money(monto_ingresado)}"
         else:
-            detalle_e = f"{registro.casa.nombre_formateado()} — {mes_nombre_e} {registro.anio} — ${format_money(monto_ingresado)}"
+            base_e = f"{registro.casa.nombre_formateado()} — {mes_nombre_e} {registro.anio} — ${format_money(monto_ingresado)}"
+        if len(aplicaciones) > 1:
+            desglose = ' | '.join(
+                f"{nombre_mes(m)} {a}: ${format_money(mo)}"
+                for (m, a), mo in sorted(aplicaciones.items())
+            )
+            detalle_e = f"{base_e} → {desglose}"
+        else:
+            detalle_e = base_e
         registrar_auditoria(current_user.username, 'PAGO_PARCIAL', detalle_e)
-        aplicar_pago_en_cascada(registro.casa, monto_ingresado, current_user.username, registro.mes, registro.anio)
 
     db.session.commit()
     return jsonify({"success": True, "wa_chat_url": generar_wa_chat_url(registro.casa)})
