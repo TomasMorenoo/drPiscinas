@@ -586,7 +586,7 @@ def calcular_saldos_anteriores_batch(mes, anio):
                           + COALESCE(promo_ext.extras, 0)
                           - COALESCE(ah.monto_pagado, 0)
                      END
-            ) AS saldo
+            ) + COALESCE(MAX(c.saldo_a_favor), 0) AS saldo
         FROM abonos_historicos ah
         JOIN casas c ON c.id = ah.casa_id
         LEFT JOIN (

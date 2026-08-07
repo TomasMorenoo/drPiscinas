@@ -143,6 +143,7 @@ class Casa(db.Model):
                 contribucion = total_hist - pagado_hist
                 saldo += contribucion
 
+        saldo += float(self.saldo_a_favor or 0)
         return round(saldo, 2)
 
     def _calcular_gastos_mensuales(self, mes, anio, hist, visitas_mes):
