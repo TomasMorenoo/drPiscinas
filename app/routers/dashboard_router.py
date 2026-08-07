@@ -875,6 +875,8 @@ def index():
             "es_proporcional_diferido": bool(_es_mes_alta_disp and _fref_disp is not None and _fref_disp.day > 14),
         }
 
+        _skip_pausada = pausado_mes and total_mes <= 0.01 and saldo_anterior_visual <= 0.01
+
         if casa.grupo_id:
             if casa.grupo_id not in reporte_grupos:
                 reporte_grupos[casa.grupo_id] = {
@@ -887,19 +889,22 @@ def index():
                     "saldo_a_favor": _saldo_grupo_para_mes(casa.grupo, mes, anio),
                     "ultimo_saldo_aplicado": float(casa.grupo.ultimo_saldo_aplicado or 0),
                 }
-            g = reporte_grupos[casa.grupo_id]
-            g["casas"].append(item_casa)
-            g["total_mes"] += total_mes + _prop_preview
-            g["saldo_anterior"] += saldo_anterior_visual
-            g["saldo_restante"] += saldo_restante
-            g["monto_pagado"] += pagos_en_este_dashboard
+            if not _skip_pausada:
+                g = reporte_grupos[casa.grupo_id]
+                g["casas"].append(item_casa)
+                g["total_mes"] += total_mes + _prop_preview
+                g["saldo_anterior"] += saldo_anterior_visual
+                g["saldo_restante"] += saldo_restante
+                g["monto_pagado"] += pagos_en_este_dashboard
         else:
-            reporte_sueltas.append(item_casa)
+            if not _skip_pausada:
+                reporte_sueltas.append(item_casa)
 
-        total_clientes += 1
-        total_abono += abono_mes
-        total_extras += extras + extras_diferidos
-        total_recaudado += pagos_en_este_dashboard
+        if not _skip_pausada:
+            total_clientes += 1
+            total_abono += abono_mes
+            total_extras += extras + extras_diferidos
+            total_recaudado += pagos_en_este_dashboard
 
     total_general = total_abono + total_extras + total_deuda_anterior
 

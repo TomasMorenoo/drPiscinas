@@ -916,24 +916,24 @@
                     <div class="d-flex flex-wrap align-items-center gap-2 gap-md-3">
 
                         <div class="grupo-montos-row flex-grow-1">
-                            {% set _saldo_visible = g.saldo_a_favor if not g.pagado else g.ultimo_saldo_aplicado %}
-                            {% set _bruto = g.monto_pagado if g.pagado else ([g.total_mes + g.saldo_anterior, 0] | max) %}
-                            {% set _neto  = [_bruto - _saldo_visible, 0] | max %}
-                            {% set debe_neto = g.saldo_anterior - g.saldo_a_favor %}
+                            {% set _subtotal = g.total_mes %}
+                            {% set _saldo = g.saldo_anterior %}
+                            {% set _total_pagar = [_subtotal + _saldo - g.saldo_a_favor, 0] | max %}
+                            {% set deuda_neta = _total_pagar %}
 
                             <div class="grupo-monto-item">
                                 <span class="grupo-monto-label">Subtotal</span>
-                                <span class="fw-bold font-monospace text-dark">${{ _bruto | pesos }}</span>
+                                <span class="fw-bold font-monospace text-dark">${{ _subtotal | pesos }}</span>
                             </div>
 
                             <div class="grupo-monto-item">
                                 <span class="grupo-monto-label">Saldo</span>
-                                {% if _saldo_visible > 0.01 %}
-                                    <span class="fw-bold text-success font-monospace">-${{ _saldo_visible | pesos }}</span>
-                                {% elif debe_neto < -0.1 %}
-                                    <span class="fw-bold text-success font-monospace">-${{ debe_neto | abs | pesos }}</span>
-                                {% elif debe_neto > 0.1 %}
-                                    <span class="fw-bold text-danger font-monospace">+${{ debe_neto | pesos }}</span>
+                                {% if g.saldo_a_favor > 0.01 %}
+                                    <span class="fw-bold text-success font-monospace">-${{ g.saldo_a_favor | pesos }}</span>
+                                {% elif _saldo < -0.1 %}
+                                    <span class="fw-bold text-success font-monospace">-${{ _saldo | abs | pesos }}</span>
+                                {% elif _saldo > 0.1 %}
+                                    <span class="fw-bold text-danger font-monospace">+${{ _saldo | pesos }}</span>
                                 {% else %}
                                     <span class="fw-bold text-muted">$0</span>
                                 {% endif %}
@@ -942,15 +942,14 @@
                             <div class="grupo-monto-item">
                                 <span class="grupo-monto-label">Total a Pagar</span>
                                 {% if g.pagado and g.monto_pagado > 0 %}
-                                    <span class="fw-bold text-success font-monospace">${{ _neto | pesos }}</span>
+                                    <span class="fw-bold text-success font-monospace">${{ g.monto_pagado | pesos }}</span>
                                 {% else %}
-                                    <span class="fw-bold text-dark font-monospace">${{ _neto | pesos }}</span>
+                                    <span class="fw-bold text-dark font-monospace">${{ _total_pagar | pesos }}</span>
                                 {% endif %}
                             </div>
 
                             <div class="grupo-monto-item">
                                 <span class="grupo-monto-label">Estado</span>
-                                {% set deuda_neta = [g.total_mes + g.saldo_anterior - g.saldo_a_favor, 0] | max %}
                                 {% if deuda_neta <= 0.01 %}
                                     <span class="fw-bold text-success small">Al día</span>
                                 {% elif g.pagado or g.monto_pagado >= (deuda_neta - 0.1) %}
