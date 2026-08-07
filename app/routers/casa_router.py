@@ -629,7 +629,7 @@ def perfil(id):
     productos = q_prod.order_by(_priority, Product.nombre).all()
 
     detalles_pagos = []
-    saldo_acumulado = 0.0
+    saldo_acumulado = float(casa.saldo_a_favor or 0)
 
     # Filtrar meses anteriores a la fecha de alta del cliente en el sistema
     if casa.fecha_creacion:
