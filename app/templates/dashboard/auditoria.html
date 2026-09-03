@@ -63,8 +63,8 @@
                     <tr>
                         <td class="ps-4 text-muted text-nowrap">{{ log.fecha.strftime('%d/%m/%Y') }}</td>
                         <td class="text-muted text-nowrap">{{ log.fecha.strftime('%H:%M:%S') }}</td>
-                        <td class="fw-bold {% if log.usuario == 'root' %}text-danger{% else %}text-primary{% endif %}">
-                            <i class="bi bi-person-fill me-1"></i>{{ log.usuario }}
+                        <td class="fw-bold text-nowrap {% if log.usuario|lower in ['root', 'sistema'] %}text-danger{% else %}text-primary{% endif %}">
+                            <span class="d-inline-flex align-items-center gap-1"><i class="bi bi-person-fill"></i><span>{{ log.usuario }}</span></span>
                         </td>
                         <td>
                             {% if log.accion == 'PAGO' %}

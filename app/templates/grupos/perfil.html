@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Grupo: {{ grupo.nombre_display }}{% endblock %}
+{% block content %}
+<style>
+    .cuenta-grupo { table-layout: fixed; min-width: 760px; }
+    .nombre-casa-detalle { display: block; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+    .detalle-casa td { background-color: var(--bs-gray-100); }
+    .detalle-casa small { white-space: normal; }
+    .detalle-grupo-toggle .bi { display: inline-block; transition: transform .2s; }
+    .detalle-grupo-toggle[aria-expanded="true"] .bi { transform: rotate(180deg); }
+</style>
+<div class="py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <a href="{{ url_for('grupos.listar_grupos') }}" class="text-muted small"><i class="bi bi-arrow-left me-1"></i>Grupos de clientes</a>
+            <h1 class="h3 fw-bold mt-2 mb-1"><i class="bi bi-collection me-2"></i>{{ grupo.nombre_display }}</h1>
+            <p class="text-muted mb-0">{{ grupo.nombre }} · {{ casas|length }} propiedades</p>
+        </div>
+        <a href="{{ url_for('grupos.editar_grupo', id=grupo.id) }}" class="btn btn-outline-primary"><i class="bi bi-pencil-square me-1"></i>Administrar grupo</a>
+    </div>
+    <div class="row g-4">
+        <div class="col-12 col-xl-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold py-3">Propiedades</div>
+                <ul class="list-group list-group-flush">
+                    {% for casa in casas %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center gap-2 py-3">
+                        <a href="{{ url_for('casas.perfil', id=casa.id) }}" class="fw-semibold">{{ casa.nombre_formateado() }}</a>
+                        {% if not casa.activo %}<span class="badge bg-dark">Baja</span>
+                        {% elif casa.pausado %}<span class="badge bg-secondary">Pausada</span>
+                        {% else %}<span class="badge bg-success">Activa</span>{% endif %}
+                    </li>
+                    {% else %}<li class="list-group-item text-muted py-4">Este grupo no tiene propiedades.</li>{% endfor %}
+                </ul>
+            </div>
+            {% if grupo.saldo_a_favor > 0 %}
+            <div class="card border-0 shadow-sm mt-3">
+                <div class="card-body">
+                    <div class="text-muted small">Crédito disponible del grupo</div>
+                    <div class="fs-4 fw-bold text-success">${{ grupo.saldo_a_favor|pesos }}</div>
+                    {% if grupo.saldo_desde_mes and grupo.saldo_desde_anio %}
+                    <small class="text-muted">Generado en {{ nombre_mes(grupo.saldo_desde_mes) }} {{ grupo.saldo_desde_anio }}. Se aplica a partir del mes siguiente.</small>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        <div class="col-12 col-xl-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2 py-3">
+                    <h2 class="h6 fw-bold mb-0">Estado de cuenta</h2>
+                    {% if anios %}
+                    <form method="GET" class="d-flex align-items-center gap-2">
+                        <label for="anio-grupo" class="small text-muted">Año</label>
+                        <select id="anio-grupo" name="anio" class="form-select form-select-sm w-auto">
+                            {% for a in anios %}<option value="{{ a }}" {% if a == anio %}selected{% endif %}>{{ a }}</option>{% endfor %}
+                        </select>
+                        <button class="btn btn-sm btn-outline-secondary" type="submit">Ver</button>
+                    </form>
+                    {% endif %}
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle text-center mb-0 cuenta-grupo">
+                        <colgroup><col style="width:24%"><col span="4" style="width:14%"><col style="width:20%"></colgroup>
+                        <thead class="table-dark text-nowrap small">
+                            <tr><th class="py-3">Período</th><th>Abono</th><th>Producto</th><th>Saldo</th><th>Recibido</th><th>Estado</th></tr>
+                        </thead>
+                        {% for fila in filas %}
+                        <tbody>
+                            <tr id="periodo-{{ fila.anio }}-{{ fila.mes }}" class="text-nowrap">
+                                <td class="fw-bold py-3"><a href="{{ url_for('dashboard.index', mes=fila.mes, anio=fila.anio) }}" class="text-dark text-decoration-none">{{ fila.periodo }}</a></td>
+                                <td>${{ fila.abono|pesos }}</td>
+                                <td>${{ fila.producto|pesos }}</td>
+                                <td class="fw-bold {% if fila.saldo_anterior > 0.01 %}text-danger{% elif fila.saldo_anterior < -0.01 %}text-success{% else %}text-muted{% endif %}">
+                                    {% if fila.saldo_anterior < -0.01 %}-{% elif fila.saldo_anterior > 0.01 %}+{% endif %}${{ fila.saldo_anterior|abs|pesos }}
+                                    {% if fila.credito > 0 %}<small class="d-block fw-normal text-muted">Crédito grupo: -${{ fila.credito|pesos }}</small>{% endif %}
+                                </td>
+                                <td class="text-success">${{ fila.recibido|pesos }}</td>
+                                <td>
+                                    <div class="d-inline-flex align-items-center gap-2">
+                                        <span class="badge bg-{{ fila.color }}">{{ fila.estado }}</span>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary border-0 detalle-grupo-toggle"
+                                                data-detalle-target="detalle-{{ fila.anio }}-{{ fila.mes }}"
+                                                aria-expanded="false" aria-controls="detalle-{{ fila.anio }}-{{ fila.mes }}"
+                                                aria-label="Ver detalle por casa de {{ fila.periodo }}">
+                                            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tbody id="detalle-{{ fila.anio }}-{{ fila.mes }}" hidden>
+                            {% for d in fila.casas %}
+                            <tr class="detalle-casa small">
+                                <td>
+                                    <a href="{{ url_for('casas.perfil', id=d.casa.id) }}"
+                                       class="text-dark text-decoration-none fw-semibold nombre-casa-detalle"
+                                       title="{{ d.casa.nombre_formateado() }}">{{ d.casa.nombre_formateado() }}</a>
+                                    {% if d.sin_historial %}<small class="d-block text-muted" title="Saldo arrastrado, sin movimientos del período">Sin movimientos</small>{% endif %}
+                                </td>
+                                <td class="text-nowrap">${{ d.abono|pesos }}</td>
+                                <td class="text-nowrap">${{ d.producto|pesos }}</td>
+                                <td class="text-nowrap">
+                                    <span class="fw-bold {% if d.saldo_anterior > 0.01 %}text-danger{% elif d.saldo_anterior < -0.01 %}text-success{% else %}text-muted{% endif %}">{% if d.saldo_anterior < -0.01 %}-{% elif d.saldo_anterior > 0.01 %}+{% endif %}${{ d.saldo_anterior|abs|pesos }}</span>
+                                </td>
+                                <td class="text-success text-nowrap">${{ d.recibido|pesos }}</td>
+                                <td><span class="badge bg-{{ d.color }}">{{ d.estado }}</span>{% if d.marcada_pagada and d.saldo > 0.01 %}<small class="d-block text-muted">Marcada pagada; saldo pendiente</small>{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        {% else %}<tbody><tr><td colspan="6" class="text-muted py-5">No hay movimientos registrados.</td></tr></tbody>{% endfor %}
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.querySelectorAll('.detalle-grupo-toggle').forEach(button => {
+    button.addEventListener('click', () => {
+        const detalle = document.getElementById(button.dataset.detalleTarget);
+        detalle.hidden = !detalle.hidden;
+        button.setAttribute('aria-expanded', String(!detalle.hidden));
+    });
+});
+</script>
+{% endblock %}

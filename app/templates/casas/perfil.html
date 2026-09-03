@@ -271,34 +271,41 @@
                                 <table class="table table-hover mb-0 align-middle bg-white text-center" style="font-size: 0.95rem;">
                                     <thead class="table-dark">
                                         <tr>
-                                            <th class="py-3 text-white text-uppercase small fw-bold">Período</th>
-                                            <th class="py-3 text-white text-uppercase small fw-bold">Saldo Anterior</th>
-                                            <th class="py-3 text-white text-uppercase small fw-bold">Costo del Mes</th>
-                                            <th class="py-3 text-white text-uppercase small fw-bold">Dinero Entregado</th>
-                                            <th class="py-3 text-white text-uppercase small fw-bold" style="width: 160px;">Estado</th>
+                                            <th class="py-3 text-white text-uppercase small fw-bold text-nowrap">Período</th>
+                                            <th class="py-3 text-white text-uppercase small fw-bold text-nowrap">Abono</th>
+                                            <th class="py-3 text-white text-uppercase small fw-bold text-nowrap">Producto</th>
+                                            <th class="py-3 text-white text-uppercase small fw-bold text-nowrap">Saldo</th>
+                                            <th class="py-3 text-white text-uppercase small fw-bold text-nowrap">Recibido</th>
+                                            <th class="py-3 text-white text-uppercase small fw-bold text-nowrap">Estado</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for anio, filas in detalles_pagos | groupby('anio') %}
                                         {% for d in filas %}
                                         <tr data-anio="{{ anio }}">
-                                            <td class="fw-bold text-dark text-uppercase">{{ d.periodo }}</td>
-                                            <td class="font-monospace" style="white-space: nowrap;">
-                                                {% if d.saldo_anterior < -0.1 %}
-                                                    <span class="text-success fw-bold">-${{ d.saldo_anterior | abs | pesos }}</span>
-                                                {% elif d.saldo_anterior > 0.1 %}
-                                                    <span class="text-danger fw-bold">+${{ d.saldo_anterior | pesos }}</span>
-                                                {% else %}
-                                                    <span class="text-muted">$0</span>
-                                                {% endif %}
+                                            <td class="fw-bold text-dark text-uppercase text-nowrap">
+                                                {{ d.periodo }}
                                             </td>
-                                            <td class="font-monospace fw-bold text-dark" style="white-space: nowrap;">
-                                                ${{ d.costo_mes | pesos }}
+                                            <td class="font-monospace fw-bold text-dark text-nowrap">
+                                                ${{ d.abono | pesos }}
                                                 {% if d.proporcional_anterior > 0 %}
                                                 <br><small class="text-warning fw-normal" style="white-space: normal;">incl. prop. mes ant.: ${{ d.proporcional_anterior | pesos }}</small>
                                                 {% endif %}
                                             </td>
-                                            <td class="font-monospace text-success fw-bold" style="white-space: nowrap;">${{ d.pagado | pesos }}</td>
+                                            <td class="font-monospace text-nowrap">${{ d.producto | pesos }}</td>
+                                            <td class="font-monospace fw-bold text-nowrap">
+                                                {% if d.saldo_anterior > 0.1 %}
+                                                <span class="text-danger">+${{ d.saldo_anterior | pesos }}</span>
+                                                {% elif d.saldo_anterior < -0.1 %}
+                                                <span class="text-success">-${{ d.saldo_anterior | abs | pesos }}</span>
+                                                {% else %}
+                                                <span class="text-muted">$0</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="font-monospace text-success fw-bold text-nowrap"
+                                                {% if d.historial and d.historial.cobrado_por and d.historial.fecha_pago %}
+                                                title="Cobrado por {{ d.historial.cobrado_por }} el {{ d.historial.fecha_pago.strftime('%d/%m/%Y a las %H:%M') }}"
+                                                {% endif %}>${{ d.pagado | pesos }}</td>
                                             <td>
                                                 {% if d.pausada %}
                                                     <span class="badge bg-secondary fs-6 w-100 py-2 text-uppercase shadow-sm">

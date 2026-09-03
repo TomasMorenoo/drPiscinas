@@ -23,7 +23,7 @@
             <tbody>
                 {% for grupo in grupos %}
                 <tr>
-                    <td class="ps-4 fw-bold text-dark fs-5">{{ grupo.nombre_display }}</td>
+                    <td class="ps-4 fw-bold fs-5"><a href="{{ url_for('grupos.perfil', id=grupo.id) }}" class="text-dark">{{ grupo.nombre_display }}</a></td>
                     <td class="text-muted small">
                         {% if grupo.nombre_identificador %}
                             {{ grupo.nombre }}

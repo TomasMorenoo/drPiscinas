@@ -100,13 +100,15 @@ def asegurar_historial_pasado(casa, precio_viejo, mes_desde, anio_desde):
     while (y_curr < y_end) or (y_curr == y_end and m_curr <= m_end):
         hist = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=m_curr, anio=y_curr).first()
         if not hist:
+            from app.routers.dashboard_router import _casa_pausada_en_mes
+            monto = 0.0 if _casa_pausada_en_mes(casa, m_curr, y_curr) else precio_viejo
             nuevo_hist = AbonoHistorico(
                 casa_id=casa.id,
                 mes=m_curr,
                 anio=y_curr,
-                monto=precio_viejo,
+                monto=monto,
                 pagado=True,
-                monto_pagado=precio_viejo,
+                monto_pagado=monto,
                 cobrado_por="SISTEMA (Historial Congelado)"
             )
             db.session.add(nuevo_hist)
@@ -673,6 +675,8 @@ def perfil(id):
             "anio": h.anio,
             "saldo_anterior": saldo_anterior_iter,
             "costo_mes": total_mes,
+            "abono": gastos['abono'],
+            "producto": gastos['extras'],
             "pagado": dinero_mostrado,
             "saldo": saldo_acumulado,
             "historial": h,

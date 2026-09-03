@@ -248,12 +248,22 @@ def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_vis
     detalle_productos = '\n'.join(f'* {p}' for p in prods)
     det_prop = detalle_proporcional or []
     det_prop_ant = detalle_proporcional_anterior or []
+    template = pt.get_template_individual()
+    mantenimiento_display = abono_mes
+    extras_display = extras
+    if '{proporcional}' not in template:
+        mantenimiento_display += proporcional
+    if '{extras_proporcional}' not in template:
+        extras_display += extras_proporcional
+    if '{detalle_proporcional}' not in template:
+        prods = prods + det_prop
+        detalle_productos = '\n'.join(f'* {p}' for p in prods)
 
     variables = {
         'saludo':                           (saludo,                                        None),
         'resumen_total':                    (resumen_total,                                 None),
-        'mantenimiento':                    (format_money(abono_mes),                       abono_mes),
-        'extras':                           (format_money(extras),                          extras),
+        'mantenimiento':                    (format_money(mantenimiento_display),           mantenimiento_display),
+        'extras':                           (format_money(extras_display),                  extras_display),
         'detalle_productos':                (detalle_productos,                             len(prods)),
         'proporcional':                     (format_money(proporcional),                    proporcional),
         'extras_proporcional':              (format_money(extras_proporcional),             extras_proporcional),
@@ -267,7 +277,7 @@ def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_vis
         'mes':                              (MESES_LARGO[mes - 1],                          None),
         'anio':                             (str(anio),                                     None),
     }
-    return renderizar_template(pt.get_template_individual(), variables)
+    return renderizar_template(template, variables)
 
 def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo_mes, total_grupo_saldo_ant_visual, total_pagos_dashboard, saldo_a_favor=0.0, pt=None):
     from app.models.plantilla_mensaje import PlantillaMensaje, renderizar_template
@@ -1259,6 +1269,8 @@ def sync_abonos():
 
     for casa in casas_sync:
         hist = hist_sync_dict.get(casa.id)
+        if hist is not None:
+            continue
         datos_v = casa.obtener_gastos_mensuales(mes, anio, hist=hist)
         extras_v = float(datos_v.get("extras", 0))
 
@@ -1321,16 +1333,6 @@ def sync_abonos():
             elif _es_mes_alta and _fref_sync and _fref_sync.day <= 14:
                 casa.proporcional_pendiente = None
             db.session.add(nuevo)
-        else:
-            if not getattr(hist, 'pagado', False) and float(hist.monto_pagado or 0) == 0:
-                nuevo_monto = abono_a_guardar + prop + extras_dif_sync
-                if float(hist.monto or 0) != nuevo_monto:
-                    hist.monto = nuevo_monto
-                if prop > 0 and not getattr(hist, 'proporcional_anterior', None):
-                    hist.proporcional_anterior = prop
-                    casa.proporcional_pendiente = None
-                elif _es_mes_alta and _fref_sync and _fref_sync.day <= 14:
-                    casa.proporcional_pendiente = None
 
     mes_nombre_s = nombre_mes(mes)
     registrar_auditoria(current_user.username, 'CERRAR_MES', f"{mes_nombre_s} {anio}")
@@ -1345,10 +1347,6 @@ def unsync_abonos():
     anio = request.form.get("anio", type=int)
     if mes and anio:
         CierreMes.query.filter_by(mes=mes, anio=anio).delete()
-        fantasmas = AbonoHistorico.query.filter_by(mes=mes, anio=anio, pagado=False).all()
-        for f in fantasmas:
-            if (not f.monto_pagado or float(f.monto_pagado) <= 0.01) and not getattr(f, 'mensaje_enviado', False):
-                db.session.delete(f)
         mes_nombre_u = nombre_mes(mes)
         registrar_auditoria(current_user.username, 'ABRIR_MES', f"{mes_nombre_u} {anio}")
         db.session.commit()
@@ -1481,7 +1479,7 @@ def toggle_pago_grupo(grupo_id):
                 _saldo_toggle = _saldo_grupo_para_mes(grupo_obj_p, mes, anio)
 
             txn_id = f"TXN-{uuid.uuid4().hex[:8].upper()}"
-            credito_casas = 0.0
+            deuda_casas = 0.0
             for h in historiales:
                 c = h.casa
                 datos = c.obtener_gastos_mensuales(mes, anio)
@@ -1489,6 +1487,7 @@ def toggle_pago_grupo(grupo_id):
                 total_a_pagar = float(datos['total']) + saldo_ant - float(h.monto_pagado or 0)
 
                 if total_a_pagar > 0.01:
+                    deuda_casas += total_a_pagar
                     aplicar_pago_en_cascada(c, total_a_pagar, current_user.username, mes, anio)
                 else:
                     h.pagado = True
@@ -1497,21 +1496,18 @@ def toggle_pago_grupo(grupo_id):
                     h.fecha_pago = obtener_marca_tiempo(mes, anio)
                     if hasattr(h, 'transaccion_id'):
                         h.transaccion_id = txn_id
-                        detalle_str = f"{txn_id}:{total_a_pagar}"
+                        detalle_str = f"{txn_id}:0.0"
                         actual = getattr(h, 'detalle_pagos', None)
                         h.detalle_pagos = f"{actual}|{detalle_str}" if actual else detalle_str
-                    if total_a_pagar < -0.01:
-                        credito_casas += abs(total_a_pagar)
 
             if grupo_obj_p:
-                grupo_obj_p.saldo_a_favor = credito_casas
-                if credito_casas > 0.01:
-                    grupo_obj_p.saldo_desde_mes = mes
-                    grupo_obj_p.saldo_desde_anio = anio
-                else:
+                saldo_aplicado = min(_saldo_toggle, deuda_casas)
+                grupo_obj_p.saldo_a_favor = float(grupo_obj_p.saldo_a_favor or 0) - saldo_aplicado
+                if grupo_obj_p.saldo_a_favor <= 0.01:
+                    grupo_obj_p.saldo_a_favor = 0.0
                     grupo_obj_p.saldo_desde_mes = None
                     grupo_obj_p.saldo_desde_anio = None
-                grupo_obj_p.ultimo_saldo_aplicado = _saldo_toggle
+                grupo_obj_p.ultimo_saldo_aplicado = saldo_aplicado
 
             wa_chat_url = next((generar_wa_chat_url(c) for c in casas_grupo if c.telefono), None)
 
@@ -2049,7 +2045,9 @@ def auditoria():
     q = AuditoriaLog.query.order_by(AuditoriaLog.fecha.desc())
 
     if current_user.username != 'root':
-        q = q.filter(AuditoriaLog.usuario != 'root')
+        q = q.filter(func.lower(AuditoriaLog.usuario).notin_(['root', 'sistema']))
+
+    acciones_disponibles = [r[0] for r in q.with_entities(AuditoriaLog.accion).order_by(None).distinct().order_by(AuditoriaLog.accion).all()]
 
     if usuario:
         q = q.filter(AuditoriaLog.usuario.ilike(f"%{usuario}%"))
@@ -2069,7 +2067,6 @@ def auditoria():
         q = q.filter(AuditoriaLog.detalle.ilike(f"%{casa}%"))
 
     paginacion = q.paginate(page=page, per_page=50, error_out=False)
-    acciones_disponibles = [r[0] for r in db.session.query(AuditoriaLog.accion).distinct().order_by(AuditoriaLog.accion).all()]
 
     return render_template(
         "dashboard/auditoria.html",

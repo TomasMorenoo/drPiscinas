@@ -903,7 +903,7 @@
 
                     {# Nombre + badge + colapsar #}
                     <div class="d-flex align-items-center gap-2 mb-2 mb-lg-0">
-                        <h6 class="mb-0 fw-bold text-dark">{{ g.nombre_display }}</h6>
+                        <h6 class="mb-0 fw-bold"><a class="text-dark text-decoration-none" href="{{ url_for('grupos.perfil', id=g.grupo_id, anio=anio, _anchor='periodo-' ~ anio ~ '-' ~ mes) }}">{{ g.nombre_display }}</a></h6>
                         <span class="badge bg-light text-primary border border-primary">{{ g.casas|length }} Lotes</span>
                         <button class="btn btn-sm btn-light border text-secondary p-1 d-print-none ms-auto ms-lg-0"
                                 type="button" data-bs-toggle="collapse" data-bs-target="#collapseGrupo{{ g.grupo_id }}"
@@ -1128,8 +1128,8 @@
                                                data-bs-placement="top"
                                                title="Entregó: ${{ item.pagos_en_este_dashboard | pesos }}"></i>
                                         </div>
-                                    {% elif item.pagado and item.monto_pagado > 0 %}
-                                        <span class="total-valor text-success">${{ item.monto_pagado | pesos }}</span>
+                                    {% elif item.pagado %}
+                                        <span class="total-valor text-success"{% if item.monto_pagado <= 0 %} title="Marcado como pagado, sin importe recibido registrado"{% endif %}>${{ item.monto_pagado | pesos }}</span>
                                     {% else %}
                                         <span class="total-valor">
                                             ${{ (item.total_mes + item.saldo_anterior + item.proporcional_preview) | pesos }}

@@ -148,7 +148,7 @@
             <div class="d-flex flex-wrap gap-2" id="chips-ind">
                 <span class="chip chip-always" draggable="true" data-var="{saludo}"                          title="Buenas Tardes / Días + nombre del cliente"><i class="bi bi-hand-wave"></i> {saludo}</span>
                 <span class="chip chip-always" draggable="true" data-var="{resumen_total}"                 title="TOTAL A PAGAR o CUENTA AL DÍA (automático)"><i class="bi bi-cash-coin"></i> {resumen_total}</span>
-                <span class="chip chip-cond"   draggable="true" data-var="${mantenimiento}"                title="Abono mensual. Se oculta si es $0 (clientes proporcionales mes de alta)"><i class="bi bi-tools"></i> ${mantenimiento}</span>
+                <span class="chip chip-cond"   draggable="true" data-var="${mantenimiento}"                title="Abono mensual. Incluye el proporcional del mes si la plantilla no usa su variable específica. Se oculta si es $0"><i class="bi bi-tools"></i> ${mantenimiento}</span>
                 <span class="chip chip-cond"   draggable="true" data-var="${extras}"                       title="Productos del mes. Se oculta si es $0"><i class="bi bi-box-seam"></i> ${extras}</span>
                 <span class="chip chip-cond"   draggable="true" data-var="{detalle_productos}"             title="Lista de productos. Se oculta si no hay"><i class="bi bi-list-ul"></i> {detalle_productos}</span>
                 <span class="chip chip-cond"   draggable="true" data-var="${proporcional}"                 title="Proporcional mes de alta (día 1-14). Se oculta si es $0"><i class="bi bi-percent"></i> ${proporcional}</span>
@@ -467,6 +467,22 @@ const COND_GRP = {
 
 // ── Render ──
 function renderTemplate(template, sample, condDefs) {
+    if (condDefs === COND_IND) {
+        sample = {...sample};
+        for (const [specific, general, specificCond, generalCond] of [
+            ['proporcional', 'mantenimiento', 'condProporcional', 'condMantenimiento'],
+            ['extras_proporcional', 'extras', 'condExtrasProp', 'condExtras'],
+        ]) {
+            if (!template.includes('{' + specific + '}')) {
+                sample[generalCond] += sample[specificCond];
+                sample[general] = sample[generalCond].toLocaleString('es-AR', {maximumFractionDigits: 0});
+            }
+        }
+        if (!template.includes('{detalle_proporcional}')) {
+            sample.detalle_productos = [sample.detalle_productos, sample.detalle_proporcional].filter(Boolean).join('\n');
+            sample.condDetalle += sample.condDetalleProp;
+        }
+    }
     const lines = template.split('\n');
     const out = [];
     for (const line of lines) {

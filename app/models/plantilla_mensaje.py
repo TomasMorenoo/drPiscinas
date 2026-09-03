@@ -20,11 +20,19 @@ Saldo adeudado de meses anteriores: ${saldo_anterior}
 Saldo a favor aplicado: -${saldo_favor}
 Entregado este mes: -${pagado}
 
-Muchas Gracias."""
+Muchas Gracias.
+
+_Este es un mensaje automático. Si ya realizaste el pago, por favor envianos el comprobante y desestimá este mensaje._
+Saludos y disculpá las molestias.
+*Dr. Piscinas*"""
 
 DEFAULT_TEMPLATE_RECORDATORIO = """{saludo}, le recordamos que aún tiene pendiente el pago de *${deuda}* correspondiente a {mes} {anio}.
 Por favor regularice a la brevedad.
-Muchas Gracias."""
+Muchas Gracias.
+
+_Este es un mensaje automático. Si ya realizaste el pago, por favor envianos el comprobante y desestimá este mensaje._
+Saludos y disculpá las molestias.
+*Dr. Piscinas*"""
 
 DEFAULT_TEMPLATE_GRUPO = """{saludo} Te paso el resumen de las {cant} propiedades.
 
@@ -35,7 +43,11 @@ Saldo adeudado de meses anteriores: ${saldo_anterior}
 Entregado este mes: *-${pagado}*
 (*) El total ya incluye un descuento de ${saldo_favor} por saldo a favor acumulado.
 
-Muchas Gracias."""
+Muchas Gracias.
+
+_Este es un mensaje automático. Si ya realizaste el pago, por favor envianos el comprobante y desestimá este mensaje._
+Saludos y disculpá las molestias.
+*Dr. Piscinas*"""
 
 # Variables que ocultan su línea completa si el valor numérico es 0
 VARS_CONDICIONALES = {'mantenimiento', 'extras', 'detalle_productos',
