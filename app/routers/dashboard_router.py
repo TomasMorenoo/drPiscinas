@@ -316,6 +316,8 @@ def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo_mes, total
     variables = {
         'saludo':          (saludo,                                str(cant)),
         'cant':            (str(cant),                             None),
+        'mes':             (MESES_LARGO[mes - 1],                  None),
+        'anio':            (str(anio),                             None),
         'resumen_total':   (resumen_total,                         None),
         'lista_casas':     ('\n'.join(lista_lines),                None),
         'saldo_anterior':  (format_money(total_grupo_saldo_ant_visual), total_grupo_saldo_ant_visual),

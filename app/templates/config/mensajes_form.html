@@ -227,6 +227,8 @@
                 <span class="d-lg-none">Tocá para insertar en el editor</span>
             </div>
             <div class="d-flex flex-wrap gap-2" id="chips-grp">
+                <span class="chip chip-always" draggable="true" data-var="{mes}" title="Nombre del mes"><i class="bi bi-calendar3"></i> {mes}</span>
+                <span class="chip chip-always" draggable="true" data-var="{anio}" title="Año"><i class="bi bi-calendar3"></i> {anio}</span>
                 <span class="chip chip-always" draggable="true" data-var="{saludo}"          title="Buenas Tardes + nombre del grupo"><i class="bi bi-hand-wave"></i> {saludo}</span>
                 <span class="chip chip-always" draggable="true" data-var="{cant}"            title="Cantidad de propiedades"><i class="bi bi-house-fill"></i> {cant}</span>
                 <span class="chip chip-always" draggable="true" data-var="{resumen_total}"   title="Total a pagar o Cuentas al día (automático)"><i class="bi bi-cash-coin"></i> {resumen_total}</span>
@@ -426,6 +428,8 @@ const SAMPLE_IND = {
 const SAMPLE_GRP = {
     deuda: {
         saludo:         'Buenas Tardes Roberto Sánchez',
+        mes:            'Mayo',
+        anio:           '2026',
         cant:           '3',
         resumen_total:  '*-- TOTAL A PAGAR: $130.000 --*',
         lista_casas:    '• *Casa Rodríguez:* Abono $40.000 + Prod. $5.000 = *$45.000*\n• *Casa López:* Abono $40.000 + Prod. $0 = *$40.000*\n• *Casa Pérez:* Abono $45.000 + Prod. $0 = *$45.000*',
@@ -435,6 +439,8 @@ const SAMPLE_GRP = {
     },
     aldia: {
         saludo:         'Buenas Tardes Roberto Sánchez',
+        mes:            'Mayo',
+        anio:           '2026',
         cant:           '3',
         resumen_total:  '*-- CUENTAS AL DÍA --*',
         lista_casas:    '• *Casa Rodríguez:* Abono $40.000 + Prod. $0 = *$40.000*\n• *Casa López:* Abono $40.000 + Prod. $0 = *$40.000*\n• *Casa Pérez:* Abono $45.000 + Prod. $0 = *$45.000*',
