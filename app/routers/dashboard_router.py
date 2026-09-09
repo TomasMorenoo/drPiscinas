@@ -245,7 +245,7 @@ def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_vis
         resumen_total = f"*-- TOTAL A PAGAR: ${format_money(total_final)} --*"
 
     prods = obtener_detalle_productos(casa, mes, anio) if extras > 0 else []
-    detalle_productos = '\n'.join(f'* {p}' for p in prods)
+    detalle_productos = '\n'.join(f'- {p}' for p in prods)
     det_prop = detalle_proporcional or []
     det_prop_ant = detalle_proporcional_anterior or []
     template = pt.get_template_individual()
@@ -257,7 +257,7 @@ def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_vis
         extras_display += extras_proporcional
     if '{detalle_proporcional}' not in template:
         prods = prods + det_prop
-        detalle_productos = '\n'.join(f'* {p}' for p in prods)
+        detalle_productos = '\n'.join(f'- {p}' for p in prods)
 
     variables = {
         'saludo':                           (saludo,                                        None),
@@ -267,10 +267,10 @@ def generar_wa_individual(casa, mes, anio, abono_mes, extras, saldo_anterior_vis
         'detalle_productos':                (detalle_productos,                             len(prods)),
         'proporcional':                     (format_money(proporcional),                    proporcional),
         'extras_proporcional':              (format_money(extras_proporcional),             extras_proporcional),
-        'detalle_proporcional':             ('\n'.join(f'* {p}' for p in det_prop),         len(det_prop)),
+        'detalle_proporcional':             ('\n'.join(f'- {p}' for p in det_prop),         len(det_prop)),
         'proporcional_anterior':            (format_money(proporcional_anterior),           proporcional_anterior),
         'extras_proporcional_anterior':     (format_money(extras_proporcional_anterior),    extras_proporcional_anterior),
-        'detalle_proporcional_anterior':    ('\n'.join(f'* {p}' for p in det_prop_ant),     len(det_prop_ant)),
+        'detalle_proporcional_anterior':    ('\n'.join(f'- {p}' for p in det_prop_ant),     len(det_prop_ant)),
         'saldo_anterior':                   (format_money(saldo_deuda),                     saldo_deuda),
         'saldo_favor':                      (format_money(saldo_favor),                     saldo_favor),
         'pagado':                           (format_money(pagos_en_este_dashboard),         pagos_en_este_dashboard),
@@ -302,9 +302,9 @@ def generar_wa_grupo(grupo_nombre, casas_data, mes, anio, total_grupo_mes, total
         abono = c['abono']
         extras = c['extras']
         saldo_ant = c.get('saldo_anterior', 0.0)
-        label = c.get('label_abono', 'Abono')
+        label = c.get('label_abono', 'Abono').replace('Abono', 'Mantenimiento')
         total_c = abono + extras
-        linea = f"• *{nombre_casa}:* {label} ${format_money(abono)} + Prod. ${format_money(extras)} = *${format_money(total_c)}*"
+        linea = f"• {nombre_casa}: {label} ${format_money(abono)} + Prod. ${format_money(extras)} = *${format_money(total_c)}*"
         if saldo_ant < -0.1:
             linea += f" _(saldo a favor: ${format_money(abs(saldo_ant))})_"
         if extras > 0:

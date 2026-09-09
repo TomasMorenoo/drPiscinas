@@ -2,29 +2,28 @@ from app import db
 from datetime import datetime
 import re
 
-DEFAULT_TEMPLATE_INDIVIDUAL = """{saludo} como te va, te recuerdo el abono de la pile de *{mes}*
+DEFAULT_TEMPLATE_INDIVIDUAL = """{saludo}. ¿Cómo estás? Te paso el detalle de mantenimiento de la pile correspondiente a lo trabajado en el mes de {mes}
 
 {resumen_total}
 
 Detalle:
-Mes de mantenimiento: ${mantenimiento}
-Productos Utilizados: ${extras}
+Mes de mantenimiento: *${mantenimiento}*
+Productos Utilizados: *${extras}*
 {detalle_productos}
-Proporcional mes de mantenimiento: ${proporcional}
-Productos Utilizados: ${extras_proporcional}
+Proporcional mes de mantenimiento: *${proporcional}*
+Productos Utilizados: *${extras_proporcional}*
 {detalle_proporcional}
-Proporcional mes pasado de mantenimiento: ${proporcional_anterior}
-Productos Utilizados el mes pasado: ${extras_proporcional_anterior}
+Proporcional mes pasado de mantenimiento: *${proporcional_anterior}*
+Productos Utilizados el mes pasado: *${extras_proporcional_anterior}*
 {detalle_proporcional_anterior}
-Saldo adeudado de meses anteriores: ${saldo_anterior}
-Saldo a favor aplicado: -${saldo_favor}
-Entregado este mes: -${pagado}
+Saldo adeudado de meses anteriores: *${saldo_anterior}*
+Saldo a favor aplicado: *-${saldo_favor}*
+Entregado este mes: *-${pagado}*
 
-Muchas Gracias.
+*(Este es un mensaje automático. Si ya realizaste la transferencia, por favor envianos el comprobante para registrarlo)*
 
-_Este es un mensaje automático. Si ya realizaste el pago, por favor envianos el comprobante y desestimá este mensaje._
-Saludos y disculpá las molestias.
-*Dr. Piscinas*"""
+¡Muchas gracias por confiar en nosotros!
+Dr. Piscinas"""
 
 DEFAULT_TEMPLATE_RECORDATORIO = """{saludo}, le recordamos que aún tiene pendiente el pago de *${deuda}* correspondiente a {mes} {anio}.
 Por favor regularice a la brevedad.
@@ -34,20 +33,19 @@ _Este es un mensaje automático. Si ya realizaste el pago, por favor envianos el
 Saludos y disculpá las molestias.
 *Dr. Piscinas*"""
 
-DEFAULT_TEMPLATE_GRUPO = """{saludo} Te paso el resumen de las {cant} propiedades.
+DEFAULT_TEMPLATE_GRUPO = """{saludo}. ¿Cómo estás? Te paso el detalle de mantenimiento de las {cant} propiedades correspondiente a lo trabajado en el mes de {mes}
 
 {resumen_total}
 
 {lista_casas}
-Saldo adeudado de meses anteriores: ${saldo_anterior}
+Saldo adeudado de meses anteriores: *${saldo_anterior}*
 Entregado este mes: *-${pagado}*
-(*) El total ya incluye un descuento de ${saldo_favor} por saldo a favor acumulado.
+_(*) El total ya incluye un descuento de ${saldo_favor} por saldo a favor acumulado._
 
-Muchas Gracias.
+*(Este es un mensaje automático. Si ya realizaste la transferencia, por favor envianos el comprobante para registrarlo)*
 
-_Este es un mensaje automático. Si ya realizaste el pago, por favor envianos el comprobante y desestimá este mensaje._
-Saludos y disculpá las molestias.
-*Dr. Piscinas*"""
+¡Muchas gracias por confiar en nosotros!
+Dr. Piscinas"""
 
 # Variables que ocultan su línea completa si el valor numérico es 0
 VARS_CONDICIONALES = {'mantenimiento', 'extras', 'detalle_productos',
