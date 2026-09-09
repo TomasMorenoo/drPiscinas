@@ -35,23 +35,25 @@
     font-family: 'Segoe UI', sans-serif; font-size: 0.93rem; line-height: 1.65;
     white-space: pre-wrap; word-break: break-word;
     overflow: hidden; pointer-events: none;
-    color: #1a1a1a; z-index: 0;
+    color: transparent; z-index: 0;
     border: none; border-radius: 8px;
 }
 /* Variable coloreada */
 .var-hl {
     background: #ffe58f;
-    color: #7c4f00;
+    color: transparent;
     border-radius: 4px;
-    padding: 0 2px;
-    font-weight: 600;
+    padding: 0;
+    font: inherit;
 }
 /* Textarea encima, transparente */
 .msg-area {
     position: relative; z-index: 1;
     font-family: 'Segoe UI', sans-serif; font-size: 0.93rem; line-height: 1.65;
     background: transparent; border: none; outline: none;
-    color: transparent; caret-color: #1a1a1a;
+    color: #1a1a1a; caret-color: #1a1a1a;
+    display: block;
+    white-space: pre-wrap; word-break: break-word;
     padding: 14px; box-sizing: border-box;
     min-height: 220px; resize: vertical; width: 100%;
 }
@@ -563,7 +565,10 @@ function highlightVars(text) {
 
 function syncOverlay(ta, overlay) {
     overlay.innerHTML = highlightVars(ta.value) + '\n';
+    overlay.style.width = ta.clientWidth + 'px';
+    overlay.style.height = ta.clientHeight + 'px';
     overlay.scrollTop = ta.scrollTop;
+    overlay.scrollLeft = ta.scrollLeft;
 }
 
 const pares = [
@@ -575,7 +580,11 @@ pares.forEach(([taId, ovId]) => {
     const ta = document.getElementById(taId);
     const ov = document.getElementById(ovId);
     ta.addEventListener('input',  () => syncOverlay(ta, ov));
-    ta.addEventListener('scroll', () => { ov.scrollTop = ta.scrollTop; });
+    ta.addEventListener('scroll', () => {
+        ov.scrollTop = ta.scrollTop;
+        ov.scrollLeft = ta.scrollLeft;
+    });
+    new ResizeObserver(() => syncOverlay(ta, ov)).observe(ta);
     syncOverlay(ta, ov); // inicial
 });
 
