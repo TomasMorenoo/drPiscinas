@@ -8,6 +8,7 @@ class Product(db.Model):
     unidad = db.Column(db.String(50), nullable=False)
     precio = db.Column(db.Numeric(10, 2), nullable=False)
     activo = db.Column(db.Boolean, default=True)
+    eliminado = db.Column(db.Boolean, nullable=False, default=False)
     stock_actual = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     stock_minimo = db.Column(db.Numeric(10, 2), nullable=True)
 

@@ -285,8 +285,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Al cargar con valor existente, formatearlo
         if (input.value !== '') {
-            // Valor puede venir como "1234.56" desde Python — normalizar
-            input.value = input.value.replace('.', ',');
+            // El punto del filtro "pesos" ya es separador de miles.
+            if (!input.value.includes(',') && /^\d+\.\d{1,2}$/.test(input.value)) {
+                input.value = input.value.replace('.', ',');
+            }
             formatearMiles(input);
         }
     });

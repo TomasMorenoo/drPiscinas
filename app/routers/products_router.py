@@ -14,6 +14,8 @@ def _parse_precio(value):
     v = value.strip()
     if ',' in v:
         v = v.replace('.', '').replace(',', '.')
+    elif v.count('.') > 1 or ('.' in v and len(v.rsplit('.', 1)[1]) == 3):
+        v = v.replace('.', '')
     return float(v)
 
 @product_bp.route("/")
@@ -28,7 +30,10 @@ def listar_products():
         (_trim.ilike('granulado rapido'), 3),
         else_=4
     )
-    products = Product.query.filter(db.func.lower(Product.nombre) != 'deuda').order_by(_priority, Product.nombre).all()
+    products = Product.query.filter(
+        Product.eliminado == False,
+        db.func.lower(Product.nombre) != 'deuda'
+    ).order_by(_priority, Product.nombre).all()
     return render_template("products/list.html", products=products)
 
 @product_bp.route("/create", methods=["GET", "POST"])
@@ -84,13 +89,9 @@ def toggle_product(id):
 @admin_required
 def eliminar_product(id):
     prod = Product.query.get_or_404(id)
-    try:
-        nombre_prod = prod.nombre
-        registrar_auditoria(current_user.username, 'ELIMINAR_PRODUCTO', nombre_prod)
-        db.session.delete(prod)
-        db.session.commit()
-        flash("Producto eliminado correctamente.", "success")
-    except Exception as e:
-        db.session.rollback()
-        flash("No se puede eliminar el producto porque ya fue usado en visitas o promociones. Te sugerimos pausarlo.", "error")
+    prod.activo = False
+    prod.eliminado = True
+    registrar_auditoria(current_user.username, 'ELIMINAR_PRODUCTO', prod.nombre)
+    db.session.commit()
+    flash("Producto eliminado. El historial de visitas se conserva.", "success")
     return redirect(url_for("products.listar_products"))
