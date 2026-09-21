@@ -37,6 +37,7 @@ def create_app():
         "pool_pre_ping": True,
     }
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-key-drpiscinas-2024")
+    app.config["WTF_CSRF_TIME_LIMIT"] = 12 * 60 * 60
     app.config["CACHE_TYPE"] = "SimpleCache"
     app.config["CACHE_DEFAULT_TIMEOUT"] = 300
 

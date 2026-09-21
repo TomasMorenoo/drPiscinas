@@ -683,7 +683,7 @@
                                 {% endif %}
 
                                 {# Acciones inline en mobile #}
-                                <div class="acciones-mobile-inline d-md-none d-print-none mt-1 justify-content-end">
+                                <div class="acciones-mobile-inline d-md-none d-print-none mt-1 justify-content-end" data-estado-clave="casa-{{ item.id_historial }}">
                                     {% if item.pausado %}
                                         <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
                                                 class="btn btn-sm btn-secondary">
@@ -743,7 +743,7 @@
                             </td>
 
                             {# 6. ACCIONES DESKTOP #}
-                            <td class="p-1 align-middle d-none d-md-table-cell d-print-none" style="width: 140px;">
+                            <td data-estado-clave="casa-{{ item.id_historial }}" class="p-1 align-middle d-none d-md-table-cell d-print-none" style="width: 140px;">
                                 {% if item.pausado %}
                                     <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
                                             class="btn btn-secondary btn-sm w-100 d-flex flex-column justify-content-center align-items-center shadow-sm fw-bold"
@@ -963,7 +963,7 @@
                         </div>
 
                         {# Botones de acción del grupo #}
-                        <div class="grupo-acciones-btn-row d-print-none">
+                        <div class="grupo-acciones-btn-row d-print-none" data-estado-clave="grupo-{{ g.grupo_id }}">
                             {% if mes_congelado %}
                                 {% if g.telefono and not g.pagado %}
                                 <a href="#"
@@ -1147,7 +1147,7 @@
                                         </span>
                                     {% endif %}
 
-                                    <div class="acciones-mobile-inline d-md-none d-print-none mt-1 justify-content-end">
+                                    <div class="acciones-mobile-inline d-md-none d-print-none mt-1 justify-content-end" data-estado-clave="casa-{{ item.id_historial }}">
                                         {% if item.pausado %}
                                             <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
                                                     class="btn btn-sm btn-secondary">
@@ -1198,7 +1198,7 @@
                                 </td>
 
                                 {# Estado desktop #}
-                                <td class="p-1 align-middle text-center pe-3 d-none d-md-table-cell d-print-none" style="width: 140px;">
+                                <td data-estado-clave="casa-{{ item.id_historial }}" class="p-1 align-middle text-center pe-3 d-none d-md-table-cell d-print-none" style="width: 140px;">
                                     {% if item.pausado %}
                                         <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
                                                 class="btn btn-secondary btn-sm w-100 shadow-sm"
@@ -1444,11 +1444,15 @@
     </div>
 </div>
 
+<script src="{{ url_for('static', filename='dashboard-estados.js') }}"></script>
 <script>
+let ultimaRecargaPanel = 0;
 /* ============================================================
    RECARGA INVISIBLE (Sincroniza toda la tabla)
    ============================================================ */
 function recargarPanel() {
+    const recarga = ++ultimaRecargaPanel;
+    const revision = revisionEstados;
     // Guardar scroll y estados de collapse antes de tocar el DOM
     const scrollY = window.scrollY;
     const colapsados = new Set();
@@ -1459,11 +1463,16 @@ function recargarPanel() {
     if (!document.getElementById('collapseGruposMain')?.classList.contains('show')) colapsados.add('collapseGruposMain');
 
     return fetch(window.location.href)
-        .then(res => res.text())
+        .then(res => {
+            if (!res.ok || res.redirected) throw new Error("No se pudo actualizar el panel");
+            return res.text();
+        })
         .then(html => {
+            if (recarga !== ultimaRecargaPanel || revision !== revisionEstados) return;
             const doc = new DOMParser().parseFromString(html, "text/html");
 
             // Actualizar tablas y KPIs
+            if (!doc.getElementById("collapseSueltas")) throw new Error("Panel incompleto");
             const ids = ['collapseSueltas', 'collapseGruposMain', 'kpi-deuda', 'kpi-total', 'kpi-recaudado', 'kpi-pendiente'];
             ids.forEach(id => {
                 const actual = document.getElementById(id);
@@ -1479,6 +1488,8 @@ function recargarPanel() {
 
             // Reaplicar filtro de búsqueda
             filtrarDashboard();
+            mostrarErroresEstado();
+            document.getElementById("error-actualizacion-panel")?.remove();
 
             document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(t => new bootstrap.Tooltip(t));
 document.querySelectorAll('[data-bs-toggle="popover"]').forEach(p => new bootstrap.Popover(p));
@@ -1486,7 +1497,7 @@ document.querySelectorAll('[data-bs-toggle="popover"]').forEach(p => new bootstr
             // Restaurar scroll
             window.scrollTo(0, scrollY);
         })
-        .catch(() => location.reload());
+        .catch(() => { mostrarErroresEstado(); mostrarErrorActualizacion(); });
 }
 
 /* ============================================================
@@ -1506,12 +1517,12 @@ function togglePago(id, actionType) {
             _activarBell(id);
             const btnM = document.getElementById(`btn-estado-m-${id}`);
             if (btnM) { btnM.className = btnM.className.replace('btn-outline-secondary','btn-primary'); btnM.querySelector('i').className = 'bi bi-send-check-fill text-white'; }
-            fetch(`/dashboard/toggle-pago/${id}`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType }) })
+            solicitarCambioEstado(`/dashboard/toggle-pago/${id}`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType }) })
                 .then(r => r.json())
                 .then(data => {
                     if (data.url_wa) window.location.href = data.url_wa;
                     recargarPanel();
-                });
+                }).catch(() => {});
             return;
         } else {
             // Notificado -> Pagado: Ilusión visual instantánea
@@ -1529,28 +1540,28 @@ function togglePago(id, actionType) {
             }
         }
     } else if (actionType === 'undo_mensaje') {
-        fetch(`/dashboard/toggle-pago/${id}`, {
+        solicitarCambioEstado(`/dashboard/toggle-pago/${id}`, {
             method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'undo_mensaje' })
-        }).then(() => recargarPanel());
+        }).then(() => recargarPanel()).catch(() => {});
         return;
     } else if (actionType === 'undo' && btnDeshacer) {
         const nombreFila = document.querySelector(`#fila-${id} .nombre-casa, [data-id="${id}"] .nombre-casa`) || null;
         confirmarDeshacer(nombreFila ? nombreFila.textContent.trim() : '', () => {
             btnDeshacer.className = "btn btn-sm btn-outline-warning w-100 d-flex flex-column justify-content-center align-items-center shadow-sm text-dark";
             btnDeshacer.innerHTML = '<i class="bi bi-arrow-counterclockwise fs-4 mb-1"></i><small class="fw-bold" style="font-size: 0.7rem;">DESHACIENDO...</small>';
-            fetch(`/dashboard/toggle-pago/${id}`, {
+            solicitarCambioEstado(`/dashboard/toggle-pago/${id}`, {
                 method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType })
-            }).then(() => recargarPanel());
+            }).then(() => recargarPanel()).catch(() => {});
         });
         return;
     }
 
-    fetch(`/dashboard/toggle-pago/${id}`, {
+    solicitarCambioEstado(`/dashboard/toggle-pago/${id}`, {
         method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType })
     }).then(r => r.json()).then(data => {
         if (data.wa_chat_url) { const f = document.createElement('iframe'); f.style.display = 'none'; f.src = data.wa_chat_url; document.body.appendChild(f); setTimeout(() => f.remove(), 1000); }
         recargarPanel();
-    });
+    }).catch(() => {});
 }
 
 function marcarPagadoDirecto(id) {
@@ -1569,12 +1580,12 @@ function marcarPagadoDirecto(id) {
         }
     }
 
-    fetch(`/dashboard/marcar-pagado-directo/${id}`, {
+    solicitarCambioEstado(`/dashboard/marcar-pagado-directo/${id}`, {
         method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
     }).then(r => r.json()).then(data => {
         if (data.wa_chat_url) { const f = document.createElement('iframe'); f.style.display = 'none'; f.src = data.wa_chat_url; document.body.appendChild(f); setTimeout(() => f.remove(), 1000); }
         recargarPanel();
-    });
+    }).catch(() => {});
 }
 
 /* ---- CASAS DENTRO DE GRUPOS ---- */
@@ -1596,7 +1607,7 @@ function togglePagoSimple(id, btn) {
                 el.querySelector('i').className = 'bi bi-bell-fill';
                 el.onclick = (e) => abrirWARecordatorio(e, id);
             });
-            fetch(`/dashboard/toggle-pago/${id}`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType }) });
+            solicitarCambioEstado(`/dashboard/toggle-pago/${id}`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType }) }).catch(() => {});
             return;
         } else {
             // Notificado -> Pagado: Ilusión visual
@@ -1606,31 +1617,31 @@ function togglePagoSimple(id, btn) {
     } else {
         confirmarDeshacer('', () => {
             btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-            fetch(`/dashboard/toggle-pago/${id}`, {
+            solicitarCambioEstado(`/dashboard/toggle-pago/${id}`, {
                 method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType })
-            }).then(() => recargarPanel());
+            }).then(() => recargarPanel()).catch(() => {});
         });
         return;
     }
 
-    fetch(`/dashboard/toggle-pago/${id}`, {
+    solicitarCambioEstado(`/dashboard/toggle-pago/${id}`, {
         method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType })
     }).then(r => r.json()).then(data => {
         if (data.wa_chat_url) { const f = document.createElement('iframe'); f.style.display = 'none'; f.src = data.wa_chat_url; document.body.appendChild(f); setTimeout(() => f.remove(), 1000); }
         recargarPanel();
-    });
+    }).catch(() => {});
 }
 
 function marcarPagadoDirectoSimple(id, btn) {
     const parentDiv = btn.parentElement;
     parentDiv.innerHTML = `<button class="btn btn-sm shadow-sm py-1 px-2 btn-success"><i class="bi bi-check-circle-fill"></i></button>`;
 
-    fetch(`/dashboard/marcar-pagado-directo/${id}`, {
+    solicitarCambioEstado(`/dashboard/marcar-pagado-directo/${id}`, {
         method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
     }).then(r => r.json()).then(data => {
         if (data.wa_chat_url) { const f = document.createElement('iframe'); f.style.display = 'none'; f.src = data.wa_chat_url; document.body.appendChild(f); setTimeout(() => f.remove(), 1000); }
         recargarPanel();
-    });
+    }).catch(() => {});
 }
 
 /* ============================================================
@@ -1813,7 +1824,7 @@ function enviarPagoParcial() {
     }
     if (tipo === 'grupo') { bodyData.mes = {{ mes }}; bodyData.anio = {{ anio }}; }
 
-    fetch(url, {
+    solicitarCambioEstado(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
         body: JSON.stringify(bodyData)
@@ -1829,6 +1840,7 @@ function enviarPagoParcial() {
     .catch(function () {
         btn.innerHTML = contenidoOriginal;
         btn.disabled = false;
+        mostrarMotivoEstado(claveEstado(url));
     });
 }
 
@@ -1879,11 +1891,11 @@ function undoMensajeGrupo(grupo_id, mes, anio) {
         btnGrp.classList.add('btn-outline-danger');
         btnGrp.querySelector('i').className = 'bi bi-check-lg';
     }
-    fetch(`/dashboard/toggle-pago-grupo/${grupo_id}`, {
+    solicitarCambioEstado(`/dashboard/toggle-pago-grupo/${grupo_id}`, {
         method: 'POST',
         headers: { 'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'undo_mensaje', mes, anio })
-    }).then(() => recargarPanel());
+    }).then(() => recargarPanel()).catch(() => {});
 }
 
 function togglePagoGrupo(grupo_id, mes, anio, btn) {
@@ -1904,7 +1916,7 @@ function _ejecutarToggleGrupo(grupo_id, mes, anio, btn, action) {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
-    fetch(`/dashboard/toggle-pago-grupo/${grupo_id}`, {
+    solicitarCambioEstado(`/dashboard/toggle-pago-grupo/${grupo_id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
         body: JSON.stringify({ mes: mes, anio: anio, action: action })
@@ -1999,10 +2011,10 @@ function abrirWA(event, historialId) {
 function abrirWARecordatorio(event, historialId) {
     event.preventDefault();
     const a = event.currentTarget;
-    fetch(`/dashboard/marcar-doble-instancia/${historialId}`, {
+    solicitarCambioEstado(`/dashboard/marcar-doble-instancia/${historialId}`, {
         method: 'POST',
         headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
-    });
+    }).catch(() => {});
     _activarEstadoDoble(historialId);
     fetch(`/dashboard/api/wa-url-recordatorio/${historialId}`)
         .then(r => r.json())
@@ -2061,11 +2073,11 @@ function abrirWAGrupo(event, grupoId, mes, anio) {
 
 function abrirWARecordatorioGrupo(event, grupoId, mes, anio) {
     event.preventDefault();
-    fetch(`/dashboard/marcar-doble-instancia-grupo/${grupoId}`, {
+    solicitarCambioEstado(`/dashboard/marcar-doble-instancia-grupo/${grupoId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
         body: JSON.stringify({ mes: mes, anio: anio })
-    });
+    }).catch(() => {});
     const btnGrp = document.getElementById(`btn-pago-grp-${grupoId}`);
     if (btnGrp && !btnGrp.classList.contains('btn-success')) {
         btnGrp.classList.remove('btn-primary', 'btn-outline-danger');
@@ -2079,18 +2091,18 @@ function abrirWARecordatorioGrupo(event, grupoId, mes, anio) {
 }
 
 function marcarEnviadoGrupo(grupo_id, mes, anio) {
-    fetch(`/dashboard/marcar-mensaje-grupo/${grupo_id}`, {
+    solicitarCambioEstado(`/dashboard/marcar-mensaje-grupo/${grupo_id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
         body: JSON.stringify({ mes: mes, anio: anio })
-    });
+    }).catch(() => {});
 }
 
 function marcarEnviado(id) {
-    fetch(`/dashboard/marcar-mensaje/${id}`, {
+    solicitarCambioEstado(`/dashboard/marcar-mensaje/${id}`, {
         method: 'POST',
         headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
-    });
+    }).catch(() => {});
 }
 
 window.addEventListener('beforeunload', () => sessionStorage.setItem('scrollPosition', window.scrollY));
