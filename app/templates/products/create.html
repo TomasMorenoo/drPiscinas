@@ -16,9 +16,10 @@
                         <label class="form-label fw-bold">Nombre del Producto</label>
                         <div class="input-group">
                             <span class="input-group-text bg-light"><i class="bi bi-tag"></i></span>
-                            <input type="text" name="nombre" class="form-control form-control-lg" 
+                            <input type="text" id="nombreProducto" name="nombre" class="form-control form-control-lg"
                                    placeholder="Ej: Cloro Líquido" required>
                         </div>
+                        <div id="alertaProductoExistente" class="alert mt-2 mb-0 d-none" role="alert"></div>
                     </div>
 
                     <div class="mb-3">
@@ -41,7 +42,7 @@
                     </div>
 
                     <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary btn-lg shadow-sm">
+                        <button type="submit" id="crearProductoBtn" class="btn btn-primary btn-lg shadow-sm">
                             <i class="bi bi-plus-circle-fill me-2"></i>Crear Producto
                         </button>
                         <a href="{{ url_for('products.listar_products') }}" class="btn btn-link text-muted">
@@ -53,4 +54,36 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const productos = {{ productos_existentes | default([]) | tojson }};
+    const input = document.getElementById('nombreProducto');
+    const alerta = document.getElementById('alertaProductoExistente');
+    const boton = document.getElementById('crearProductoBtn');
+
+    function normalizar(valor) {
+        return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+            .match(/[a-z0-9]+/g)?.map(palabra => {
+                if (palabra.length > 3 && palabra.endsWith('ces')) return palabra.slice(0, -3) + 'z';
+                if (palabra.length > 4 && palabra.endsWith('es') && !'aeiou'.includes(palabra.at(-3))) return palabra.slice(0, -2);
+                if (palabra.length > 3 && palabra.endsWith('s') && 'aeiou'.includes(palabra.at(-2))) return palabra.slice(0, -1);
+                return palabra;
+            }).join(' ') || '';
+    }
+
+    input.addEventListener('input', () => {
+        const coincidencia = productos.find(p => normalizar(p.nombre) === normalizar(input.value));
+        alerta.classList.add('d-none');
+        boton.disabled = false;
+        if (!coincidencia || !input.value.trim()) return;
+
+        alerta.className = `alert mt-2 mb-0 ${coincidencia.eliminado ? 'alert-warning' : 'alert-danger'}`;
+        alerta.textContent = coincidencia.eliminado
+            ? `Ya hubo un producto llamado "${coincidencia.nombre}". Se guardará con ese nombre para mantener sus estadísticas. Si es otro producto, detallá marca, tipo o presentación.`
+            : `Ya existe un producto activo llamado "${coincidencia.nombre}".`;
+        boton.disabled = !coincidencia.eliminado;
+    });
+});
+</script>
 {% endblock %}

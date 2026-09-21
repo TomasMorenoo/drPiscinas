@@ -5,6 +5,8 @@ from app import db
 from app.models.products import Product
 from app.utils import registrar_auditoria
 from sqlalchemy import case
+import re
+import unicodedata
 
 product_bp = Blueprint("products", __name__, url_prefix="/products")
 
@@ -17,6 +19,29 @@ def _parse_precio(value):
     elif v.count('.') > 1 or ('.' in v and len(v.rsplit('.', 1)[1]) == 3):
         v = v.replace('.', '')
     return float(v)
+
+def _normalizar_nombre_producto(value):
+    texto = unicodedata.normalize('NFD', (value or '').strip().lower())
+    texto = ''.join(c for c in texto if unicodedata.category(c) != 'Mn')
+    palabras = re.findall(r'[a-z0-9]+', texto)
+    normalizadas = []
+    for palabra in palabras:
+        if len(palabra) > 3 and palabra.endswith('ces'):
+            palabra = palabra[:-3] + 'z'
+        elif len(palabra) > 4 and palabra.endswith('es') and palabra[-3] not in 'aeiou':
+            palabra = palabra[:-2]
+        elif len(palabra) > 3 and palabra.endswith('s') and palabra[-2] in 'aeiou':
+            palabra = palabra[:-1]
+        normalizadas.append(palabra)
+    return ' '.join(normalizadas)
+
+def _buscar_producto_similar(nombre, excluir_id=None):
+    clave = _normalizar_nombre_producto(nombre)
+    productos = Product.query.filter(db.func.lower(Product.nombre) != 'deuda')
+    if excluir_id is not None:
+        productos = productos.filter(Product.id != excluir_id)
+    productos = productos.order_by(Product.eliminado.asc(), Product.id.desc())
+    return next((p for p in productos.all() if _normalizar_nombre_producto(p.nombre) == clave), None)
 
 @product_bp.route("/")
 @login_required
@@ -41,13 +66,20 @@ def listar_products():
 @admin_required
 def crear_product():
     if request.method == "POST":
-        nombre = request.form.get("nombre")
+        nombre = request.form.get("nombre", "").strip()
         precio = request.form.get("precio")
-        unidad = request.form.get("unidad")
+        unidad = request.form.get("unidad", "").strip()
 
         if not nombre or not precio or not unidad:
             flash("Todos los campos son obligatorios", "error")
             return redirect(url_for("products.crear_product"))
+
+        anterior = _buscar_producto_similar(nombre)
+        if anterior and not anterior.eliminado:
+            flash(f"Ya existe un producto activo llamado {anterior.nombre}.", "error")
+            return redirect(url_for("products.crear_product"))
+        if anterior:
+            nombre = anterior.nombre
 
         nuevo = Product(nombre=nombre, precio=_parse_precio(precio), unidad=unidad)
         db.session.add(nuevo)
@@ -57,7 +89,11 @@ def crear_product():
         flash("Producto creado", "success")
         return redirect(url_for("products.listar_products"))
         
-    return render_template("products/create.html")
+    productos_existentes = [
+        {"nombre": p.nombre, "eliminado": p.eliminado}
+        for p in Product.query.filter(db.func.lower(Product.nombre) != 'deuda').all()
+    ]
+    return render_template("products/create.html", productos_existentes=productos_existentes)
 
 @product_bp.route("/edit/<int:id>", methods=["GET", "POST"])
 @login_required

@@ -107,6 +107,12 @@ def migrar_base_de_datos():
         print("Tabla movimientos_stock...")
         _run("ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_actual NUMERIC(10,2) NOT NULL DEFAULT 0;")
         _run("ALTER TABLE products ADD COLUMN IF NOT EXISTS eliminado BOOLEAN NOT NULL DEFAULT FALSE;")
+        _run("ALTER TABLE products DROP CONSTRAINT IF EXISTS products_nombre_key;")
+        _run("""
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_products_nombre_activo
+            ON products (LOWER(BTRIM(nombre)))
+            WHERE eliminado = FALSE;
+        """)
         _run("""
             CREATE TABLE IF NOT EXISTS movimientos_stock (
                 id SERIAL PRIMARY KEY,
