@@ -2,6 +2,7 @@ from app import db
 from sqlalchemy import UniqueConstraint
 from datetime import datetime
 from app.utils import proporcional_aplica
+from app.greenville import es_greenville, codigo_barrio_greenville
 
 class Casa(db.Model):
     __tablename__ = "casas"
@@ -104,8 +105,12 @@ class Casa(db.Model):
 
     def nombre_formateado(self):
         num_str = "" if self.numero.upper() == "S/N" else f" {self.numero}"
-        
+
         if self.barrio:
+            if es_greenville(self.country.nombre):
+                sector = codigo_barrio_greenville(self.barrio.nombre)
+                if sector:
+                    return f"{self.country.nombre} {sector}{num_str}"
             return f"{self.barrio.nombre}{num_str}"
         return f"{self.country.nombre}{num_str}"
     

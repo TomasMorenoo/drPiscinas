@@ -19,17 +19,17 @@
                         <select name="country_id" id="countrySelect" class="form-select" required>
                             <option value="">-- Seleccionar Country --</option>
                             {% for country in countries %}
-                                <option value="{{ country.id }}">{{ country.nombre }}</option>
+                                <option value="{{ country.id }}" data-greenville="{{ '1' if country.nombre|lower == 'greenville' else '0' }}">{{ country.nombre }}</option>
                             {% endfor %}
                         </select>
                     </div>
 
                     <div class="mb-3">
-                        <label for="barrioSelect" class="form-label fw-bold text-secondary small text-uppercase">Barrio / Sector</label>
+                        <label for="barrioSelect" id="barrioLabel" class="form-label fw-bold text-secondary small text-uppercase">Barrio / Sector</label>
                         <select name="barrio_id" id="barrioSelect" class="form-select bg-light" disabled>
                             <option value="">Sin Barrio</option>
                         </select>
-                        <div class="form-text small"><i class="bi bi-info-circle"></i> Se habilitará automáticamente si el country tiene barrios.</div>
+                        <div class="form-text small" id="helpBarrio"><i class="bi bi-info-circle"></i> Se habilitará automáticamente si el country tiene barrios.</div>
                     </div>
 
                     <div class="row mb-3">
@@ -152,11 +152,37 @@ function toggleNumero() {
 document.addEventListener('DOMContentLoaded', function() {
     const countrySelect = document.getElementById('countrySelect');
     const barrioSelect = document.getElementById('barrioSelect');
+    const barrioLabel = document.getElementById('barrioLabel');
+    const helpBarrio = document.getElementById('helpBarrio');
+    const helpNumero = document.getElementById('helpNumero');
+
+    function esGreenville() {
+        const option = countrySelect.options[countrySelect.selectedIndex];
+        return option && option.dataset.greenville === '1';
+    }
+
+    function actualizarReglasGreenville() {
+        const requerido = esGreenville();
+        barrioSelect.required = requerido;
+        barrioLabel.innerHTML = requerido
+            ? 'Barrio / Sector <span class="text-danger">*</span>'
+            : 'Barrio / Sector';
+        helpBarrio.innerHTML = requerido
+            ? '<i class="bi bi-info-circle"></i> Obligatorio en Greenville.'
+            : '<i class="bi bi-info-circle"></i> Se habilitará automáticamente si el country tiene barrios.';
+        helpNumero.innerHTML = requerido
+            ? '<strong>Greenville:</strong> ingresá solo el lote. No escribas el barrio, por ejemplo: 47.'
+            : '<strong>Carga múltiple:</strong> Varios separados por coma.';
+    }
 
     countrySelect.addEventListener('change', function() {
         const countryId = this.value;
 
-        barrioSelect.innerHTML = '<option value="">Sin Barrio</option>';
+        actualizarReglasGreenville();
+
+        barrioSelect.innerHTML = esGreenville()
+            ? '<option value="">-- Seleccionar Barrio --</option>'
+            : '<option value="">Sin Barrio</option>';
         barrioSelect.disabled = true;
         barrioSelect.classList.add('bg-light');
 
@@ -167,7 +193,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.length > 0) {
                         barrioSelect.disabled = false;
                         barrioSelect.classList.remove('bg-light');
-                        barrioSelect.innerHTML = '<option value="">-- Seleccionar Barrio --</option>';
+                        barrioSelect.innerHTML = esGreenville()
+                            ? '<option value="">-- Seleccionar Barrio obligatorio --</option>'
+                            : '<option value="">-- Seleccionar Barrio --</option>';
                         data.forEach(b => {
                             const option = document.createElement('option');
                             option.value = b.id;
@@ -179,6 +207,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 .catch(err => console.error(err));
         }
     });
+
+    actualizarReglasGreenville();
 });
 
 // 3. Formateo de moneda argentina visual (Puntos para mil, coma para decimal)

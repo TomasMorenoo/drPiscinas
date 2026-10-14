@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
-from app.decorators import admin_required
+from app.decorators import admin_required, root_required
 from app import db
 from app.models import Casa, Country, Barrio
 from app.models.visit import Visit
@@ -11,8 +11,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_, and_, case
 from sqlalchemy.orm import joinedload, selectinload
 from app.utils import nombre_mes, registrar_auditoria, mover_stock
+from app.greenville import (
+    codigo_barrio_greenville,
+    es_greenville,
+    lote_tiene_sector,
+    separar_sector_lote,
+)
 import re
 import calendar
+import string
 
 DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
@@ -37,6 +44,33 @@ from app.models.casa import HistorialAumento
 import os
 
 casa_bp = Blueprint("casas", __name__, url_prefix="/casas")
+
+
+def _country_y_barrio(country_id, barrio_id):
+    country = Country.query.get(country_id) if country_id else None
+    if not country or not country.activo:
+        return None, None, "El country seleccionado no es válido."
+
+    barrio = None
+    if barrio_id:
+        barrio = Barrio.query.filter_by(
+            id=barrio_id,
+            country_id=country.id,
+            activo=True,
+        ).first()
+        if not barrio:
+            return country, None, "El barrio no pertenece al country seleccionado."
+
+    if es_greenville(country.nombre) and not barrio:
+        return country, None, "En Greenville es obligatorio seleccionar el barrio."
+
+    return country, barrio, None
+
+
+def _validar_lote_greenville(country, numero):
+    if es_greenville(country.nombre) and lote_tiene_sector(numero):
+        return "En Greenville elegí el barrio por separado e ingresá solo el lote, por ejemplo 47."
+    return None
 
 # ==========================================
 # LOG EN TXT DE AUMENTOS (AUDITORÍA)
@@ -388,6 +422,16 @@ def editar_casa(id):
             flash("Datos inválidos. Asegurate de completar el Teléfono y el Número.", "error")
             return redirect(url_for("casas.editar_casa", id=id))
 
+        country, barrio, error_ubicacion = _country_y_barrio(country_id, barrio_id)
+        if error_ubicacion:
+            flash(error_ubicacion, "error")
+            return redirect(url_for("casas.editar_casa", id=id))
+
+        error_lote = _validar_lote_greenville(country, numero)
+        if error_lote:
+            flash(error_lote, "error")
+            return redirect(url_for("casas.editar_casa", id=id))
+
         query = Casa.query.filter(Casa.id != id).filter_by(numero=numero, country_id=country_id)
         if barrio_id:
             query = query.filter_by(barrio_id=barrio_id)
@@ -399,6 +443,12 @@ def editar_casa(id):
             return redirect(url_for("casas.editar_casa", id=id))
 
         precio_actual_db = float(casa.precio_base) if casa.precio_base else 0.0
+        ubicacion_anterior = casa.nombre_formateado()
+        ubicacion_cambio = (
+            casa.numero != numero
+            or casa.country_id != country.id
+            or casa.barrio_id != (barrio.id if barrio else None)
+        )
 
         # --- EL BLINDAJE PARA LA EDICIÓN MANUAL ---
         if abs(precio_actual_db - nuevo_precio) > 0.01:
@@ -422,8 +472,8 @@ def editar_casa(id):
             )
 
         casa.numero = numero
-        casa.country_id = country_id
-        casa.barrio_id = barrio_id
+        casa.country = country
+        casa.barrio = barrio
         casa.nombre_cliente = nombre_cliente
         casa.telefono = telefono
         casa.email = email if email else None
@@ -431,14 +481,35 @@ def editar_casa(id):
         dias_edit = request.form.getlist("dia_visita")
         casa.dia_visita = ','.join(sorted(dias_edit, key=int)) if dias_edit else None
 
+        if ubicacion_cambio:
+            registrar_auditoria(
+                current_user.username,
+                "CAMBIO_UBICACION_CLIENTE",
+                f"Casa ID {casa.id}: {ubicacion_anterior} → {casa.nombre_formateado()}",
+            )
+
         db.session.commit()
         flash("Cliente actualizado.", "success")
         return redirect(url_for("casas.listar_casas"))
 
     countries = Country.query.filter_by(activo=True).order_by(Country.nombre).all()
     barrios = Barrio.query.filter_by(country_id=casa.country_id, activo=True).order_by(Barrio.nombre).all()
-    
-    return render_template("casas/edit.html", casa=casa, countries=countries, barrios=barrios)
+    nombres_barrios = {
+        barrio.id: (
+            codigo_barrio_greenville(barrio.nombre) or barrio.nombre
+            if es_greenville(casa.country.nombre)
+            else barrio.nombre
+        )
+        for barrio in barrios
+    }
+
+    return render_template(
+        "casas/edit.html",
+        casa=casa,
+        countries=countries,
+        barrios=barrios,
+        nombres_barrios=nombres_barrios,
+    )
 
 # ==========================================
 # CREAR (CON CARGA MÚLTIPLE)
@@ -473,15 +544,27 @@ def crear_casa():
             flash("Faltan datos obligatorios (incluyendo el Teléfono).", "error")
             return redirect(url_for("casas.crear_casa"))
 
+        country, barrio, error_ubicacion = _country_y_barrio(country_id, barrio_id)
+        if error_ubicacion:
+            flash(error_ubicacion, "error")
+            return redirect(url_for("casas.crear_casa"))
+
         numeros_lista = [n.strip() for n in numeros_input.split(",") if n.strip()]
-        
+
+        for numero in numeros_lista:
+            error_lote = _validar_lote_greenville(country, numero)
+            if error_lote:
+                flash(error_lote, "error")
+                return redirect(url_for("casas.crear_casa"))
+
         creados = 0
         omitidos = 0
+        casas_creadas = []
         
         for num in numeros_lista:
-            query = Casa.query.filter_by(numero=num, country_id=country_id)
-            if barrio_id:
-                query = query.filter_by(barrio_id=barrio_id)
+            query = Casa.query.filter_by(numero=num, country_id=country.id)
+            if barrio:
+                query = query.filter_by(barrio_id=barrio.id)
             else:
                 query = query.filter_by(barrio_id=None)
                 
@@ -499,8 +582,8 @@ def crear_casa():
             nueva_casa = Casa(
                 numero=num,
                 precio_base=precio_base,
-                country_id=country_id,
-                barrio_id=barrio_id,
+                country_id=country.id,
+                barrio_id=barrio.id if barrio else None,
                 nombre_cliente=nombre_cliente,
                 telefono=telefono,
                 email=email if email else None,
@@ -509,19 +592,20 @@ def crear_casa():
                 proporcional_pendiente=proporcional,
             )
             db.session.add(nueva_casa)
+            casas_creadas.append(nueva_casa)
             creados += 1
 
         db.session.commit()
 
         # --- AUDITORÍA ---
         if creados > 0:
-            country_obj = Country.query.get(country_id)
-            country_nombre = country_obj.nombre if country_obj else str(country_id)
-            nombres_creados = ", ".join(numeros_lista[:creados]) if len(numeros_lista) <= 5 else f"{creados} clientes"
+            nombres_creados = ", ".join(c.nombre_formateado() for c in casas_creadas[:5])
+            if creados > 5:
+                nombres_creados += f" y {creados - 5} más"
             registrar_auditoria(
                 current_user.username,
                 'CREAR_CLIENTE',
-                f"{nombres_creados} — {country_nombre}" + (f" — {nombre_cliente}" if nombre_cliente else "")
+                nombres_creados + (f" — {nombre_cliente}" if nombre_cliente else "")
             )
             db.session.commit()
 
@@ -693,11 +777,135 @@ def perfil(id):
 # ==========================================
 # OTRAS RUTAS
 # ==========================================
+@casa_bp.route("/migrar-greenville", methods=["GET"])
+@login_required
+@root_required
+def migrar_greenville():
+    greenville = next(
+        (country for country in Country.query.all() if es_greenville(country.nombre)),
+        None,
+    )
+    filas = []
+    if greenville:
+        casas = Casa.query.filter_by(country_id=greenville.id).order_by(Casa.numero).all()
+        for casa in casas:
+            sector_numero, lote_sugerido = separar_sector_lote(casa.numero)
+            sector_barrio = codigo_barrio_greenville(casa.barrio.nombre) if casa.barrio else None
+            barrio_normalizado = bool(
+                casa.barrio
+                and sector_barrio
+                and casa.barrio.nombre.strip().upper() == sector_barrio
+            )
+            if casa.barrio and barrio_normalizado and not sector_numero:
+                continue
+            filas.append({
+                "casa": casa,
+                "sector": sector_barrio or sector_numero or "",
+                "lote": lote_sugerido,
+            })
+
+    return render_template(
+        "casas/migrar_greenville.html",
+        greenville=greenville,
+        filas=filas,
+        sectores=list(string.ascii_uppercase),
+    )
+
+
+@casa_bp.route("/migrar-greenville/<int:id>", methods=["POST"])
+@login_required
+@root_required
+def confirmar_migracion_greenville(id):
+    casa = Casa.query.filter_by(id=id).with_for_update().first_or_404()
+    if not es_greenville(casa.country.nombre):
+        flash("La casa seleccionada no pertenece a Greenville.", "error")
+        return redirect(url_for("casas.migrar_greenville"))
+
+    sector = request.form.get("sector", "").strip().upper()
+    lote = request.form.get("lote", "").strip()
+    if not re.fullmatch(r"[A-Z]", sector):
+        flash("Seleccioná un barrio válido entre A y Z.", "error")
+        return redirect(url_for("casas.migrar_greenville"))
+    if not lote:
+        flash("Ingresá el número de lote.", "error")
+        return redirect(url_for("casas.migrar_greenville"))
+    if lote_tiene_sector(lote):
+        flash("El lote no debe incluir el barrio. Ingresá solo el número.", "error")
+        return redirect(url_for("casas.migrar_greenville"))
+
+    barrios = Barrio.query.filter_by(country_id=casa.country_id).with_for_update().all()
+    barrio = next((b for b in barrios if b.nombre.strip().upper() == sector), None)
+    if not barrio:
+        barrio = next((b for b in barrios if codigo_barrio_greenville(b.nombre) == sector), None)
+        if barrio:
+            nombre_barrio_anterior = barrio.nombre
+            barrio.nombre = sector
+            barrio.activo = True
+            registrar_auditoria(
+                current_user.username,
+                "NORMALIZAR_BARRIO_GREENVILLE",
+                f"Barrio ID {barrio.id}: {nombre_barrio_anterior} → {sector}.",
+            )
+        else:
+            barrio = Barrio(nombre=sector, country_id=casa.country_id, activo=True)
+            db.session.add(barrio)
+            db.session.flush()
+            registrar_auditoria(
+                current_user.username,
+                "CREAR_BARRIO_GREENVILLE",
+                f"Barrio ID {barrio.id}: se creó el sector {sector} en Greenville.",
+            )
+
+    duplicada = Casa.query.filter(
+        Casa.id != casa.id,
+        Casa.country_id == casa.country_id,
+        Casa.barrio_id == barrio.id,
+        Casa.numero == lote,
+    ).first()
+    if duplicada:
+        db.session.rollback()
+        flash(f"Ya existe Greenville {sector} {lote}.", "error")
+        return redirect(url_for("casas.migrar_greenville"))
+
+    barrio_anterior = casa.barrio.nombre if casa.barrio else "sin barrio"
+    lote_anterior = casa.numero
+    casa.barrio = barrio
+    casa.numero = lote
+    registrar_auditoria(
+        current_user.username,
+        "MIGRAR_CASA_GREENVILLE",
+        (
+            f"Casa ID {casa.id}: Greenville | barrio {barrio_anterior} | lote {lote_anterior} "
+            f"→ Greenville {sector} {lote}. Se conservaron casa, historial, pagos y visitas."
+        ),
+    )
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        flash("No se pudo migrar porque la dirección ya existe.", "error")
+        return redirect(url_for("casas.migrar_greenville"))
+
+    flash(f"Casa ID {casa.id} migrada a Greenville {sector} {lote}.", "success")
+    return redirect(url_for("casas.migrar_greenville"))
+
+
 @casa_bp.route("/barrios/<int:country_id>")
 @login_required
 def barrios_por_country(country_id):
     barrios = Barrio.query.filter_by(country_id=country_id, activo=True).order_by(Barrio.nombre).all()
-    return jsonify([{"id": b.id, "nombre": b.nombre} for b in barrios])
+    country = Country.query.get(country_id)
+    greenville = bool(country and es_greenville(country.nombre))
+    return jsonify([
+        {
+            "id": barrio.id,
+            "nombre": codigo_barrio_greenville(barrio.nombre) or barrio.nombre
+            if greenville
+            else barrio.nombre,
+        }
+        for barrio in barrios
+    ])
 
 @casa_bp.route("/toggle/<int:id>", methods=["GET", "POST"])
 @login_required

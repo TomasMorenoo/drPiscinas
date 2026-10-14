@@ -51,7 +51,9 @@ def index():
         Country.nombre, 
         func.count(func.distinct(Casa.barrio_id)),
         func.count(Casa.id)
-    ).join(Casa, Country.id == Casa.country_id).group_by(Country.nombre).all()
+    ).join(Casa, Country.id == Casa.country_id).filter(
+        Casa.activo.is_(True)
+    ).group_by(Country.id, Country.nombre).all()
     
     lista_countries = [{"nombre": c[0], "barrios": c[1], "casas": c[2]} for c in countries_con_barrios]
     

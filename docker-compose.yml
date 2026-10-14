@@ -16,6 +16,8 @@ services:
       - ./db_data:/var/lib/postgresql/data
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
+    networks:
+      - drpiscinas_net
 
   web:
     build: .
@@ -25,6 +27,7 @@ services:
       - DATABASE_URL=postgresql://${DB_USER:-drPiscinas}:${DB_PASS:-administrador}@dr_piscinas_db:5432/${DB_NAME:-drPiscinas_db}
       - SECRET_KEY=${SECRET_KEY}
       - TZ=America/Argentina/Buenos_Aires
+      - FLASK_DEBUG=0
     ports:
       - "5000:5000"
     volumes:

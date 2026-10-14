@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Migrar Greenville - Dr. Piscinas{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h2 class="h4 fw-bold mb-1"><i class="bi bi-signpost-split me-2"></i>Migrar casas de Greenville</h2>
+        <p class="text-muted mb-0">Confirmá barrio y lote. La casa conserva su ID, pagos, historial y visitas.</p>
+    </div>
+    <a href="{{ url_for('casas.listar_casas') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Volver
+    </a>
+</div>
+
+{% if not greenville %}
+<div class="alert alert-danger">No se encontró el country Greenville.</div>
+{% elif not filas %}
+<div class="alert alert-success">
+    <i class="bi bi-check-circle-fill me-2"></i>Todas las casas de Greenville están normalizadas.
+</div>
+{% else %}
+<div class="alert alert-info">
+    Quedan <strong>{{ filas|length }}</strong> casas. Revisá la vista previa y confirmá una por una.
+</div>
+
+<div class="row g-3">
+    {% for fila in filas %}
+    <div class="col-12 col-xl-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <span class="badge bg-secondary mb-2">Casa ID {{ fila.casa.id }}</span>
+                        <div class="fw-bold">Dato actual: Greenville {{ fila.casa.numero }}</div>
+                        <small class="text-muted">Barrio actual: {{ fila.casa.barrio.nombre if fila.casa.barrio else 'Sin barrio' }}</small>
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ url_for('casas.confirmar_migracion_greenville', id=fila.casa.id) }}" class="migracion-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-4">
+                            <label class="form-label small fw-bold text-uppercase">Barrio</label>
+                            <select name="sector" class="form-select sector" required>
+                                <option value="">Elegir</option>
+                                {% for sector in sectores %}
+                                <option value="{{ sector }}" {% if sector == fila.sector %}selected{% endif %}>{{ sector }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-8">
+                            <label class="form-label small fw-bold text-uppercase">Lote</label>
+                            <input name="lote" class="form-control lote" value="{{ fila.lote }}" placeholder="Ej: 47" required>
+                        </div>
+                        <div class="col-12">
+                            <div class="rounded bg-light border p-2 mb-2">
+                                Vista previa: <strong class="vista-previa">Greenville {{ fila.sector }} {{ fila.lote }}</strong>
+                            </div>
+                            <button class="btn btn-primary w-100 fw-bold" type="submit">
+                                <i class="bi bi-check-lg me-1"></i> Confirmar esta casa
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<script>
+document.querySelectorAll('.migracion-form').forEach(form => {
+    const sector = form.querySelector('.sector');
+    const lote = form.querySelector('.lote');
+    const vista = form.querySelector('.vista-previa');
+    const actualizar = () => {
+        vista.textContent = `Greenville ${sector.value || '?'} ${lote.value.trim() || '?'}`;
+    };
+    sector.addEventListener('change', actualizar);
+    lote.addEventListener('input', actualizar);
+    actualizar();
+});
+</script>
+{% endblock %}

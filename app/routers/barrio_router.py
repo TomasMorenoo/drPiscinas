@@ -1,11 +1,23 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required
+from flask_login import login_required, current_user
 from app.decorators import admin_required
 from app import db
 from app.models.barrio import Barrio
 from app.models.country import Country
+from app.greenville import es_greenville
+from app.utils import registrar_auditoria
+import re
 
 barrio_bp = Blueprint("barrio", __name__, url_prefix="/barrios")
+
+
+def _nombre_barrio(nombre, country):
+    nombre = (nombre or "").strip()
+    if es_greenville(country.nombre):
+        nombre = nombre.upper()
+        if not re.fullmatch(r"[A-Z]", nombre):
+            return None, "En Greenville el barrio debe ser una sola letra, por ejemplo A."
+    return nombre, None
 
 @barrio_bp.route("/")
 @login_required
@@ -26,8 +38,28 @@ def crear_barrio():
             flash("Todos los campos son obligatorios", "error")
             return redirect(url_for("barrio.crear_barrio"))
             
-        nuevo = Barrio(nombre=nombre, country_id=country_id)
+        country = Country.query.get(country_id)
+        if not country:
+            flash("El country seleccionado no es válido.", "error")
+            return redirect(url_for("barrio.crear_barrio"))
+
+        nombre, error = _nombre_barrio(nombre, country)
+        if error:
+            flash(error, "error")
+            return redirect(url_for("barrio.crear_barrio"))
+
+        if Barrio.query.filter_by(nombre=nombre, country_id=country.id).first():
+            flash("Ese barrio ya existe en el country seleccionado.", "error")
+            return redirect(url_for("barrio.crear_barrio"))
+
+        nuevo = Barrio(nombre=nombre, country_id=country.id)
         db.session.add(nuevo)
+        db.session.flush()
+        registrar_auditoria(
+            current_user.username,
+            "CREAR_BARRIO",
+            f"Barrio ID {nuevo.id}: {country.nombre} {nombre}.",
+        )
         db.session.commit()
         flash("Barrio creado exitosamente", "success")
         return redirect(url_for("barrio.listar_barrios"))
@@ -41,8 +73,33 @@ def crear_barrio():
 def editar_barrio(id):
     barrio = Barrio.query.get_or_404(id)
     if request.method == "POST":
-        barrio.nombre = request.form.get("nombre")
-        barrio.country_id = request.form.get("country_id")
+        country = Country.query.get(request.form.get("country_id"))
+        if not country:
+            flash("El country seleccionado no es válido.", "error")
+            return redirect(url_for("barrio.editar_barrio", id=id))
+
+        nombre, error = _nombre_barrio(request.form.get("nombre"), country)
+        if error:
+            flash(error, "error")
+            return redirect(url_for("barrio.editar_barrio", id=id))
+
+        duplicado = Barrio.query.filter(
+            Barrio.id != barrio.id,
+            Barrio.nombre == nombre,
+            Barrio.country_id == country.id,
+        ).first()
+        if duplicado:
+            flash("Ese barrio ya existe en el country seleccionado.", "error")
+            return redirect(url_for("barrio.editar_barrio", id=id))
+
+        anterior = f"{barrio.country.nombre} {barrio.nombre}"
+        barrio.nombre = nombre
+        barrio.country = country
+        registrar_auditoria(
+            current_user.username,
+            "EDITAR_BARRIO",
+            f"Barrio ID {barrio.id}: {anterior} → {country.nombre} {nombre}.",
+        )
         db.session.commit()
         flash("Barrio actualizado", "success")
         return redirect(url_for("barrio.listar_barrios"))

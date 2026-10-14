@@ -20,7 +20,7 @@
                         <label class="form-label fw-bold small text-uppercase text-muted">Country <span class="text-danger">*</span></label>
                         <select name="country_id" id="country_select" class="form-select" required onchange="cargarBarrios()">
                             {% for country in countries %}
-                                <option value="{{ country.id }}" {% if country.id == casa.country_id %}selected{% endif %}>
+                                <option value="{{ country.id }}" data-greenville="{{ '1' if country.nombre|lower == 'greenville' else '0' }}" {% if country.id == casa.country_id %}selected{% endif %}>
                                     {{ country.nombre }}
                                 </option>
                             {% endfor %}
@@ -28,15 +28,16 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold small text-uppercase text-muted">Barrio (Opcional)</label>
+                        <label id="barrio_label" class="form-label fw-bold small text-uppercase text-muted">Barrio (Opcional)</label>
                         <select name="barrio_id" id="barrio_select" class="form-select">
                             <option value="">-- Ninguno --</option>
                             {% for barrio in barrios %}
                                 <option value="{{ barrio.id }}" {% if barrio.id == casa.barrio_id %}selected{% endif %}>
-                                    {{ barrio.nombre }}
+                                    {{ nombres_barrios[barrio.id] }}
                                 </option>
                             {% endfor %}
                         </select>
+                        <div id="barrio_help" class="form-text small text-muted"></div>
                     </div>
 
                     <div class="row mb-3">
@@ -142,9 +143,28 @@
     }
 
     // 2. Carga de barrios dinámica
+    function esGreenville() {
+        const countrySelect = document.getElementById('country_select');
+        const option = countrySelect.options[countrySelect.selectedIndex];
+        return option && option.dataset.greenville === '1';
+    }
+
+    function actualizarReglasGreenville() {
+        const requerido = esGreenville();
+        const barrioSelect = document.getElementById('barrio_select');
+        barrioSelect.required = requerido;
+        document.getElementById('barrio_label').innerHTML = requerido
+            ? 'Barrio / Sector <span class="text-danger">*</span>'
+            : 'Barrio (Opcional)';
+        document.getElementById('barrio_help').textContent = requerido
+            ? 'En Greenville ingresá el barrio separado y solo el número en el lote.'
+            : '';
+    }
+
     function cargarBarrios() {
         const countryId = document.getElementById('country_select').value;
         const barrioSelect = document.getElementById('barrio_select');
+        actualizarReglasGreenville();
         barrioSelect.innerHTML = '<option value="">Cargando...</option>';
 
         if (!countryId) {
@@ -155,7 +175,9 @@
         fetch(`/casas/barrios/${countryId}`)
             .then(response => response.json())
             .then(data => {
-                barrioSelect.innerHTML = '<option value="">-- Ninguno --</option>';
+                barrioSelect.innerHTML = esGreenville()
+                    ? '<option value="">-- Seleccionar Barrio obligatorio --</option>'
+                    : '<option value="">-- Ninguno --</option>';
                 data.forEach(barrio => {
                     const option = document.createElement('option');
                     option.value = barrio.id;
@@ -165,6 +187,8 @@
             })
             .catch(error => { console.error(error); });
     }
+
+    document.addEventListener('DOMContentLoaded', actualizarReglasGreenville);
 
     // 3. Formateo de moneda argentina (Puntos para mil, coma para decimal)
     function formatearMoneda(input) {
