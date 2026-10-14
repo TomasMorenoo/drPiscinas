@@ -956,6 +956,8 @@
                                     <span class="fw-bold text-success small"><i class="bi bi-check-circle-fill"></i> Pagado</span>
                                 {% elif g.monto_pagado > 0 %}
                                     <span class="fw-bold text-warning small"><i class="bi bi-coin me-1"></i>Faltan: ${{ (deuda_neta - g.monto_pagado) | pesos }}</span>
+                                {% elif g.mensaje_enviado %}
+                                    <span class="fw-bold text-info small"><i class="bi bi-send-check-fill me-1"></i>Men. Enviado</span>
                                 {% else %}
                                     <span class="fw-bold text-danger small"><i class="bi bi-clock-fill"></i> Pendiente</span>
                                 {% endif %}
