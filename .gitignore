@@ -18,6 +18,8 @@ actualizacion_deudas.txt
 .codex/
 .agents/
 .vscode/
+diagnostics/
+tests/
 .idea/
 AGENTS.md
 mensajes_de_prueba*.txt
