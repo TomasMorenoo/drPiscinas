@@ -595,6 +595,44 @@ def crear_casa():
             casas_creadas.append(nueva_casa)
             creados += 1
 
+        db.session.flush()
+
+        from app.models.cierre_mes import CierreMes
+        from app.utils import proporcional_aplica
+        from app.models.configuracion import Configuracion
+        _prop_cfg = Configuracion.get('proporcional_desde')
+
+        for nueva_casa in casas_creadas:
+            fc = fecha_creacion_obj
+            mes_alta = fc.month
+            anio_alta = fc.year
+            mes_cerrado = CierreMes.query.filter_by(mes=mes_alta, anio=anio_alta).first()
+            if not mes_cerrado:
+                continue
+            ya_existe = AbonoHistorico.query.filter_by(
+                casa_id=nueva_casa.id, mes=mes_alta, anio=anio_alta
+            ).first()
+            if ya_existe:
+                continue
+            _aplica = proporcional_aplica(fc, _prop_cfg)
+            if _aplica and fc.day <= 14:
+                monto_alta = float(nueva_casa.proporcional_pendiente or 0)
+                nueva_casa.proporcional_pendiente = None
+            elif _aplica and fc.day > 14:
+                monto_alta = 0.0
+            else:
+                pb_val = float(str(nueva_casa.precio_base).replace('.', '').replace(',', '.')) if nueva_casa.precio_base else 0.0
+                monto_alta = pb_val
+            abono_alta = AbonoHistorico(
+                casa_id=nueva_casa.id,
+                mes=mes_alta,
+                anio=anio_alta,
+                monto=monto_alta,
+                pagado=False,
+                monto_pagado=0,
+            )
+            db.session.add(abono_alta)
+
         db.session.commit()
 
         # --- AUDITORÍA ---

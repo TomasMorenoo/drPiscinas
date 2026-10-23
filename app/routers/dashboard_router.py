@@ -545,7 +545,7 @@ def calcular_saldos_anteriores_batch(mes, anio):
                     WHERE p.casa_id = ah.casa_id
                       AND p.desde <= make_date(ah.anio, ah.mes, 1)
                       AND (p.hasta IS NULL OR p.hasta >= make_date(ah.anio, ah.mes, 1))
-                ) THEN -COALESCE(ah.monto_pagado, 0)
+                ) THEN COALESCE(prod_ext.extras, 0) + COALESCE(promo_ext.extras, 0) - COALESCE(ah.monto_pagado, 0)
                      WHEN c.fecha_creacion IS NOT NULL
                       AND (
                           (
@@ -576,7 +576,7 @@ def calcular_saldos_anteriores_batch(mes, anio):
                               OR COALESCE(c.proporcional_pendiente, 0) > 0
                           )
                       )
-                     THEN -COALESCE(ah.monto_pagado, 0)
+                     THEN COALESCE(prod_ext.extras, 0) + COALESCE(promo_ext.extras, 0) - COALESCE(ah.monto_pagado, 0)
                      WHEN c.fecha_reactivacion IS NOT NULL
                       AND (
                           (
@@ -592,7 +592,7 @@ def calcular_saldos_anteriores_batch(mes, anio):
                       )
                       AND EXTRACT(YEAR  FROM c.fecha_reactivacion)::int = ah.anio
                       AND EXTRACT(MONTH FROM c.fecha_reactivacion)::int = ah.mes
-                     THEN -COALESCE(ah.monto_pagado, 0)
+                     THEN COALESCE(prod_ext.extras, 0) + COALESCE(promo_ext.extras, 0) - COALESCE(ah.monto_pagado, 0)
                      ELSE ah.monto
                           + COALESCE(prod_ext.extras, 0)
                           + COALESCE(promo_ext.extras, 0)
