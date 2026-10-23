@@ -1,4 +1,6 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, Response
+import csv
+import io
 from flask_login import login_required, current_user
 from app.decorators import admin_required, root_required
 from app import db
@@ -234,6 +236,72 @@ def listar_casas():
         pausados_count=pausados_count,
         inactivos_count=inactivos_count,
     )
+
+@casa_bp.route("/exportar-csv", methods=["GET"])
+@login_required
+@admin_required
+def exportar_casas_csv():
+    buscar = request.args.get("buscar", "").strip()
+    estado = request.args.get("estado", "todo")
+    country_id = request.args.get("country_id", "")
+    barrio_id = request.args.get("barrio_id", "")
+
+    query = Casa.query
+
+    if buscar:
+        query = query.join(Country).outerjoin(Barrio).filter(
+            db.or_(
+                Casa.numero.ilike(f"%{buscar}%"),
+                Barrio.nombre.ilike(f"%{buscar}%"),
+                Country.nombre.ilike(f"%{buscar}%"),
+                Casa.nombre_cliente.ilike(f"%{buscar}%")
+            )
+        )
+
+    if estado == "activos":
+        query = query.filter(Casa.activo == True, Casa.pausado == False)
+    elif estado == "inactivos":
+        query = query.filter(Casa.activo == False)
+    elif estado == "pausados":
+        query = query.filter(Casa.pausado == True)
+
+    if country_id:
+        query = query.filter(Casa.country_id == country_id)
+
+    if barrio_id:
+        query = query.filter(Casa.barrio_id == barrio_id)
+
+    casas = query.all()
+    casas.sort(key=natural_sort_key)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Dirección", "Cliente", "Teléfono", "Email", "Precio Base", "Estado"])
+
+    for casa in casas:
+        if not casa.activo:
+            estado_str = "Inactivo"
+        elif casa.pausado:
+            estado_str = "Pausado"
+        else:
+            estado_str = "Activo"
+
+        writer.writerow([
+            casa.nombre_formateado(),
+            casa.nombre_cliente or "",
+            casa.telefono or "",
+            casa.email or "",
+            float(casa.precio_base or 0),
+            estado_str,
+        ])
+
+    output.seek(0)
+    return Response(
+        "\ufeff" + output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=clientes.csv"}
+    )
+
 
 # ==========================================
 # HERRAMIENTA DE AUMENTOS GLOBALES

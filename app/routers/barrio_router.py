@@ -121,11 +121,13 @@ def toggle_barrio(id):
 @admin_required
 def eliminar_barrio(id):
     barrio = Barrio.query.get_or_404(id)
+    next_url = request.form.get("next") or url_for("barrio.listar_barrios")
     try:
+        registrar_auditoria(current_user.username, "ELIMINAR_BARRIO", f"Barrio ID {barrio.id}: {barrio.country.nombre} {barrio.nombre}.")
         db.session.delete(barrio)
         db.session.commit()
         flash("Barrio eliminado definitivamente.", "success")
     except Exception as e:
         db.session.rollback()
         flash("No se puede eliminar porque hay propiedades asociadas a este barrio.", "error")
-    return redirect(url_for("barrio.listar_barrios"))
+    return redirect(next_url)
