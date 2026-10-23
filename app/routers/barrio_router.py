@@ -4,6 +4,7 @@ from app.decorators import admin_required
 from app import db
 from app.models.barrio import Barrio
 from app.models.country import Country
+from app.models.configuracion import Configuracion
 from app.greenville import es_greenville
 from app.utils import registrar_auditoria
 import re
@@ -24,7 +25,8 @@ def _nombre_barrio(nombre, country):
 @admin_required
 def listar_barrios():
     barrios = Barrio.query.join(Country).order_by(Country.nombre, Barrio.nombre).all()
-    return render_template("barrios/list.html", barrios=barrios)
+    editar_activo = Configuracion.get("editar_countries", False)
+    return render_template("barrios/list.html", barrios=barrios, editar_activo=editar_activo)
 
 @barrio_bp.route("/create", methods=["GET", "POST"])
 @login_required

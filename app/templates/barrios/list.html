@@ -50,9 +50,9 @@
                                     <span class="d-none d-md-inline ms-1">{{ 'Pausar' if barrio.activo else 'Activar' }}</span>
                                 </a>
 
-                                {# BOTÓN BORRAR (SOLO APARECE SI ESTÁ PAUSADO) #}
-                                {% if not barrio.activo %}
-                                <form action="{{ url_for('barrio.eliminar_barrio', id=barrio.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar este Barrio? Solo se podrá si no tiene propiedades asociadas.');">
+                                {# BOTÓN BORRAR #}
+                                {% if editar_activo %}
+                                <form action="{{ url_for('barrio.eliminar_barrio', id=barrio.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Eliminar el barrio {{ barrio.nombre }}? Solo se podrá si no tiene propiedades asociadas.');">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar">
                                         <i class="bi bi-trash"></i>
