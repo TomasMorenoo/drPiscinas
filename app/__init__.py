@@ -170,9 +170,6 @@ def create_app():
     _maint_cache = {"v": False, "t": 0.0}
 
     def _check_maint_active():
-        """Verifica si el modo mantenimiento está activo: primero por archivo, luego por DB."""
-        if os.path.exists('mantenimiento.flag'):
-            return True
         try:
             from app.models.configuracion import Configuracion
             return bool(Configuracion.get('mantenimiento', False))
