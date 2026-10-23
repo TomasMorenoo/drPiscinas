@@ -1004,6 +1004,30 @@ def toggle_casa(id):
             casa.nombre_formateado()
         )
 
+        from app.models.cierre_mes import CierreMes
+        from app.utils import proporcional_aplica
+        from app.models.configuracion import Configuracion
+        _prop_cfg = Configuracion.get('proporcional_desde')
+        mes_reac = fecha_reac.month
+        anio_reac = fecha_reac.year
+        if CierreMes.query.filter_by(mes=mes_reac, anio=anio_reac).first():
+            ya_existe = AbonoHistorico.query.filter_by(
+                casa_id=casa.id, mes=mes_reac, anio=anio_reac
+            ).first()
+            if not ya_existe:
+                _aplica = proporcional_aplica(fecha_reac, _prop_cfg)
+                if _aplica and fecha_reac.day <= 14:
+                    monto_reac = float(casa.proporcional_pendiente or 0)
+                    casa.proporcional_pendiente = None
+                elif _aplica and fecha_reac.day > 14:
+                    monto_reac = 0.0
+                else:
+                    monto_reac = float(casa.precio_base or 0)
+                db.session.add(AbonoHistorico(
+                    casa_id=casa.id, mes=mes_reac, anio=anio_reac,
+                    monto=monto_reac, pagado=False, monto_pagado=0,
+                ))
+
     db.session.commit()
     return redirect(url_for("casas.listar_casas"))
 
