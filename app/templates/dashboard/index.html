@@ -2067,10 +2067,10 @@ function abrirWAGrupo(event, grupoId, mes, anio) {
             bell.querySelector('i').className = 'bi bi-bell-fill';
         });
     }
-    if (a.dataset.url) { window.location.href = a.dataset.url; return; }
+    if (a.dataset.url) { window.location.href = a.dataset.url; recargarPanel(); return; }
     fetch(`/dashboard/api/wa-url-grupo/${grupoId}?mes=${mes}&anio=${anio}`)
         .then(r => r.json())
-        .then(data => { if (data.url) { a.dataset.url = data.url; window.location.href = data.url; } });
+        .then(data => { if (data.url) { a.dataset.url = data.url; window.location.href = data.url; } recargarPanel(); });
 }
 
 function abrirWARecordatorioGrupo(event, grupoId, mes, anio) {
