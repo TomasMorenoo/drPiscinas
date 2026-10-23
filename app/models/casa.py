@@ -88,10 +88,14 @@ class Casa(db.Model):
         elif self.fecha_creacion and (proporcional_aplica(self.fecha_creacion) or _has_pend):
             _fref = self.fecha_creacion
         es_mes_alta = bool(_fref and _fref.month == mes and _fref.year == anio)
-        if pausa_en_mes or es_mes_alta:
+        if pausa_en_mes:
             abono_final = 0.0
-            if es_mes_alta and _fref and _fref.day > 14:
+        elif es_mes_alta:
+            if _fref.day > 14:
+                abono_final = 0.0
                 total_extras = 0.0
+            else:
+                abono_final = float(hist.monto) if hist else 0.0
         elif hist:
             abono_final = float(hist.monto)
         else:
@@ -187,10 +191,14 @@ class Casa(db.Model):
         elif self.fecha_creacion and (proporcional_aplica(self.fecha_creacion) or _has_pend):
             _fref = self.fecha_creacion
         es_mes_alta = bool(_fref and _fref.month == mes and _fref.year == anio)
-        if pausa_en_mes or es_mes_alta:
+        if pausa_en_mes:
             abono_final = 0.0
-            if es_mes_alta and _fref and _fref.day > 14:
+        elif es_mes_alta:
+            if _fref.day > 14:
+                abono_final = 0.0
                 total_extras = 0.0
+            else:
+                abono_final = float(hist.monto) if hist else 0.0
         elif hist:
             abono_final = float(hist.monto)
         else:
