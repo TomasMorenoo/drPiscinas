@@ -28,8 +28,8 @@
                 <a href="{{ url_for('casas.herramienta_aumento') }}" class="btn btn-outline-dark btn-sm px-3 fw-bold" title="Actualizar precios masivamente">
                     <i class="bi bi-currency-dollar me-1"></i> Precios
                 </a>
-                <a href="{{ url_for('casas.exportar_casas_csv', buscar=buscar_actual, estado=estado_actual, country_id=country_actual, barrio_id=barrio_actual) }}" class="btn btn-outline-success btn-sm px-3 fw-bold" title="Exportar lista a CSV">
-                    <i class="bi bi-download me-1"></i> CSV
+                <a href="{{ url_for('casas.exportar_casas_csv', buscar=buscar_actual, estado=estado_actual, country_id=country_actual, barrio_id=barrio_actual) }}" class="btn btn-outline-success btn-sm px-3 fw-bold" title="Exportar lista a Excel">
+                    <i class="bi bi-file-earmark-excel me-1"></i> Excel
                 </a>
                 <a href="{{ url_for('casas.form_crear_casa') }}" class="btn btn-dark btn-sm px-4 fw-bold">
                     <i class="bi bi-plus-lg me-1"></i> Nuevo
@@ -43,8 +43,8 @@
                 <a href="{{ url_for('casas.herramienta_aumento') }}" class="btn btn-outline-dark btn-sm fw-bold flex-fill" title="Actualizar precios masivamente">
                     <i class="bi bi-currency-dollar me-1"></i> Precios
                 </a>
-                <a href="{{ url_for('casas.exportar_casas_csv', buscar=buscar_actual, estado=estado_actual, country_id=country_actual, barrio_id=barrio_actual) }}" class="btn btn-outline-success btn-sm fw-bold flex-fill" title="Exportar lista a CSV">
-                    <i class="bi bi-download me-1"></i> CSV
+                <a href="{{ url_for('casas.exportar_casas_csv', buscar=buscar_actual, estado=estado_actual, country_id=country_actual, barrio_id=barrio_actual) }}" class="btn btn-outline-success btn-sm fw-bold flex-fill" title="Exportar lista a Excel">
+                    <i class="bi bi-file-earmark-excel me-1"></i> Excel
                 </a>
                 <a href="{{ url_for('casas.form_crear_casa') }}" class="btn btn-dark btn-sm fw-bold flex-fill">
                     <i class="bi bi-plus-lg me-1"></i> Nuevo

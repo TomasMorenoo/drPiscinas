@@ -158,7 +158,9 @@ def crear_visit():
     products = q.order_by(Product.nombre).all()
     promos = Promo.query.filter_by(activo=True).order_by(Promo.nombre).all()
 
-    return render_template("visits/create.html", casas=casas, products=products, promos=promos)
+    ultima_visita = Visit.query.filter_by(usuario_id=current_user.id).order_by(Visit.id.desc()).first()
+
+    return render_template("visits/create.html", casas=casas, products=products, promos=promos, ultima_visita=ultima_visita)
 
 @visit_bp.route("/delete/<int:id>", methods=["POST"])
 @login_required

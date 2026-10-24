@@ -11,6 +11,13 @@
             </h2>
         </div>
 
+        {% if ultima_visita %}
+        <div class="alert alert-light border py-2 px-3 mb-3 small text-muted d-flex align-items-center gap-2">
+            <i class="bi bi-clock-history"></i>
+            <span>Última cargada: <strong class="text-dark">{{ ultima_visita.casa.nombre_formateado() }}</strong> — {{ ultima_visita.fecha.strftime('%d/%m/%Y') }}{% if ultima_visita.productos %} · {% for vp in ultima_visita.productos %}{% set cant = vp.cantidad | int if vp.cantidad == vp.cantidad | int else vp.cantidad %}{{ vp.product.nombre }} {{ cant }} {{ vp.product.unidad }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}{% if ultima_visita.promo %} · {{ ultima_visita.promo.nombre }}{% endif %}</span>
+        </div>
+        {% endif %}
+
         <form method="POST" action="{{ url_for('visits.crear_visit') }}" id="visitForm">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
@@ -203,6 +210,7 @@
     actualizarCasasFiltradas();
 
     searchInput.addEventListener('input', function() {
+        bypassDuplicateCheck = false;
         const val = this.value.toLowerCase();
         autocompleteList.innerHTML = '';
         hiddenInput.value = '';
@@ -236,6 +244,13 @@
     document.addEventListener('click', function(e) {
         if (e.target !== searchInput && e.target !== autocompleteList)
             autocompleteList.style.display = 'none';
+    });
+
+    let bypassDuplicateCheck = false;
+
+    window.addEventListener('pageshow', function(e) {
+        const nav = performance.getEntriesByType('navigation')[0];
+        if (e.persisted || (nav && nav.type === 'back_forward')) location.reload();
     });
 
     const PINNED_SEARCHES = [['pastilla'], ['granulado', 'lento'], ['granulado', 'rapid'], ['clarificador']];
@@ -313,12 +328,43 @@
         initProductPicker(container.lastElementChild);
     }
 
-    document.getElementById('visitForm').addEventListener('submit', function(e) {
+    document.getElementById('visitForm').addEventListener('submit', async function(e) {
         for (const row of document.querySelectorAll('.producto-row')) {
             if (!row.querySelector('.product-select').value) {
                 e.preventDefault();
                 row.querySelector('.product-pick-btn').classList.add('is-invalid');
                 return;
+            }
+        }
+        if (bypassDuplicateCheck) return;
+        const casaId = hiddenInput.value;
+        const fecha = fechaInput.value;
+        if (casaId && fecha) {
+            e.preventDefault();
+            try {
+                const r = await fetch(`/visits/check_duplicate?casa_id=${casaId}&fecha=${fecha}`);
+                const data = await r.json();
+                if (data.exists) {
+                    document.getElementById('detalle-duplicado').innerText = data.detalles.replace("Productos:", "\nProductos:");
+                    const modalEl = document.getElementById('modalDuplicado');
+                    const modalObj = new bootstrap.Modal(modalEl);
+                    modalObj.show();
+                    document.getElementById('btn-cancelar-duplicado').onclick = function() {
+                        searchInput.value = "";
+                        hiddenInput.value = "";
+                        searchInput.classList.remove('is-valid');
+                        modalObj.hide();
+                    };
+                    document.getElementById('btn-aceptar-duplicado').onclick = function() {
+                        modalObj.hide();
+                        bypassDuplicateCheck = true;
+                        document.getElementById('visitForm').submit();
+                    };
+                } else {
+                    this.submit();
+                }
+            } catch(err) {
+                this.submit();
             }
         }
     });
@@ -346,13 +392,14 @@
                             searchInput.classList.remove('is-valid');
                             modalObj.hide();
                         };
-                        document.getElementById('btn-aceptar-duplicado').onclick = function() { modalObj.hide(); };
+                        document.getElementById('btn-aceptar-duplicado').onclick = function() { bypassDuplicateCheck = true; modalObj.hide(); };
                     }
                 });
         }
     }
 
     fechaInput.addEventListener('change', function() {
+        bypassDuplicateCheck = false;
         actualizarCasasFiltradas();
         verificarDuplicado();
     });

@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, Response
-import csv
 import io
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
 from flask_login import login_required, current_user
 from app.decorators import admin_required, root_required
 from app import db
@@ -237,7 +238,7 @@ def listar_casas():
         inactivos_count=inactivos_count,
     )
 
-@casa_bp.route("/exportar-csv", methods=["GET"])
+@casa_bp.route("/exportar-excel", methods=["GET"])
 @login_required
 @admin_required
 def exportar_casas_csv():
@@ -274,9 +275,18 @@ def exportar_casas_csv():
     casas = query.all()
     casas.sort(key=natural_sort_key)
 
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["Dirección", "Cliente", "Teléfono", "Email", "Precio Base", "Estado"])
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Clientes"
+
+    headers = ["Dirección", "Cliente", "Teléfono", "Email", "Precio Base", "Estado"]
+    ws.append(headers)
+    header_fill = PatternFill("solid", fgColor="1F4E79")
+    header_font = Font(bold=True, color="FFFFFF")
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
 
     for casa in casas:
         if not casa.activo:
@@ -285,8 +295,7 @@ def exportar_casas_csv():
             estado_str = "Pausado"
         else:
             estado_str = "Activo"
-
-        writer.writerow([
+        ws.append([
             casa.nombre_formateado(),
             casa.nombre_cliente or "",
             casa.telefono or "",
@@ -295,11 +304,17 @@ def exportar_casas_csv():
             estado_str,
         ])
 
+    for col in ws.columns:
+        max_len = max((len(str(cell.value)) if cell.value else 0) for cell in col)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 50)
+
+    output = io.BytesIO()
+    wb.save(output)
     output.seek(0)
     return Response(
-        "\ufeff" + output.getvalue(),
-        mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=clientes.csv"}
+        output.getvalue(),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=clientes.xlsx"}
     )
 
 
