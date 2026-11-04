@@ -659,6 +659,7 @@ def set_footer():
     Configuracion.set("footer_texto", texto)
     Configuracion.set("footer_contacto", contacto)
     db.session.commit()
+    cache.delete("_cfg_data")
     flash("✅ Footer actualizado.", "success")
     return redirect(url_for("root.panel"))
 
