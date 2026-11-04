@@ -253,7 +253,7 @@
         if (e.persisted || (nav && nav.type === 'back_forward')) location.reload();
     });
 
-    const PINNED_SEARCHES = [['pastilla'], ['granulado', 'lento'], ['granulado', 'rapid'], ['clarificador']];
+    const PINNED_SEARCHES = [['pastilla'], ['clarificador'], ['granulado'], ['granulado', 'lento'], ['granulado', 'rapid']];
     function normStr(s) { return s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, ''); }
     function matchesPinned(text, terms) { const n = normStr(text); return terms.every(t => n.includes(normStr(t))); }
 
