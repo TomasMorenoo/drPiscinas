@@ -39,6 +39,46 @@
     </div>
 </div>
 
+{% if novedades %}
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="card border-warning border-2 shadow-sm">
+            <div class="card-header bg-warning bg-opacity-10 border-bottom border-warning border-opacity-25 py-3">
+                <h5 class="fw-bold mb-0 text-dark">
+                    <i class="bi bi-bell-fill text-warning me-2"></i> Novedades!
+                    <span class="badge bg-warning text-dark ms-2">{{ novedades|length }}</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    {% for v in novedades %}
+                    <li class="list-group-item px-4 py-3 d-flex align-items-start justify-content-between gap-3">
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="fw-bold text-dark">{{ v.casa.nombre }}</span>
+                                <span class="text-muted small">·</span>
+                                <span class="text-muted small">{{ v.fecha.strftime('%d/%m/%Y') }}</span>
+                                {% if v.usuario %}
+                                <span class="text-muted small">· por {{ v.usuario.username }}</span>
+                                {% endif %}
+                            </div>
+                            <p class="mb-0 text-secondary">{{ v.observaciones }}</p>
+                        </div>
+                        <form method="POST" action="{{ url_for('main.marcar_novedad_vista', visit_id=v.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary text-nowrap">
+                                <i class="bi bi-check2 me-1"></i> Vista
+                            </button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% if sin_stock or stock_bajo %}
 <div class="row mb-4">
     <div class="col-12 d-flex flex-column gap-2">
