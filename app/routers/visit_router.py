@@ -142,6 +142,13 @@ def crear_visit():
             f"{visit.casa.nombre_formateado()} — {fecha_obj.strftime('%d/%m/%Y')}"
         )
         db.session.commit()
+        if visit.observaciones:
+            from app.push_utils import enviar_push_novedades
+            enviar_push_novedades(
+                f"Nueva novedad: {visit.casa.nombre_formateado()}",
+                visit.observaciones
+            )
+
         flash("Visita registrada correctamente", "success")
         return redirect(url_for("visits.listar_visits"))
         

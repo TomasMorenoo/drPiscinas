@@ -146,6 +146,17 @@ def migrar_base_de_datos():
         print("Saldo a favor individual por casa...")
         _run("ALTER TABLE casas ADD COLUMN IF NOT EXISTS saldo_a_favor NUMERIC(10,2) DEFAULT 0;")
 
+        print("Tabla push_subscriptions...")
+        _run("""
+            CREATE TABLE IF NOT EXISTS push_subscriptions (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                endpoint TEXT NOT NULL UNIQUE,
+                p256dh TEXT NOT NULL,
+                auth TEXT NOT NULL
+            );
+        """)
+
         print("Novedad vista en visits...")
         _run("ALTER TABLE visits ADD COLUMN IF NOT EXISTS novedad_vista BOOLEAN NOT NULL DEFAULT FALSE;")
 
