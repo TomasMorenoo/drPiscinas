@@ -90,40 +90,6 @@
 </head>
 <body>
 
-<div id="pwa-splash" style="
-    position:fixed;top:0;left:0;width:100%;height:100%;
-    background:#212529;
-    display:none;flex-direction:column;align-items:center;justify-content:center;gap:0.5rem;
-    z-index:9999;
-    transition:opacity 0.4s ease;
-    opacity:1;
-">
-    <img src="/static/drpiscina-192.png" alt="logo"
-         style="width:90px;height:90px;border-radius:20px;margin-bottom:0.8rem;box-shadow:0 6px 30px rgba(0,0,0,0.5);">
-    <div style="color:#fff;font-size:1.2rem;font-weight:700;letter-spacing:3px;text-transform:uppercase;">Dr. Piscinas</div>
-    <div style="color:#adb5bd;font-size:0.85rem;font-style:italic;">Tu pileta en buenas manos</div>
-</div>
-
-<script>
-(function() {
-    var isPWA = window.navigator.standalone === true
-             || window.matchMedia('(display-mode: standalone)').matches;
-    var firstLoad = !sessionStorage.getItem('pwa_launched');
-
-    if (isPWA && firstLoad) {
-        sessionStorage.setItem('pwa_launched', '1');
-        var splash = document.getElementById('pwa-splash');
-        splash.style.display = 'flex';
-        window.addEventListener('load', function() {
-            setTimeout(function() {
-                splash.style.opacity = '0';
-                setTimeout(function() { splash.style.display = 'none'; }, 400);
-            }, 1200);
-        });
-    }
-})();
-</script>
-
 <nav class="navbar navbar-expand-lg navbar-dark mb-4" {% if request and ('localhost' in request.host or '127.0.0.1' in request.host) and not (current_user.is_authenticated and current_user.rol == 'demo') %}style="background-color: #ff8c00 !important;"{% endif %}>
     <div class="container">
         <a class="navbar-brand" href="{{ url_for('main.home') }}">
