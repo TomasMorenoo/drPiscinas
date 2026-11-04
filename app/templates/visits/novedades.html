@@ -9,34 +9,8 @@
     </a>
 </div>
 
+{% if paginacion.items %}
 <div class="card border-0 shadow-sm mb-4">
-    <div class="card-body py-3">
-        <form method="GET" class="row g-2 align-items-end">
-            <div class="col-auto">
-                <label class="form-label small fw-bold text-muted mb-1">Desde</label>
-                <div class="d-flex gap-2">
-                    <select name="desde_mes" class="form-select form-select-sm" style="width:auto;">
-                        {% set meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'] %}
-                        {% for m in meses %}
-                        <option value="{{ loop.index }}" {% if desde_mes == loop.index %}selected{% endif %}>{{ m }}</option>
-                        {% endfor %}
-                    </select>
-                    <select name="desde_anio" class="form-select form-select-sm" style="width:auto;">
-                        {% for y in range(2024, 2028) %}
-                        <option value="{{ y }}" {% if desde_anio == y %}selected{% endif %}>{{ y }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-{% if visits %}
-<div class="card border-0 shadow-sm">
     <div class="card-body p-0">
         <table class="table table-hover align-middle mb-0">
             <thead class="table-dark">
@@ -49,7 +23,7 @@
                 </tr>
             </thead>
             <tbody>
-                {% for v in visits %}
+                {% for v in paginacion.items %}
                 <tr>
                     <td class="ps-4 text-muted small">{{ v.fecha.strftime('%d/%m/%Y') }}</td>
                     <td class="fw-bold">{{ v.casa.nombre_formateado() }}</td>
@@ -68,10 +42,33 @@
         </table>
     </div>
 </div>
+
+{% if paginacion.pages > 1 %}
+<nav>
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if not paginacion.has_prev %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('visits.historial_novedades', page=paginacion.prev_num) }}">‹</a>
+        </li>
+        {% for p in paginacion.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+            {% if p %}
+            <li class="page-item {% if p == paginacion.page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('visits.historial_novedades', page=p) }}">{{ p }}</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% endif %}
+        {% endfor %}
+        <li class="page-item {% if not paginacion.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('visits.historial_novedades', page=paginacion.next_num) }}">›</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
 {% else %}
 <div class="text-center text-muted py-5">
     <i class="bi bi-bell-slash fs-1 d-block mb-3"></i>
-    No hay novedades en el período seleccionado.
+    No hay novedades registradas.
 </div>
 {% endif %}
 {% endblock %}
