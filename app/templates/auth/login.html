@@ -97,11 +97,21 @@
             z-index: 1;
         }
 
+        .brand-tagline {
+            font-size: 0.95rem;
+            color: #adb5bd;
+            text-align: center;
+            margin-top: 0.3rem;
+            font-style: italic;
+            position: relative;
+            z-index: 1;
+        }
+
         .brand-desc {
             font-size: 0.85rem;
             color: #6c757d;
             text-align: center;
-            margin-top: 0.5rem;
+            margin-top: 0.3rem;
             position: relative;
             z-index: 1;
         }
@@ -207,7 +217,9 @@
             .brand-logo { width: 48px; height: 48px; margin-bottom: 0; border-radius: 10px; }
             .brand-icon-fallback { font-size: 2rem; margin-bottom: 0; }
             .brand-name { font-size: 1.1rem; letter-spacing: 1px; text-align: left; }
-            .brand-desc, .brand-divider { display: none; }
+            .brand-tagline { font-size: 0.75rem; text-align: left; margin-top: 0.1rem; }
+            .brand-desc { font-size: 0.7rem; text-align: left; margin-top: 0.1rem; }
+            .brand-divider { display: none; }
             .form-panel { padding: 2rem 1.5rem; }
             .login-footer { justify-content: center; text-align: center; }
         }
@@ -227,6 +239,7 @@
             <i class="bi bi-grid-3x3-gap-fill brand-icon-fallback"></i>
         {% endif %}
         <div class="brand-name">{{ cfg.app_name }}</div>
+        <div class="brand-tagline">Tu pileta en buenas manos</div>
         <div class="brand-desc">{{ cfg.app_description or 'Sistema de gestión' }}</div>
         <div class="brand-divider"></div>
     </div>
