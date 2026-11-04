@@ -1,3 +1,4 @@
+import io
 import os
 import subprocess
 import threading
@@ -431,7 +432,7 @@ def backup_db():
         with open(os.path.join(backup_dir, filename), "wb") as f:
             f.write(sql_content)
 
-        return Response(
+        resp = Response(
             sql_content,
             mimetype="application/octet-stream",
             headers={
@@ -439,12 +440,85 @@ def backup_db():
                 "Content-Length": len(sql_content),
             }
         )
+        dltoken = request.args.get("dltoken")
+        if dltoken:
+            resp.set_cookie("dltoken", dltoken, max_age=60, path="/")
+        return resp
 
     except FileNotFoundError:
         flash("❌ pg_dump no está disponible. Reconstruí el container con 'docker compose build'.", "error")
         return redirect(url_for("root.panel"))
     except subprocess.TimeoutExpired:
         flash("❌ El backup tardó demasiado y fue cancelado.", "error")
+        return redirect(url_for("root.panel"))
+    except Exception as e:
+        flash(f"❌ Error inesperado: {str(e)}", "error")
+        return redirect(url_for("root.panel"))
+
+
+# ================================================
+# BACKUP COMPLETO (SQL + MULTIMEDIA)
+# ================================================
+@root_bp.route("/backup-completo")
+@login_required
+@root_required
+def backup_completo():
+    import io, zipfile, urllib.parse as _urlparse
+    from flask import current_app
+
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        parsed = _urlparse.urlparse(database_url)
+        db_user = parsed.username
+        db_pass = parsed.password
+        db_host = parsed.hostname
+        db_port = str(parsed.port or 5432)
+        db_name = parsed.path.lstrip("/")
+    else:
+        db_user = os.getenv("DB_USER", "drPiscinas")
+        db_pass = os.getenv("DB_PASS", "administrador")
+        db_host = os.getenv("DB_HOST", "db")
+        db_port = "5432"
+        db_name = os.getenv("DB_NAME", "drPiscinas_db")
+
+    env = os.environ.copy()
+    env["PGPASSWORD"] = db_pass or ""
+
+    try:
+        resultado = subprocess.run(
+            ["pg_dump", "-h", db_host, "-p", db_port, "-U", db_user, "-d", db_name,
+             "--no-password", "--format=plain", "--encoding=UTF8", "--clean", "--if-exists"],
+            capture_output=True, env=env, timeout=60,
+        )
+        if resultado.returncode != 0:
+            error_msg = resultado.stderr.decode("utf-8", errors="replace")
+            flash(f"❌ Error al generar el backup: {error_msg[:200]}", "error")
+            return redirect(url_for("root.panel"))
+
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr(f"backup_{timestamp}.sql", resultado.stdout.decode('utf-8', errors='replace'))
+            uploads_dir = os.path.join(current_app.static_folder, 'uploads', 'visits')
+            if os.path.exists(uploads_dir):
+                for root_dir, _, files in os.walk(uploads_dir):
+                    for file in files:
+                        filepath = os.path.join(root_dir, file)
+                        arcname = os.path.relpath(filepath, current_app.static_folder)
+                        zf.write(filepath, arcname)
+
+        buf.seek(0)
+        resp = Response(
+            buf.read(),
+            mimetype="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="backup_completo_{timestamp}.zip"'}
+        )
+        dltoken = request.args.get("dltoken")
+        if dltoken:
+            resp.set_cookie("dltoken", dltoken, max_age=60, path="/")
+        return resp
+    except subprocess.TimeoutExpired:
+        flash("❌ El backup tardó demasiado.", "error")
         return redirect(url_for("root.panel"))
     except Exception as e:
         flash(f"❌ Error inesperado: {str(e)}", "error")
@@ -462,7 +536,7 @@ def restore_db():
     Recibe un archivo .sql y lo inyecta en la base de datos via psql en background.
     OPERACIÓN DESTRUCTIVA: sobreescribe datos existentes.
     """
-    import urllib.parse as _urlparse
+    import zipfile, urllib.parse as _urlparse
     global _restore_state
 
     with _restore_lock:
@@ -476,8 +550,8 @@ def restore_db():
         return redirect(url_for("root.panel"))
 
     ext = os.path.splitext(secure_filename(archivo.filename))[1].lower()
-    if ext != ".sql":
-        flash("Solo se aceptan archivos .sql", "error")
+    if ext not in (".sql", ".zip"):
+        flash("Solo se aceptan archivos .sql o .zip", "error")
         return redirect(url_for("root.panel"))
 
     # Leer credenciales
@@ -496,10 +570,35 @@ def restore_db():
         db_port = "5432"
         db_name = os.getenv("DB_NAME", "drPiscinas_db")
 
-    # Guardar SQL en archivo temporal (el thread lo limpia al terminar)
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".sql")
-    archivo.save(tmp.name)
-    tmp.close()
+    if ext == ".zip":
+        try:
+            zdata = archivo.read()
+            with zipfile.ZipFile(io.BytesIO(zdata)) as zf:
+                sql_names = [n for n in zf.namelist() if n.endswith('.sql')]
+                if not sql_names:
+                    flash("El ZIP no contiene ningún archivo .sql", "error")
+                    return redirect(url_for("root.panel"))
+
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".sql")
+                tmp.write(zf.read(sql_names[0]))
+                tmp.close()
+
+                # Extraer multimedia a static/
+                static_folder = current_app.static_folder
+                for name in zf.namelist():
+                    if name.endswith('.sql') or name.endswith('/'):
+                        continue
+                    dest = os.path.join(static_folder, name)
+                    os.makedirs(os.path.dirname(dest), exist_ok=True)
+                    with zf.open(name) as src, open(dest, 'wb') as dst:
+                        dst.write(src.read())
+        except zipfile.BadZipFile:
+            flash("El archivo ZIP está corrupto.", "error")
+            return redirect(url_for("root.panel"))
+    else:
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".sql")
+        archivo.save(tmp.name)
+        tmp.close()
 
     env = os.environ.copy()
     env["PGPASSWORD"] = db_pass or ""

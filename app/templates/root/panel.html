@@ -383,15 +383,17 @@
                         </div>
                         <div>
                             <p class="fw-bold mb-0">Backup</p>
-                            <p class="text-muted small mb-0">Descarga un <code>.sql</code> completo con toda la base.</p>
+                            <p class="text-muted small mb-0">Descarga solo la base (<code>.sql</code>) o con multimedia (<code>.zip</code>).</p>
                         </div>
                     </div>
-                    <div class="mt-auto">
-                        <a href="{{ url_for('root.backup_db') }}"
-                           id="btn-backup"
-                           class="btn btn-dark fw-semibold px-4"
-                           onclick="var b=this;b.innerHTML='<span class=\'spinner-border spinner-border-sm me-2\'></span>Generando...';b.classList.add('disabled');setTimeout(function(){b.innerHTML='<i class=\'bi bi-download me-2\'></i>Descargar Backup';b.classList.remove('disabled');},15000);">
-                            <i class="bi bi-download me-2"></i>Descargar Backup
+                    <div class="mt-auto d-flex flex-wrap gap-2">
+                        <a href="#" id="btn-backup" class="btn btn-dark fw-semibold px-4"
+                           onclick="iniciarDescarga(this, '{{ url_for('root.backup_db') }}', '<i class=\'bi bi-download me-2\'></i>Solo BD'); return false;">
+                            <i class="bi bi-download me-2"></i>Solo BD
+                        </a>
+                        <a href="#" id="btn-backup-completo" class="btn btn-outline-dark fw-semibold px-4"
+                           onclick="iniciarDescarga(this, '{{ url_for('root.backup_completo') }}', '<i class=\'bi bi-file-zip me-2\'></i>Con Multimedia'); return false;">
+                            <i class="bi bi-file-zip me-2"></i>Con Multimedia
                         </a>
                     </div>
                 </div>
@@ -422,13 +424,13 @@
                           onsubmit="if(!confirm('⚠️ Esta operación inyectará el SQL en la base de datos.\nLos datos existentes serán sobreescritos.\n\n¿Estás seguro?')) return false; startRestorePolling();">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="input-group">
-                            <input type="file" name="backup_file" accept=".sql" class="form-control" required>
+                            <input type="file" name="backup_file" accept=".sql,.zip" class="form-control" required>
                             <button type="submit" class="btn btn-danger fw-semibold px-4">
                                 <i class="bi bi-upload me-1"></i>Restaurar
                             </button>
                         </div>
                         <p class="text-danger small mt-2 mb-0">
-                            <i class="bi bi-exclamation-triangle-fill me-1"></i>Solo archivos <code>.sql</code> generados por este sistema.
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i>Acepta <code>.sql</code> (solo BD) o <code>.zip</code> (con multimedia).
                         </p>
                     </form>
                 </div>
@@ -1019,6 +1021,23 @@ document.querySelectorAll('.rp-switch').forEach(function(sw) {
         document.getElementById(this.dataset.form).submit();
     });
 });
+
+// Descarga con detección de fin via cookie
+function iniciarDescarga(btn, url, labelOriginal) {
+    var token = Math.random().toString(36).slice(2);
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generando...';
+    btn.classList.add('disabled');
+    window.location = url + '?dltoken=' + token;
+    var timer = setInterval(function() {
+        if (document.cookie.indexOf('dltoken=' + token) !== -1) {
+            clearInterval(timer);
+            document.cookie = 'dltoken=; Max-Age=0; path=/';
+            btn.innerHTML = labelOriginal;
+            btn.classList.remove('disabled');
+        }
+    }, 500);
+    setTimeout(function() { clearInterval(timer); btn.innerHTML = labelOriginal; btn.classList.remove('disabled'); }, 60000);
+}
 
 // Restore polling
 (function() {
