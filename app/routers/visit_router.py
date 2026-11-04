@@ -167,6 +167,8 @@ def crear_visit():
                 visit.observaciones
             )
 
+        _guardar_media_visita(visit.id, request.files.getlist('archivos'), current_user.username)
+
         flash("Visita registrada correctamente", "success")
         return redirect(url_for("visits.listar_visits"))
         
@@ -295,25 +297,12 @@ ALLOWED_VIDEO = {'mp4', 'mov', 'avi', 'webm', 'mkv'}
 def _ext(filename):
     return filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
 
-@visit_bp.route("/detalle/<int:id>/media/upload", methods=["POST"])
-@login_required
-def upload_media(id):
+def _guardar_media_visita(visit_id, files, username):
     import uuid, os
-    from werkzeug.utils import secure_filename
     from flask import current_app
     from app.models.visit_media import VisitMedia
-
-    visit = Visit.query.get_or_404(id)
-    files = request.files.getlist('archivos')
-    if not files:
-        flash("No se seleccionaron archivos.", "error")
-        return redirect(url_for("visits.detalle_visit", id=id))
-
-    upload_dir = os.path.join(current_app.static_folder, 'uploads', 'visits', str(id))
-    os.makedirs(upload_dir, exist_ok=True)
-
     for f in files:
-        if not f.filename:
+        if not f or not f.filename:
             continue
         ext = _ext(f.filename)
         if ext in ALLOWED_FOTO:
@@ -321,18 +310,19 @@ def upload_media(id):
         elif ext in ALLOWED_VIDEO:
             tipo = 'video'
         else:
-            flash(f"Formato no soportado: {f.filename}", "warning")
             continue
+        upload_dir = os.path.join(current_app.static_folder, 'uploads', 'visits', str(visit_id))
+        os.makedirs(upload_dir, exist_ok=True)
         filename = f"{uuid.uuid4().hex}.{ext}"
         f.save(os.path.join(upload_dir, filename))
-        db.session.add(VisitMedia(
-            visit_id=id,
-            filename=filename,
-            tipo=tipo,
-            subido_por=current_user.username
-        ))
-
+        db.session.add(VisitMedia(visit_id=visit_id, filename=filename, tipo=tipo, subido_por=username))
     db.session.commit()
+
+@visit_bp.route("/detalle/<int:id>/media/upload", methods=["POST"])
+@login_required
+def upload_media(id):
+    Visit.query.get_or_404(id)
+    _guardar_media_visita(id, request.files.getlist('archivos'), current_user.username)
     return redirect(url_for("visits.detalle_visit", id=id))
 
 

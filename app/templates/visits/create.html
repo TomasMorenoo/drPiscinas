@@ -18,7 +18,7 @@
         </div>
         {% endif %}
 
-        <form method="POST" action="{{ url_for('visits.crear_visit') }}" id="visitForm">
+        <form method="POST" action="{{ url_for('visits.crear_visit') }}" id="visitForm" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
             <div class="card shadow-sm border-0 mb-3">
@@ -80,6 +80,13 @@
                 <div class="card-body p-3">
                     <label class="form-label fw-bold small text-muted">Observaciones / Notas del trabajo</label>
                     <textarea name="observaciones" class="form-control" rows="2" placeholder="Ej: Se limpió fondo y se ajustó timer..."></textarea>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body p-3">
+                    <label class="form-label fw-bold small text-muted"><i class="bi bi-images me-1"></i>Fotos / Videos (opcional)</label>
+                    <input type="file" name="archivos" multiple accept="image/*,video/*" class="form-control">
                 </div>
             </div>
 
