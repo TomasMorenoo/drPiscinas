@@ -10,7 +10,7 @@ auth_bp = Blueprint('auth', __name__)
 # LOGIN (ACCESO)
 # ==========================================
 @auth_bp.route('/login', methods=['GET', 'POST'])
-@limiter.limit("5 per minute") # Máximo 5 intentos por minuto para evitar ataques
+@limiter.limit("20 per minute")
 def login():
     # Si ya está logueado, lo mandamos al Home
     if current_user.is_authenticated:
@@ -44,7 +44,7 @@ def login():
 # ACCESO OCULTO PARA ROOT (durante mantenimiento)
 # ==========================================
 @auth_bp.route('/acceso', methods=['GET', 'POST'])
-@limiter.limit("5 per minute")
+@limiter.limit("20 per minute")
 def acceso_root():
     """Ruta de login que no es bloqueada por el modo mantenimiento."""
     if current_user.is_authenticated:
