@@ -157,6 +157,18 @@ def migrar_base_de_datos():
             );
         """)
 
+        print("Tabla visit_media...")
+        _run("""
+            CREATE TABLE IF NOT EXISTS visit_media (
+                id SERIAL PRIMARY KEY,
+                visit_id INTEGER NOT NULL REFERENCES visits(id) ON DELETE CASCADE,
+                filename VARCHAR(255) NOT NULL,
+                tipo VARCHAR(10) NOT NULL,
+                subido_por VARCHAR(100),
+                fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
         print("Novedad vista en visits...")
         _run("ALTER TABLE visits ADD COLUMN IF NOT EXISTS novedad_vista BOOLEAN NOT NULL DEFAULT FALSE;")
 

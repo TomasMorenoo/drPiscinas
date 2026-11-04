@@ -86,6 +86,51 @@
                 </a>
             </div>
 
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold mb-0"><i class="bi bi-images me-2"></i>Fotos y Videos</h6>
+                    <button class="btn btn-sm btn-outline-primary" onclick="document.getElementById('inputMedia').click()">
+                        <i class="bi bi-upload me-1"></i> Subir
+                    </button>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('visits.upload_media', id=visit.id) }}" method="POST" enctype="multipart/form-data" id="formMedia">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="file" id="inputMedia" name="archivos" multiple accept="image/*,video/*" class="d-none"
+                               onchange="document.getElementById('formMedia').submit()">
+                    </form>
+
+                    {% if visit.media %}
+                    <div class="row g-2">
+                        {% for m in visit.media %}
+                        <div class="col-6 col-md-4 position-relative">
+                            {% if m.tipo == 'foto' %}
+                            <a href="{{ url_for('static', filename='uploads/visits/' ~ visit.id ~ '/' ~ m.filename) }}" target="_blank">
+                                <img src="{{ url_for('static', filename='uploads/visits/' ~ visit.id ~ '/' ~ m.filename) }}"
+                                     class="img-fluid rounded" style="width:100%;height:120px;object-fit:cover;">
+                            </a>
+                            {% else %}
+                            <video class="w-100 rounded" style="height:120px;object-fit:cover;" controls>
+                                <source src="{{ url_for('static', filename='uploads/visits/' ~ visit.id ~ '/' ~ m.filename) }}">
+                            </video>
+                            {% endif %}
+                            <form action="{{ url_for('visits.delete_media', visit_id=visit.id, media_id=m.id) }}" method="POST"
+                                  onsubmit="return confirm('¿Eliminar?');"
+                                  style="position:absolute;top:4px;right:8px;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-danger btn-sm py-0 px-1" style="font-size:.7rem;">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </form>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted small mb-0 text-center py-2">Sin archivos adjuntos.</p>
+                    {% endif %}
+                </div>
+            </div>
+
         </div>
     </div>
 </div>

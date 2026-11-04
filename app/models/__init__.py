@@ -13,3 +13,4 @@ from app.models.pausa import Pausa
 from app.models.plantilla_mensaje import PlantillaMensaje
 from app.models.movimiento_stock import MovimientoStock
 from app.models.push_subscription import PushSubscription
+from app.models.visit_media import VisitMedia

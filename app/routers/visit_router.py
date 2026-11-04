@@ -288,6 +288,69 @@ def detalle_visit(id):
     visit = Visit.query.get_or_404(id)
     return render_template("visits/detalle.html", visit=visit)
 
+
+ALLOWED_FOTO = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'}
+ALLOWED_VIDEO = {'mp4', 'mov', 'avi', 'webm', 'mkv'}
+
+def _ext(filename):
+    return filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+
+@visit_bp.route("/detalle/<int:id>/media/upload", methods=["POST"])
+@login_required
+def upload_media(id):
+    import uuid, os
+    from werkzeug.utils import secure_filename
+    from flask import current_app
+    from app.models.visit_media import VisitMedia
+
+    visit = Visit.query.get_or_404(id)
+    files = request.files.getlist('archivos')
+    if not files:
+        flash("No se seleccionaron archivos.", "error")
+        return redirect(url_for("visits.detalle_visit", id=id))
+
+    upload_dir = os.path.join(current_app.static_folder, 'uploads', 'visits', str(id))
+    os.makedirs(upload_dir, exist_ok=True)
+
+    for f in files:
+        if not f.filename:
+            continue
+        ext = _ext(f.filename)
+        if ext in ALLOWED_FOTO:
+            tipo = 'foto'
+        elif ext in ALLOWED_VIDEO:
+            tipo = 'video'
+        else:
+            flash(f"Formato no soportado: {f.filename}", "warning")
+            continue
+        filename = f"{uuid.uuid4().hex}.{ext}"
+        f.save(os.path.join(upload_dir, filename))
+        db.session.add(VisitMedia(
+            visit_id=id,
+            filename=filename,
+            tipo=tipo,
+            subido_por=current_user.username
+        ))
+
+    db.session.commit()
+    return redirect(url_for("visits.detalle_visit", id=id))
+
+
+@visit_bp.route("/detalle/<int:visit_id>/media/<int:media_id>/delete", methods=["POST"])
+@login_required
+def delete_media(visit_id, media_id):
+    import os
+    from flask import current_app
+    from app.models.visit_media import VisitMedia
+
+    media = VisitMedia.query.get_or_404(media_id)
+    filepath = os.path.join(current_app.static_folder, 'uploads', 'visits', str(visit_id), media.filename)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+    db.session.delete(media)
+    db.session.commit()
+    return redirect(url_for("visits.detalle_visit", id=visit_id))
+
 @visit_bp.route("/check_duplicate")
 @login_required
 def check_duplicate():
