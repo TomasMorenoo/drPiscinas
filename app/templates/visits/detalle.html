@@ -99,23 +99,15 @@
                         {% for m in visit.media %}
                         <div class="col-6 col-md-4 position-relative">
                             {% if m.tipo == 'foto' %}
-                            <a href="{{ url_for('static', filename='uploads/visits/' ~ visit.id ~ '/' ~ m.filename) }}" target="_blank">
-                                <img src="{{ url_for('static', filename='uploads/visits/' ~ visit.id ~ '/' ~ m.filename) }}"
-                                     class="img-fluid rounded" style="width:100%;height:120px;object-fit:cover;">
-                            </a>
+                            <img src="{{ url_for('static', filename='uploads/visits/' ~ visit.id ~ '/' ~ m.filename) }}"
+                                 class="img-fluid rounded" style="width:100%;height:120px;object-fit:cover;cursor:pointer;"
+                                 onclick="abrirVisor('{{ url_for('static', filename='uploads/visits/' ~ visit.id ~ '/' ~ m.filename) }}', 'foto')">
                             {% else %}
-                            <video class="w-100 rounded" style="height:120px;object-fit:cover;" controls>
+                            <video class="w-100 rounded" style="height:120px;object-fit:cover;cursor:pointer;"
+                                   onclick="abrirVisor('{{ url_for('static', filename='uploads/visits/' ~ visit.id ~ '/' ~ m.filename) }}', 'video')">
                                 <source src="{{ url_for('static', filename='uploads/visits/' ~ visit.id ~ '/' ~ m.filename) }}">
                             </video>
                             {% endif %}
-                            <form action="{{ url_for('visits.delete_media', visit_id=visit.id, media_id=m.id) }}" method="POST"
-                                  onsubmit="return confirm('¿Eliminar?');"
-                                  style="position:absolute;top:4px;right:8px;">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-danger btn-sm py-0 px-1" style="font-size:.7rem;">
-                                    <i class="bi bi-x"></i>
-                                </button>
-                            </form>
                         </div>
                         {% endfor %}
                     </div>
@@ -134,4 +126,27 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modalVisor" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content bg-dark border-0">
+            <div class="modal-header border-0 pb-0">
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-2" id="visorContenido"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+function abrirVisor(src, tipo) {
+    const contenido = document.getElementById('visorContenido');
+    if (tipo === 'foto') {
+        contenido.innerHTML = `<img src="${src}" class="img-fluid rounded">`;
+    } else {
+        contenido.innerHTML = `<video controls autoplay class="w-100 rounded" style="max-height:70vh;"><source src="${src}"></video>`;
+    }
+    new bootstrap.Modal(document.getElementById('modalVisor')).show();
+}
+</script>
 {% endblock %}

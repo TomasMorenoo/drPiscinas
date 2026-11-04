@@ -273,6 +273,7 @@ def editar_visit(id):
             f"{visit.casa.nombre_formateado()} — {nueva_fecha.strftime('%d/%m/%Y')}"
         )
         db.session.commit()
+        _guardar_media_visita(id, request.files.getlist('archivos'), current_user.username)
         flash("Visita actualizada", "success")
         return redirect(url_for("visits.listar_visits"))
         
