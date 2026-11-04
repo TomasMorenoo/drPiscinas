@@ -10,7 +10,7 @@ from app.models.promo import Promo
 from app.models.abono_historico import AbonoHistorico 
 from app.models.cierre_mes import CierreMes  # <-- IMPORTAMOS EL CANDADO
 from app.models.movimiento_stock import MovimientoStock
-from sqlalchemy import extract, func
+from sqlalchemy import extract, func, case
 from sqlalchemy.orm import selectinload
 from datetime import datetime
 
@@ -162,7 +162,16 @@ def crear_visit():
     q = Product.query.filter_by(activo=True)
     if current_user.username != 'root':
         q = q.filter(db.func.lower(Product.nombre) != 'deuda')
-    products = q.order_by(Product.nombre).all()
+    _trim = db.func.trim(Product.nombre)
+    _priority = case(
+        (db.or_(_trim.ilike('pastilla de cloro'), _trim.ilike('pastillas de cloro')), 0),
+        (_trim.ilike('clarificador'), 1),
+        (_trim.ilike('granulado'), 2),
+        (_trim.ilike('granulado lento'), 3),
+        (_trim.ilike('granulado rapido'), 4),
+        else_=5
+    )
+    products = q.order_by(_priority, Product.nombre).all()
     promos = Promo.query.filter_by(activo=True).order_by(Promo.nombre).all()
 
     ultima_visita = Visit.query.filter_by(usuario_id=current_user.id).order_by(Visit.id.desc()).first()
