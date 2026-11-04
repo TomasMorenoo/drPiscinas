@@ -160,14 +160,25 @@ def crear_visit():
             f"{visit.casa.nombre_formateado()} — {fecha_obj.strftime('%d/%m/%Y')}"
         )
         db.session.commit()
+
+        archivos_subidos = [f for f in request.files.getlist('archivos') if f and f.filename]
+        _guardar_media_visita(visit.id, archivos_subidos, current_user.username)
+
         if visit.observaciones:
             from app.push_utils import enviar_push_novedades
+            fotos = [f for f in archivos_subidos if f.content_type and f.content_type.startswith('image/')]
+            videos = [f for f in archivos_subidos if f.content_type and f.content_type.startswith('video/')]
+            sufijo = ""
+            if fotos and videos:
+                sufijo = " [foto · video]"
+            elif fotos:
+                sufijo = " [foto]"
+            elif videos:
+                sufijo = " [video]"
             enviar_push_novedades(
                 f"Nueva novedad: {visit.casa.nombre_formateado()}",
-                visit.observaciones
+                visit.observaciones + sufijo
             )
-
-        _guardar_media_visita(visit.id, request.files.getlist('archivos'), current_user.username)
 
         flash("Visita registrada correctamente", "success")
         return redirect(url_for("visits.listar_visits"))
