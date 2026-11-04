@@ -78,6 +78,17 @@ def listar_visits():
     )
     
     
+@visit_bp.route("/novedades")
+@login_required
+def historial_novedades():
+    visits = Visit.query.filter(
+        Visit.observaciones != None,
+        Visit.observaciones != '',
+        ~Visit.observaciones.in_(['[EXTRA_MANUAL]', '[DEUDA_ANTERIOR]'])
+    ).order_by(Visit.fecha.desc()).all()
+    return render_template("visits/novedades.html", visits=visits)
+
+
 @visit_bp.route("/create", methods=["GET", "POST"])
 @login_required
 def crear_visit():

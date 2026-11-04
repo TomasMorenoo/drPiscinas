@@ -14,7 +14,10 @@
         </span>
         {% endif %}
     </div>
-    <div class="col-md-6 text-md-end mt-3 mt-md-0">
+    <div class="col-md-6 text-md-end mt-3 mt-md-0 d-flex gap-2 justify-content-md-end">
+        <a href="{{ url_for('visits.historial_novedades') }}" class="btn btn-outline-warning shadow-sm fw-bold">
+            <i class="bi bi-bell-fill"></i> Novedades
+        </a>
         <a href="{{ url_for('visits.crear_visit') }}" class="btn btn-success shadow-sm fw-bold">
             <i class="bi bi-plus-lg"></i> Nueva Visita
         </a>
