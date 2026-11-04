@@ -849,11 +849,17 @@ def perfil(id):
         pagado_real = float(getattr(h, 'monto_pagado', 0) or 0)
 
         mes_actual = (h.anio, h.mes)
-        pausada = any(
-            (p.desde.year, p.desde.month) <= mes_actual and
-            ((p.hasta.year, p.hasta.month) >= mes_actual if p.hasta else True)
-            for p in casa.historial_pausas
-        )
+        pausada = False
+        for _p in casa.historial_pausas:
+            _inicio = (_p.desde.year, _p.desde.month)
+            if _p.hasta:
+                _fin = (_p.hasta.year, _p.hasta.month)
+                _cond = _fin >= mes_actual if _p.hasta.day == 1 else _fin > mes_actual
+            else:
+                _cond = True
+            if _inicio <= mes_actual and _cond:
+                pausada = True
+                break
 
         saldo_anterior_iter = saldo_acumulado
         saldo_acumulado += total_mes
@@ -1259,9 +1265,17 @@ def reanudar_casa(id):
         max_dia = calendar.monthrange(hasta_anio, hasta_mes)[1]
         dia = min(hasta_dia, max_dia) if hasta_dia else 1
         hasta = date(hasta_anio, hasta_mes, dia)
+        # día 1 = usuario eligió "primer mes activo" → guardar mes anterior
+        if dia == 1:
+            if hasta_mes == 1:
+                hasta = date(hasta_anio - 1, 12, 1)
+            else:
+                hasta = date(hasta_anio, hasta_mes - 1, 1)
     else:
         hasta = date(hoy.year, hoy.month, hoy.day)
     pausa = Pausa.query.filter_by(casa_id=casa.id, hasta=None).order_by(Pausa.desde.desc()).first()
+    if not pausa:
+        pausa = Pausa.query.filter_by(casa_id=casa.id).order_by(Pausa.desde.desc()).first()
     if pausa:
         pausa.hasta = hasta
     casa.pausado = False
@@ -1346,12 +1360,10 @@ def deshacer_pausa(id):
         if pausa:
             fin = (pausa.hasta.year, pausa.hasta.month) if pausa.hasta else None
             if fin and fin <= (anio_ctx, mes_ctx):
-                # La pausa termina en este mes o antes → eliminarla
                 db.session.delete(pausa)
                 casa.pausado = False
             else:
                 pausa.desde = nuevo_desde
-                # Si el nuevo desde supera el hasta → eliminar
                 if pausa.hasta and pausa.desde > pausa.hasta:
                     db.session.delete(pausa)
                     casa.pausado = False
@@ -1365,6 +1377,103 @@ def deshacer_pausa(id):
         registrar_auditoria(current_user.username, "DESHACER_PAUSA_COMPLETA", f"{casa.nombre_formateado()}")
         flash("Pausa eliminada completamente.", "info")
 
+    # Restaurar abonos en $0 que ya no estén pausados
+    db.session.flush()
+    pausas_post = Pausa.query.filter_by(casa_id=casa.id).all()
+    hists_cero = AbonoHistorico.query.filter_by(
+        casa_id=casa.id, pagado=False
+    ).filter(AbonoHistorico.monto == 0, AbonoHistorico.monto_pagado == 0).all()
+    for h in hists_cero:
+        mes_h = (h.anio, h.mes)
+        sigue_pausado = False
+        for p in pausas_post:
+            inicio = (p.desde.year, p.desde.month)
+            if p.hasta:
+                fin = (p.hasta.year, p.hasta.month)
+                cond_fin = fin >= mes_h if p.hasta.day == 1 else fin > mes_h
+            else:
+                cond_fin = True
+            if inicio <= mes_h and cond_fin:
+                sigue_pausado = True
+                break
+        if not sigue_pausado and casa.activo:
+            h.monto = float(casa.precio_base or 0)
+
     db.session.commit()
     next_url = request.referrer or url_for("casas.perfil", id=id)
     return redirect(next_url)
+
+
+@casa_bp.route("/<int:id>/corregir-hasta-pausa", methods=["POST"])
+@login_required
+@root_required
+def corregir_hasta_pausa(id):
+    from app.models.pausa import Pausa
+    from datetime import date
+    casa = Casa.query.get_or_404(id)
+    hasta_mes = request.form.get("hasta_mes", type=int)
+    hasta_anio = request.form.get("hasta_anio", type=int)
+    hasta_dia = request.form.get("hasta_dia", type=int)
+    if not (hasta_mes and hasta_anio):
+        flash("Fecha inválida.", "danger")
+        return redirect(url_for("casas.perfil", id=id))
+    max_dia = calendar.monthrange(hasta_anio, hasta_mes)[1]
+    dia = min(hasta_dia, max_dia) if hasta_dia else 1
+    nueva_hasta = date(hasta_anio, hasta_mes, dia)
+    if dia == 1:
+        if hasta_mes == 1:
+            nueva_hasta = date(hasta_anio - 1, 12, 1)
+        else:
+            nueva_hasta = date(hasta_anio, hasta_mes - 1, 1)
+    pausa = Pausa.query.filter_by(casa_id=casa.id).order_by(Pausa.desde.desc()).first()
+    if not pausa:
+        flash("No hay pausas para corregir.", "warning")
+        return redirect(url_for("casas.perfil", id=id))
+    anterior = pausa.hasta
+    pausa.hasta = nueva_hasta
+    # Restaurar abonos en $0 que ya no estén pausados
+    pausas_post = Pausa.query.filter_by(casa_id=casa.id).all()
+    hists_cero = AbonoHistorico.query.filter_by(
+        casa_id=casa.id, pagado=False
+    ).filter(AbonoHistorico.monto == 0, AbonoHistorico.monto_pagado == 0).all()
+    for h in hists_cero:
+        mes_h = (h.anio, h.mes)
+        sigue_pausado = False
+        for p in pausas_post:
+            inicio = (p.desde.year, p.desde.month)
+            if p.hasta:
+                fin = (p.hasta.year, p.hasta.month)
+                cond_fin = fin >= mes_h if p.hasta.day == 1 else fin > mes_h
+            else:
+                cond_fin = True
+            if inicio <= mes_h and cond_fin:
+                sigue_pausado = True
+                break
+        if not sigue_pausado and casa.activo:
+            h.monto = float(casa.precio_base or 0)
+    registrar_auditoria(current_user.username, "CORREGIR_HASTA_PAUSA",
+                        f"{casa.nombre_formateado()} — hasta {anterior} → {nueva_hasta}")
+    db.session.commit()
+    flash(f"Reanudación corregida a {nueva_hasta.strftime('%d/%m/%Y')}.", "success")
+    return redirect(url_for("casas.perfil", id=id))
+
+
+@casa_bp.route("/<int:id>/eliminar-ultima-pausa", methods=["POST"])
+@login_required
+@root_required
+def eliminar_ultima_pausa(id):
+    from app.models.pausa import Pausa
+    casa = Casa.query.get_or_404(id)
+    pausa = Pausa.query.filter_by(casa_id=casa.id).order_by(Pausa.desde.desc()).first()
+    if not pausa:
+        flash("No hay pausas para eliminar.", "warning")
+        return redirect(url_for("casas.perfil", id=id))
+    detalle = f"desde {pausa.desde}" + (f" hasta {pausa.hasta}" if pausa.hasta else " (abierta)")
+    db.session.delete(pausa)
+    pausas_restantes = Pausa.query.filter_by(casa_id=casa.id).all()
+    if not pausas_restantes:
+        casa.pausado = False
+    registrar_auditoria(current_user.username, "ELIMINAR_ULTIMA_PAUSA", f"{casa.nombre_formateado()} — {detalle}")
+    db.session.commit()
+    flash(f"Última pausa eliminada ({detalle}).", "success")
+    return redirect(url_for("casas.perfil", id=id))

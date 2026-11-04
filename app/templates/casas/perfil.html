@@ -171,6 +171,19 @@
                             <i class="bi bi-x-circle me-1"></i>Deshacer
                         </button>
                         {% endif %}
+                        {% if current_user.username == 'root' and casa.historial_pausas %}
+                        <form method="POST" action="{{ url_for('casas.eliminar_ultima_pausa', id=casa.id) }}"
+                              onsubmit="return confirm('¿Eliminar la última pausa de esta casa?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash me-1"></i>Borrar última pausa
+                            </button>
+                        </form>
+                        <button type="button" class="btn btn-sm btn-outline-warning"
+                                data-bs-toggle="modal" data-bs-target="#modalCorregirHasta">
+                            <i class="bi bi-pencil-square me-1"></i>Corregir reanudación
+                        </button>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -822,6 +835,45 @@
     </div>
 </div>
 
+<div class="modal fade" id="modalCorregirHasta" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 shadow overflow-hidden">
+            <div class="modal-header border-0 text-white py-4" style="background: linear-gradient(135deg, #fd7e14, #e55300);">
+                <div class="w-100 text-center">
+                    <i class="bi bi-pencil-square fs-1 mb-2 d-block opacity-90"></i>
+                    <h5 class="modal-title fw-bold mb-0">Corregir Reanudación</h5>
+                    <small class="opacity-75">{{ casa.nombre_formateado() }}</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('casas.corregir_hasta_pausa', id=casa.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="hasta_dia" id="corregir_hasta_dia">
+                <input type="hidden" name="hasta_mes" id="corregir_hasta_mes">
+                <input type="hidden" name="hasta_anio" id="corregir_hasta_anio">
+                <div class="modal-body px-4 py-3">
+                    <p class="text-muted small text-center mb-3">Pisá el <strong>hasta</strong> de la última pausa con una nueva fecha.</p>
+                    {% set ultima_pausa = casa.historial_pausas | sort(attribute='desde', reverse=True) | first %}
+                    {% if ultima_pausa %}
+                    <div class="alert alert-secondary py-2 small text-center mb-3">
+                        Última pausa: <strong>{{ ultima_pausa.desde.strftime('%d/%m/%Y') }}</strong>
+                        {% if ultima_pausa.hasta %} → <strong>{{ ultima_pausa.hasta.strftime('%d/%m/%Y') }}</strong>{% else %} → <span class="text-muted">abierta</span>{% endif %}
+                    </div>
+                    {% endif %}
+                    <div id="calendarioCorregir" class="mb-2"></div>
+                    <p class="text-center small text-muted mb-0">Nuevo hasta: <strong id="corregirFechaDisplay">—</strong></p>
+                </div>
+                <div class="modal-footer border-0 px-4 pb-4 pt-0 d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning btn-sm fw-bold flex-fill">
+                        <i class="bi bi-pencil-square me-1"></i>Corregir
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="modalConfirmarEliminarExtra" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content border-danger border-2">
@@ -916,6 +968,30 @@ function confirmarEliminarExtra(url, nombre, mes) {
         locale: 'es',
         onChange: function(selectedDates, dateStr) {
             setFecha(dateStr);
+        }
+    });
+})();
+
+(function() {
+    const hoy = '{{ now.strftime("%Y-%m-%d") }}';
+    const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+    function setFechaCorregir(dateStr) {
+        const parts = dateStr.split('-');
+        document.getElementById('corregir_hasta_anio').value = parts[0];
+        document.getElementById('corregir_hasta_mes').value = parseInt(parts[1]);
+        document.getElementById('corregir_hasta_dia').value = parseInt(parts[2]);
+        const label = parseInt(parts[2]) + ' de ' + meses[parseInt(parts[1])-1] + ' de ' + parts[0];
+        document.getElementById('corregirFechaDisplay').textContent = label;
+    }
+
+    setFechaCorregir(hoy);
+    flatpickr('#calendarioCorregir', {
+        inline: true,
+        defaultDate: hoy,
+        locale: 'es',
+        onChange: function(selectedDates, dateStr) {
+            setFechaCorregir(dateStr);
         }
     });
 })();

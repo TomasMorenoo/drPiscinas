@@ -76,8 +76,12 @@ class Casa(db.Model):
         pausa_en_mes = False
         for p in self.historial_pausas:
             inicio = (p.desde.year, p.desde.month)
-            fin = (p.hasta.year, p.hasta.month) if p.hasta else None
-            if inicio <= mes_actual and (fin is None or fin >= mes_actual):
+            if p.hasta:
+                fin = (p.hasta.year, p.hasta.month)
+                cond_fin = fin >= mes_actual if p.hasta.day == 1 else fin > mes_actual
+            else:
+                cond_fin = True
+            if inicio <= mes_actual and cond_fin:
                 pausa_en_mes = True
                 break
 
@@ -179,8 +183,12 @@ class Casa(db.Model):
         pausa_en_mes = False
         for p in self.historial_pausas:
             inicio = (p.desde.year, p.desde.month)
-            fin = (p.hasta.year, p.hasta.month) if p.hasta else None
-            if inicio <= mes_actual and (fin is None or fin >= mes_actual):
+            if p.hasta:
+                fin = (p.hasta.year, p.hasta.month)
+                cond_fin = fin >= mes_actual if p.hasta.day == 1 else fin > mes_actual
+            else:
+                cond_fin = True
+            if inicio <= mes_actual and cond_fin:
                 pausa_en_mes = True
                 break
 
