@@ -49,11 +49,12 @@ def _buscar_producto_similar(nombre, excluir_id=None):
 def listar_products():
     _trim = db.func.trim(Product.nombre)
     _priority = case(
-        (_trim.ilike('pastilla de cloro'), 0),
+        (db.or_(_trim.ilike('pastilla de cloro'), _trim.ilike('pastillas de cloro')), 0),
         (_trim.ilike('clarificador'), 1),
-        (_trim.ilike('granulado lento'), 2),
-        (_trim.ilike('granulado rapido'), 3),
-        else_=4
+        (_trim.ilike('granulado'), 2),
+        (_trim.ilike('granulado lento'), 3),
+        (_trim.ilike('granulado rapido'), 4),
+        else_=5
     )
     products = Product.query.filter(
         Product.eliminado == False,
