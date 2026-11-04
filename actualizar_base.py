@@ -146,6 +146,9 @@ def migrar_base_de_datos():
         print("Saldo a favor individual por casa...")
         _run("ALTER TABLE casas ADD COLUMN IF NOT EXISTS saldo_a_favor NUMERIC(10,2) DEFAULT 0;")
 
+        print("Novedad vista en visits...")
+        _run("ALTER TABLE visits ADD COLUMN IF NOT EXISTS novedad_vista BOOLEAN NOT NULL DEFAULT FALSE;")
+
         print("Listo.")
 
 if __name__ == "__main__":

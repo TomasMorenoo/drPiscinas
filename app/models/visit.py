@@ -37,6 +37,7 @@ class Visit(db.Model):
     )
 
     observaciones = db.Column(db.String(255))
+    novedad_vista = db.Column(db.Boolean, nullable=False, default=False)
 
     # relaciones
     productos = db.relationship("VisitProduct", backref="visit", lazy=True)
