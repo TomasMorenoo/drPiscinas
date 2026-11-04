@@ -81,12 +81,19 @@ def listar_visits():
 @visit_bp.route("/novedades")
 @login_required
 def historial_novedades():
+    from datetime import date
+    desde_mes = request.args.get('desde_mes', 3, type=int)
+    desde_anio = request.args.get('desde_anio', 2026, type=int)
+    desde_fecha = date(desde_anio, desde_mes, 1)
+
     visits = Visit.query.filter(
         Visit.observaciones != None,
         Visit.observaciones != '',
-        ~Visit.observaciones.in_(['[EXTRA_MANUAL]', '[DEUDA_ANTERIOR]'])
+        ~Visit.observaciones.in_(['[EXTRA_MANUAL]', '[DEUDA_ANTERIOR]']),
+        Visit.fecha >= desde_fecha
     ).order_by(Visit.fecha.desc()).all()
-    return render_template("visits/novedades.html", visits=visits)
+
+    return render_template("visits/novedades.html", visits=visits, desde_mes=desde_mes, desde_anio=desde_anio)
 
 
 @visit_bp.route("/create", methods=["GET", "POST"])

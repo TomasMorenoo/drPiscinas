@@ -9,6 +9,32 @@
     </a>
 </div>
 
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small fw-bold text-muted mb-1">Desde</label>
+                <div class="d-flex gap-2">
+                    <select name="desde_mes" class="form-select form-select-sm" style="width:auto;">
+                        {% set meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'] %}
+                        {% for m in meses %}
+                        <option value="{{ loop.index }}" {% if desde_mes == loop.index %}selected{% endif %}>{{ m }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="desde_anio" class="form-select form-select-sm" style="width:auto;">
+                        {% for y in range(2024, 2028) %}
+                        <option value="{{ y }}" {% if desde_anio == y %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 {% if visits %}
 <div class="card border-0 shadow-sm">
     <div class="card-body p-0">
@@ -45,7 +71,7 @@
 {% else %}
 <div class="text-center text-muted py-5">
     <i class="bi bi-bell-slash fs-1 d-block mb-3"></i>
-    No hay visitas con novedades.
+    No hay novedades en el período seleccionado.
 </div>
 {% endif %}
 {% endblock %}
