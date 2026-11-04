@@ -25,7 +25,11 @@
             </thead>
             <tbody>
                 {% for v in paginacion.items %}
-                <tr>
+                {% set mlist = [] %}
+                {% for m in v.media %}{% if mlist.append({"tipo": m.tipo, "url": url_for("static", filename="uploads/visits/" ~ v.id ~ "/" ~ m.filename)}) %}{% endif %}{% endfor %}
+                <tr style="cursor:pointer;"
+                    onclick="abrirNovedad(this)"
+                    data-visit='{{ {"casa": v.casa.nombre_formateado(), "fecha": v.fecha.strftime("%d/%m/%Y"), "usuario": (v.usuario.username if v.usuario else ""), "obs": (v.observaciones or ""), "vista": v.novedad_vista, "media": mlist} | tojson }}'>
                     <td class="ps-4 text-muted small">{{ v.fecha.strftime('%d/%m/%Y') }}</td>
                     <td class="fw-bold">{{ v.casa.nombre_formateado() }}</td>
                     <td>{{ v.observaciones }}</td>
@@ -79,4 +83,79 @@
     No hay novedades registradas.
 </div>
 {% endif %}
+
+<!-- Modal Novedad -->
+<div class="modal fade" id="modalNovedad" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-dark text-white py-3">
+                <div>
+                    <h5 class="modal-title fw-bold mb-0" id="novModal-casa"></h5>
+                    <small id="novModal-meta" class="opacity-75"></small>
+                </div>
+                <button type="button" class="btn-close btn-close-white ms-3" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="novModal-obs" class="mb-3"></div>
+                <div id="novModal-media" class="row g-2"></div>
+            </div>
+            <div class="modal-footer py-2">
+                <span id="novModal-estado" class="me-auto"></span>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Visor media -->
+<div class="modal fade" id="modalVisorNov" tabindex="-1" style="z-index:1070;">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content bg-dark border-0">
+            <div class="modal-header border-0 pb-0">
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-2" id="visorNovContenido"></div>
+        </div>
+    </div>
+</div>
+<script>
+function abrirNovedad(el) {
+    var d = JSON.parse(el.dataset.visit);
+    document.getElementById('novModal-casa').textContent = d.casa;
+    document.getElementById('novModal-meta').textContent = d.fecha + (d.usuario ? ' · por ' + d.usuario : '');
+    var obsEl = document.getElementById('novModal-obs');
+    if (d.obs) {
+        obsEl.innerHTML = '<p class="p-3 bg-light rounded border fst-italic text-dark mb-0">\u201c' + d.obs + '\u201d</p>';
+    } else {
+        obsEl.innerHTML = '<p class="text-muted fst-italic mb-0">Sin observaciones.</p>';
+    }
+    var mediaEl = document.getElementById('novModal-media');
+    mediaEl.innerHTML = '';
+    if (d.media && d.media.length) {
+        d.media.forEach(function(m) {
+            var col = document.createElement('div');
+            col.className = 'col-6 col-md-4';
+            if (m.tipo === 'foto') {
+                col.innerHTML = '<img src="' + m.url + '" class="img-fluid rounded" style="width:100%;height:150px;object-fit:cover;cursor:pointer;" onclick="abrirVisorNov(\'' + m.url + '\',\'foto\')">';
+            } else {
+                col.innerHTML = '<video class="w-100 rounded" style="height:150px;object-fit:cover;cursor:pointer;" onclick="abrirVisorNov(\'' + m.url + '\',\'video\')"><source src="' + m.url + '"></video>';
+            }
+            mediaEl.appendChild(col);
+        });
+    }
+    var estadoEl = document.getElementById('novModal-estado');
+    estadoEl.innerHTML = d.vista
+        ? '<span class="badge bg-success">Vista</span>'
+        : '<span class="badge bg-warning text-dark">Pendiente</span>';
+    new bootstrap.Modal(document.getElementById('modalNovedad')).show();
+}
+function abrirVisorNov(src, tipo) {
+    var contenido = document.getElementById('visorNovContenido');
+    if (tipo === 'foto') {
+        contenido.innerHTML = '<img src="' + src + '" class="img-fluid rounded">';
+    } else {
+        contenido.innerHTML = '<video controls autoplay class="w-100 rounded" style="max-height:70vh;"><source src="' + src + '"></video>';
+    }
+    new bootstrap.Modal(document.getElementById('modalVisorNov')).show();
+}
+</script>
 {% endblock %}
