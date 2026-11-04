@@ -1,6 +1,5 @@
 import json
 import os
-import base64
 
 def enviar_push_novedades(titulo, cuerpo):
     try:
@@ -10,21 +9,16 @@ def enviar_push_novedades(titulo, cuerpo):
         from app import db
 
         vapid_private_key = os.environ.get('VAPID_PRIVATE_KEY', '')
-        vapid_public_key = os.environ.get('VAPID_PUBLIC_KEY', '')
         vapid_email = os.environ.get('VAPID_EMAIL', 'admin@example.com')
 
         if not vapid_private_key:
             return
-
-        private_key_bytes = base64.urlsafe_b64decode(vapid_private_key + '==')
-        private_key_pem = private_key_bytes.decode('utf-8')
 
         admin_ids = [u.id for u in User.query.filter(
             db.or_(User.rol.in_(['admin', 'demo']), User.username == 'root')
         ).all()]
 
         subs = PushSubscription.query.filter(PushSubscription.user_id.in_(admin_ids)).all()
-
         payload = json.dumps({'title': titulo, 'body': cuerpo})
         stale = []
 
@@ -36,7 +30,7 @@ def enviar_push_novedades(titulo, cuerpo):
                         'keys': {'p256dh': sub.p256dh, 'auth': sub.auth}
                     },
                     data=payload,
-                    vapid_private_key=private_key_pem,
+                    vapid_private_key=vapid_private_key,
                     vapid_claims={'sub': f'mailto:{vapid_email}'}
                 )
             except WebPushException as e:
