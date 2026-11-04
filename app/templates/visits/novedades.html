@@ -18,6 +18,7 @@
                     <th class="ps-4">Fecha</th>
                     <th>Casa</th>
                     <th>Observación</th>
+                    <th class="text-center">Media</th>
                     <th class="text-center">Estado</th>
                     <th class="text-center pe-4">Cargó</th>
                 </tr>
@@ -28,6 +29,13 @@
                     <td class="ps-4 text-muted small">{{ v.fecha.strftime('%d/%m/%Y') }}</td>
                     <td class="fw-bold">{{ v.casa.nombre_formateado() }}</td>
                     <td>{{ v.observaciones }}</td>
+                    <td class="text-center">
+                        {% set fotos = v.media | selectattr('tipo', 'eq', 'foto') | list %}
+                        {% set videos = v.media | selectattr('tipo', 'eq', 'video') | list %}
+                        {% if fotos %}<i class="bi bi-image text-primary me-1" title="{{ fotos|length }} foto(s)"></i>{% endif %}
+                        {% if videos %}<i class="bi bi-camera-video text-danger" title="{{ videos|length }} video(s)"></i>{% endif %}
+                        {% if not v.media %}—{% endif %}
+                    </td>
                     <td class="text-center">
                         {% if v.novedad_vista %}
                         <span class="badge bg-success">Vista</span>

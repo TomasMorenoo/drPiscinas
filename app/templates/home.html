@@ -63,6 +63,14 @@
                                 {% endif %}
                             </div>
                             <p class="mb-0 text-secondary">{{ v.observaciones }}</p>
+                            {% if v.media %}
+                            <div class="mt-1">
+                                {% set fotos = v.media | selectattr('tipo', 'eq', 'foto') | list %}
+                                {% set videos = v.media | selectattr('tipo', 'eq', 'video') | list %}
+                                {% if fotos %}<span class="text-primary small me-2"><i class="bi bi-image me-1"></i>{{ fotos|length }} foto{% if fotos|length > 1 %}s{% endif %}</span>{% endif %}
+                                {% if videos %}<span class="text-danger small"><i class="bi bi-camera-video me-1"></i>{{ videos|length }} video{% if videos|length > 1 %}s{% endif %}</span>{% endif %}
+                            </div>
+                            {% endif %}
                         </div>
                         <form method="POST" action="{{ url_for('main.marcar_novedad_vista', visit_id=v.id) }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
