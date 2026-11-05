@@ -2,7 +2,7 @@
 {% block title %}Gestión de Grupos - Dr. Piscinas{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-none d-md-flex justify-content-between align-items-center mb-4">
     <h1 class="h3 mb-0 text-gray-800 fw-bold"><i class="bi bi-collection-fill me-2 text-success"></i>Grupos de Clientes</h1>
     <a href="{{ url_for('grupos.crear_grupo') }}" class="btn btn-success fw-bold shadow-sm">
         <i class="bi bi-plus-lg me-1"></i> Crear Grupo
@@ -51,43 +51,67 @@
     </div>
 </div>
 
-{# MOBILE: cards #}
-<div class="d-md-none">
-    {% for grupo in grupos %}
-    <div class="card border-0 shadow-sm mb-3" style="border-left: 4px solid #198754 !important;">
-        <div class="card-body py-3 px-3">
-            <div class="d-flex align-items-start justify-content-between mb-2">
-                <div>
-                    <div class="fw-bold fs-5 lh-sm">
-                        <a href="{{ url_for('grupos.perfil', id=grupo.id) }}" class="text-dark text-decoration-none">{{ grupo.nombre_display }}</a>
-                    </div>
-                    <div class="text-muted small mt-1">
-                        <i class="bi bi-whatsapp me-1 {% if grupo.nombre_identificador %}text-success{% endif %}"></i>
-                        {% if grupo.nombre_identificador %}
-                            {{ grupo.nombre }}
-                        {% else %}
-                            <span class="fst-italic">(igual al anterior)</span>
-                        {% endif %}
-                    </div>
-                </div>
-                <span class="badge bg-secondary ms-2 mt-1">{{ grupo.casas|length }} casas</span>
-            </div>
-            <div class="d-flex gap-2">
-                <a href="{{ url_for('grupos.editar_grupo', id=grupo.id) }}" class="btn btn-primary btn-sm fw-bold flex-grow-1">
-                    <i class="bi bi-pencil-square me-1"></i>Administrar
-                </a>
-                <form action="{{ url_for('grupos.eliminar_grupo', id=grupo.id) }}" method="POST" onsubmit="return confirm('¿Seguro que querés desarmar este grupo? Las casas volverán a ser sueltas.');">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <button type="submit" class="btn btn-outline-danger btn-sm fw-bold">
-                        <i class="bi bi-trash-fill"></i>
-                    </button>
-                </form>
-            </div>
+{# MOBILE: cards con header oscuro #}
+<div class="d-md-none" style="margin: -1rem -12px 0;">
+
+    {# Header oscuro #}
+    <div style="background:linear-gradient(135deg,#0d1a2e,#1a2f4e);padding:16px 16px 20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:1rem;font-weight:700;color:#fff;">
+                <i class="bi bi-collection-fill me-2"></i>Grupos
+            </span>
+            <a href="{{ url_for('grupos.crear_grupo') }}"
+               style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:9px;padding:6px 14px;font-size:0.8rem;font-weight:700;color:#fff;text-decoration:none;">
+                <i class="bi bi-plus-lg me-1"></i>Crear
+            </a>
+        </div>
+        <div style="margin-top:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:6px 12px;display:flex;align-items:center;gap:8px;">
+            <i class="bi bi-search" style="color:rgba(255,255,255,0.3);"></i>
+            <span style="font-size:0.82rem;color:rgba(255,255,255,0.3);">{{ grupos|length }} grupo{{ 's' if grupos|length != 1 else '' }}</span>
         </div>
     </div>
-    {% else %}
-    <p class="text-center text-muted py-4">No hay grupos creados todavía.</p>
-    {% endfor %}
+
+    {# Cards #}
+    <div style="background:#f1f5f9;padding:12px;">
+        {% for grupo in grupos %}
+        <div style="background:#fff;border-radius:12px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);border-left:4px solid #198754;">
+            <div style="padding:12px 14px;">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">
+                    <div>
+                        <div style="font-size:1rem;font-weight:700;line-height:1.2;">
+                            <a href="{{ url_for('grupos.perfil', id=grupo.id) }}" style="color:#1e293b;text-decoration:none;">{{ grupo.nombre_display }}</a>
+                        </div>
+                        <div style="font-size:0.78rem;color:#64748b;margin-top:3px;">
+                            <i class="bi bi-whatsapp me-1 {% if grupo.nombre_identificador %}text-success{% endif %}"></i>
+                            {% if grupo.nombre_identificador %}
+                                {{ grupo.nombre }}
+                            {% else %}
+                                <span class="fst-italic">igual al anterior</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <span style="background:#e2e8f0;color:#475569;border-radius:20px;padding:3px 10px;font-size:0.72rem;font-weight:600;white-space:nowrap;margin-left:8px;margin-top:2px;">{{ grupo.casas|length }} casas</span>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <a href="{{ url_for('grupos.editar_grupo', id=grupo.id) }}"
+                       style="flex:1;background:#0d1a2e;color:#fff;border-radius:9px;padding:8px;font-size:0.8rem;font-weight:700;text-align:center;text-decoration:none;">
+                        <i class="bi bi-pencil-square me-1"></i>Administrar
+                    </a>
+                    <form action="{{ url_for('grupos.eliminar_grupo', id=grupo.id) }}" method="POST" onsubmit="return confirm('¿Seguro que querés desarmar este grupo? Las casas volverán a ser sueltas.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit"
+                                style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:9px;padding:8px 14px;font-size:0.8rem;font-weight:700;color:#ef4444;cursor:pointer;">
+                            <i class="bi bi-trash-fill"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <p style="text-align:center;color:#94a3b8;padding:2rem 0;">No hay grupos creados todavía.</p>
+        {% endfor %}
+    </div>
+
 </div>
 
 {% endblock %}
