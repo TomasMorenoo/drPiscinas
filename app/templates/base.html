@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     
     <style>
+        html, body { overflow-x: hidden; max-width: 100%; }
         a, a:hover, a:focus, a:active,
         .btn-link, .btn-link:hover, .btn-link:focus, .btn-link:active {
             text-decoration: none !important;
@@ -86,14 +87,103 @@
             border-radius: 3px; /* Botones más cuadrados */
             font-weight: 500;
         }
+
+        /* ── Bottom tab bar (mobile) ─────────────────────────────────── */
+        @media (max-width: 991px) {
+            .navbar-collapse { display: none !important; }
+            .navbar-toggler  { display: none !important; }
+            .navbar-nav, .navbar-nav li { display: none !important; }
+            .navbar { margin-bottom: 0 !important; }
+            .container.py-4 { padding-top: 0 !important; }
+
+            body { padding-bottom: 60px; }
+
+            .bottom-tab-bar {
+                display: flex;
+                position: fixed;
+                bottom: 0; left: 0; right: 0;
+                height: 58px;
+                background: #212529;
+                border-top: 1px solid #343a40;
+                z-index: 1050;
+                align-items: stretch;
+            }
+
+            .tab-item {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 2px;
+                color: #6c757d;
+                font-size: 10px;
+                font-weight: 500;
+                text-decoration: none;
+                cursor: pointer;
+                border: none;
+                background: none;
+                padding: 0;
+                transition: color 0.15s;
+                -webkit-tap-highlight-color: transparent;
+            }
+            .tab-item i { font-size: 20px; line-height: 1; }
+            .tab-item.active { color: #60a5fa; }
+            .tab-item:hover  { color: #adb5bd; }
+
+            /* Drawer "Más" */
+            .mas-drawer {
+                display: none;
+                position: fixed;
+                bottom: 58px; left: 0; right: 0;
+                background: #1a1d20;
+                border-top: 1px solid #343a40;
+                z-index: 1049;
+                padding: 8px 0;
+                box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+            }
+            .mas-drawer.open { display: block; }
+            .mas-drawer a {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 12px 20px;
+                color: #adb5bd;
+                font-size: 0.9rem;
+                font-weight: 500;
+                border-bottom: 1px solid #232629;
+            }
+            .mas-drawer a:last-child { border-bottom: none; }
+            .mas-drawer a:hover { background: rgba(255,255,255,0.05); color: #fff; }
+            .mas-drawer a i { font-size: 1.1rem; width: 20px; text-align: center; }
+            .mas-drawer .drawer-user {
+                padding: 10px 20px 6px;
+                font-size: 0.75rem;
+                color: #495057;
+                letter-spacing: 0.5px;
+                text-transform: uppercase;
+            }
+
+            .mas-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                z-index: 1048;
+            }
+            .mas-overlay.open { display: block; }
+        }
+
+        @media (min-width: 992px) {
+            .bottom-tab-bar, .mas-drawer, .mas-overlay { display: none !important; }
+        }
     </style>
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-dark mb-4" {% if request and ('localhost' in request.host or '127.0.0.1' in request.host) and not (current_user.is_authenticated and current_user.rol == 'demo') %}style="background-color: #ff8c00 !important;"{% endif %}>
+<nav class="navbar navbar-expand-lg navbar-dark mb-4">
     <div class="container">
         <a class="navbar-brand" href="{{ url_for('main.home') }}">
-            <i class="bi bi-droplet-fill text-info"></i> DR. PISCINAS
+            <img src="{{ url_for('static', filename='DRPiscinas2.png') }}" alt="DR. PISCINAS" style="height:30px;width:auto;object-fit:contain;margin-left:-5px;">
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
             <span class="navbar-toggler-icon"></span>
@@ -182,6 +272,7 @@
 </nav>
 
 <div class="main-content">
+{% block subnav %}{% endblock %}
 <div class="container py-4">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -216,6 +307,60 @@
     </div>
 </footer>
 
+{% if current_user.is_authenticated %}
+{# ── Overlay para cerrar el drawer ── #}
+<div class="mas-overlay" id="mas-overlay" onclick="closeMas()"></div>
+
+{# ── Drawer "Más" ── #}
+<div class="mas-drawer" id="mas-drawer">
+    <div class="drawer-user"><i class="bi bi-person-circle me-1"></i>{{ current_user.username }}</div>
+
+    {% if current_user.is_admin() %}
+    <a href="{{ url_for('estadisticas.index') }}"><i class="bi bi-bar-chart"></i> Estadísticas</a>
+    <a href="{{ url_for('stock.index') }}"><i class="bi bi-boxes"></i> Stock</a>
+    <a href="{{ url_for('users.listar_usuarios') }}"><i class="bi bi-person-badge-fill"></i> Empleados</a>
+    <a href="{{ url_for('config.listar_plantillas') }}"><i class="bi bi-gear"></i> Configuración</a>
+    {% endif %}
+
+    {% if current_user.username == 'root' %}
+    <a href="{{ url_for('root.panel') }}"><i class="bi bi-shield-lock-fill text-danger"></i> Panel Root</a>
+    {% endif %}
+
+    {% if current_user.is_admin() %}
+    <a href="{{ url_for('dashboard.auditoria') }}"><i class="bi bi-shield-check"></i> Auditoría</a>
+    {% endif %}
+
+    <a href="{{ url_for('auth.logout') }}" style="color:#ef4444"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</a>
+</div>
+
+{# ── Bottom tab bar ── #}
+<nav class="bottom-tab-bar">
+    <a class="tab-item {% if request.endpoint and request.endpoint.startswith('visits.') %}active{% endif %}"
+       href="{{ url_for('visits.listar_visits') }}">
+        <i class="bi bi-calendar-check"></i>
+        <span>Visitas</span>
+    </a>
+
+    {% if current_user.is_admin() %}
+    <a class="tab-item {% if request.endpoint and request.endpoint.startswith('casas.') %}active{% endif %}"
+       href="{{ url_for('casas.listar_casas') }}">
+        <i class="bi bi-house-door"></i>
+        <span>Clientes</span>
+    </a>
+    <a class="tab-item {% if request.endpoint and request.endpoint.startswith('dashboard.') %}active{% endif %}"
+       href="{{ url_for('dashboard.index') }}">
+        <i class="bi bi-speedometer2"></i>
+        <span>Panel</span>
+    </a>
+    {% endif %}
+
+    <button class="tab-item" id="btn-mas" onclick="toggleMas()">
+        <i class="bi bi-grid-3x3-gap"></i>
+        <span>Más</span>
+    </button>
+</nav>
+{% endif %}
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 {% if current_user.is_authenticated and current_user.rol == 'demo' %}
@@ -235,6 +380,19 @@ document.addEventListener('DOMContentLoaded', function() {
 {% endif %}
 
 <script>
+    function toggleMas() {
+        var drawer  = document.getElementById('mas-drawer');
+        var overlay = document.getElementById('mas-overlay');
+        var open = drawer.classList.toggle('open');
+        overlay.classList.toggle('open', open);
+        document.getElementById('btn-mas').classList.toggle('active', open);
+    }
+    function closeMas() {
+        document.getElementById('mas-drawer').classList.remove('open');
+        document.getElementById('mas-overlay').classList.remove('open');
+        document.getElementById('btn-mas').classList.remove('active');
+    }
+
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
             navigator.serviceWorker.register('/sw.js').then(function(registration) {
