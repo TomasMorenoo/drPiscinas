@@ -61,13 +61,25 @@
             <div style="font-size:0.65rem;color:#3b82f6;text-transform:uppercase;letter-spacing:0.5px;">Extras</div>
         </div>
         {% endif %}
-        <div class="flex-fill text-center rounded-3 py-2 px-1" style="background:#fff;border:1px solid #dee2e6;">
-            <div class="fw-bold" style="font-size:1.1rem;color:#374151;">
-                {% if visitas_por_dia %}{{ visitas_por_dia[-1][1] }}{% else %}0{% endif %}
+    </div>
+
+    {# Visitas por día — carrusel mobile #}
+    {% if visitas_por_dia %}
+    <div class="rounded-3 mb-2" style="background:linear-gradient(135deg,#0d6efd 0%,#6610f2 100%);">
+        <div class="d-flex align-items-center justify-content-between px-3 py-2">
+            <button onclick="cambiarDia(-1)" id="btn-prev" class="btn border-0 p-0 text-white opacity-75" style="font-size:1.3rem;background:none;"><i class="bi bi-chevron-left"></i></button>
+            <div class="text-center text-white flex-grow-1">
+                <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:1px;opacity:0.6;margin-bottom:2px;">Visitas por Día</div>
+                <div class="d-flex align-items-center justify-content-center fw-bold" style="font-size:1.2rem;gap:8px;">
+                    <span id="vpd-fecha" style="color:rgba(255,255,255,0.95);">—</span>
+                    <span style="color:rgba(255,255,255,0.3);">|</span>
+                    <span id="vpd-cnt" style="color:rgba(255,255,255,0.7);font-size:1rem;">—</span>
+                </div>
             </div>
-            <div style="font-size:0.65rem;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;">Hoy</div>
+            <button onclick="cambiarDia(1)" id="btn-next" class="btn border-0 p-0 text-white opacity-75" style="font-size:1.3rem;background:none;"><i class="bi bi-chevron-right"></i></button>
         </div>
     </div>
+    {% endif %}
 
     {% if top_productos %}
     <div class="rounded-3 p-2" style="background:#f8f9fa;border:1px solid #dee2e6;">
@@ -156,7 +168,7 @@
         <div class="card border-0 shadow-sm h-100" style="background:linear-gradient(135deg,#0d6efd 0%,#6610f2 100%);">
             <div class="card-body d-flex align-items-center justify-content-between px-4 py-3">
                 {% if visitas_por_dia %}
-                <button onclick="cambiarDia(-1)" id="btn-prev"
+                <button onclick="cambiarDia(-1)" id="btn-prev-lg"
                         class="btn border-0 p-0 text-white opacity-75"
                         style="font-size:1.4rem;line-height:1;background:none;">
                     <i class="bi bi-chevron-left"></i>
@@ -164,13 +176,12 @@
                 <div class="text-center text-white flex-grow-1">
                     <h6 class="fw-bold small text-uppercase opacity-75 mb-1" style="position:relative;top:-8px;"><i class="bi bi-calendar-day me-1"></i>Visitas por Día</h6>
                     <div class="d-flex align-items-center fw-bold" style="font-size:1.4rem;line-height:1;">
-                        <span id="vpd-fecha" class="text-end" style="flex:1;color:rgba(255,255,255,0.95);">—</span>
+                        <span id="vpd-fecha-lg" class="text-end" style="flex:1;color:rgba(255,255,255,0.95);">—</span>
                         <span class="text-center" style="flex:0 0 2rem;color:rgba(255,255,255,0.35);font-weight:300;">|</span>
-                        <span id="vpd-cnt" class="text-start" style="flex:1;color:rgba(255,255,255,0.7);font-size:1.1rem;">—</span>
+                        <span id="vpd-cnt-lg" class="text-start" style="flex:1;color:rgba(255,255,255,0.7);font-size:1.1rem;">—</span>
                     </div>
-
                 </div>
-                <button onclick="cambiarDia(1)" id="btn-next"
+                <button onclick="cambiarDia(1)" id="btn-next-lg"
                         class="btn border-0 p-0 text-white opacity-75"
                         style="font-size:1.4rem;line-height:1;background:none;">
                     <i class="bi bi-chevron-right"></i>
@@ -284,10 +295,18 @@
         function renderDia() {
             const { dia, cnt } = vpd[idx];
             const meses = {{ MESES_LARGO | tojson }};
-            document.getElementById('vpd-fecha').textContent = dia.toString().padStart(2,'0') + ' de ' + meses[{{ mes_sel }} - 1];
-            document.getElementById('vpd-cnt').textContent = cnt + (cnt === 1 ? ' visita' : ' visitas');
-            document.getElementById('btn-prev').disabled = idx === 0;
-            document.getElementById('btn-next').disabled = idx === vpd.length - 1;
+            const fechaTxt = dia.toString().padStart(2,'0') + ' de ' + meses[{{ mes_sel }} - 1];
+            const cntTxt = cnt + (cnt === 1 ? ' visita' : ' visitas');
+            ['', '-lg'].forEach(function(sfx) {
+                var f = document.getElementById('vpd-fecha' + sfx);
+                var c = document.getElementById('vpd-cnt' + sfx);
+                var p = document.getElementById('btn-prev' + sfx);
+                var n = document.getElementById('btn-next' + sfx);
+                if (f) f.textContent = fechaTxt;
+                if (c) c.textContent = cntTxt;
+                if (p) p.disabled = idx === 0;
+                if (n) n.disabled = idx === vpd.length - 1;
+            });
         }
         renderDia();
 
