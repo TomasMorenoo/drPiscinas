@@ -112,94 +112,51 @@
 }
 
 /* ============================================================
-   TABLA DE PROPIEDADES INDIVIDUALES — versión mobile con cards
+   TABLA DE PROPIEDADES INDIVIDUALES — scroll horizontal en todos los tamaños
    ============================================================ */
 
-/* En mobile mostramos filas como "mini-cards" */
+/* Siempre ocultar celdas legacy mobile-only */
+.td-montos-grid-cell { display: none !important; }
+.acciones-mobile-inline { display: none !important; }
+
+/* Ancho completo en mobile — las cards rompen el padding del container */
 @media (max-width: 767px) {
-    .tabla-sueltas thead,
-    .tabla-grupos-inner thead {
-        display: none;
+    /* Card de propiedades individuales */
+    #collapseSueltas .card {
+        margin-left: -1rem;
+        margin-right: -1rem;
+        border-radius: 0 !important;
     }
 
-    .tabla-sueltas tbody tr,
-    .tabla-grupos-inner tbody tr {
-        display: block;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        margin-bottom: 0.6rem;
-        padding: 0.5rem 0.75rem;
-        background: #fff;
-        box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    /* Cards de grupos */
+    #collapseGruposMain .card {
+        margin-left: -1rem;
+        margin-right: -1rem;
+        border-radius: 0 !important;
     }
 
-    .tabla-sueltas tbody tr td,
-    .tabla-grupos-inner tbody tr td {
-        display: block;
-        border: none;
-        padding: 0 !important;
-        max-width: 100% !important;
-        text-align: left !important;
+    /* Header de grupos scrolleable */
+    .grupo-card-header-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
-
-    /* Fila nombre */
-    .td-nombre {
-        font-weight: 700;
-        font-size: 0.95rem;
-        padding-bottom: 0.4rem !important;
-        border-bottom: 1px solid #f0f0f0 !important;
-        margin-bottom: 0.4rem !important;
-    }
-
-    /* Grid de montos en mobile */
-    .td-montos-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 0.25rem;
-        padding: 0.3rem 0 !important;
-    }
-    .td-montos-grid .monto-item {
-        display: flex;
-        flex-direction: column;
-    }
-    .td-montos-grid .monto-item .monto-label {
-        font-size: 0.6rem;
-        text-transform: uppercase;
-        font-weight: 700;
-        color: #adb5bd;
-        letter-spacing: .03em;
-    }
-    .td-montos-grid .monto-item .monto-valor {
-        font-size: 0.8rem;
-        font-weight: 600;
-        font-family: monospace;
-        color: #495057;
-    }
-
-    /* Fila total + acciones */
-    .td-total-acciones {
-        display: flex !important;
+    .grupo-header-mobile {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
         align-items: center;
-        justify-content: space-between;
-        padding-top: 0.4rem !important;
-        border-top: 1px solid #f0f0f0 !important;
-        margin-top: 0.35rem !important;
+        min-width: max-content;
+        gap: 1rem;
     }
-    .td-total-acciones .total-valor {
-        font-size: 1.15rem;
-        font-weight: 800;
-        color: #212529;
-        font-family: monospace;
+    .grupo-header-mobile > div:first-child {
+        margin-bottom: 0 !important;
+        flex-shrink: 0;
     }
-    .td-total-acciones .badge-baja {
-        font-size: 0.6rem;
+    .grupo-montos-row {
+        flex-wrap: nowrap !important;
     }
-}
-
-/* En desktop ocultamos la celda de montos-grid que sólo existe en mobile */
-@media (min-width: 768px) {
-    .td-montos-grid-cell { display: none !important; }
-    .td-total-acciones .acciones-mobile-inline { display: none !important; }
+    .grupo-acciones-btn-row {
+        flex-shrink: 0;
+    }
 }
 
 /* ============================================================
@@ -300,32 +257,6 @@
     padding: 3rem 1rem;
 }
 
-/* Tabla desktop — sin cambios al comportamiento original */
-@media (min-width: 768px) {
-    .tabla-sueltas tbody tr,
-    .tabla-grupos-inner tbody tr {
-        display: table-row;
-    }
-    .tabla-sueltas tbody tr td,
-    .tabla-grupos-inner tbody tr td {
-        display: table-cell;
-        vertical-align: middle;
-    }
-    .td-nombre { border-bottom: none !important; padding-bottom: 0 !important; margin-bottom: 0 !important; }
-    .td-total-acciones { 
-        display: table-cell !important; 
-        border-top: none !important; 
-        padding-top: 0 !important; 
-        margin-top: 0 !important; 
-    }
-    .td-total-acciones .total-valor { font-size: 1rem; }
-}
-
-/* Grupo card inner table — en mobile sin bordes extras */
-@media (max-width: 767px) {
-    .tabla-grupos-inner { margin: 0 !important; }
-    .card-body.p-0 { padding: 0.5rem !important; }
-}
 
 /* Botón cerrar mes — texto corto en mobile */
 .btn-cerrar-mes-texto { display: none; }
@@ -688,7 +619,7 @@
 
     <div class="collapse show" id="collapseSueltas">
         <div class="card border-0 shadow-sm mb-4">
-            <div class="table-responsive">
+            <div class="table-responsive tabla-sueltas-wrap">
                 <table class="table table-striped table-hover align-middle mb-0 buscar-tabla tabla-sueltas">
 
                     {# THEAD — solo visible en desktop #}
@@ -725,17 +656,17 @@
                             </td>
 
                             {# 2. ABONO #}
-                            <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">
+                            <td class="text-end font-monospace text-muted">
                                 ${{ item.abono | pesos }}
                             </td>
 
                             {# 3. PRODUCTOS #}
-                            <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">
+                            <td class="text-end font-monospace text-muted">
                                 ${{ item.extras | pesos }}
                             </td>
 
                             {# 4. DEBE #}
-                            <td class="text-end pe-3 text-nowrap d-none d-md-table-cell d-print-table-cell">
+                            <td class="text-end pe-3 text-nowrap">
                                 {% if item.saldo_anterior < -0.1 %}
                                     <span class="text-success fw-bold font-monospace">-${{ item.saldo_anterior | abs | pesos }}</span>
                                 {% elif item.saldo_anterior > 0.1 %}
@@ -888,7 +819,7 @@
                             </td>
 
                             {# 6. ACCIONES DESKTOP #}
-                            <td data-estado-clave="casa-{{ item.id_historial }}" class="p-1 align-middle d-none d-md-table-cell d-print-none" style="width: 140px;">
+                            <td data-estado-clave="casa-{{ item.id_historial }}" class="p-1 align-middle d-print-none" style="width: 140px;">
                                 {% if item.pausado %}
                                     <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
                                             class="btn btn-secondary btn-sm w-100 d-flex flex-column justify-content-center align-items-center shadow-sm fw-bold"
@@ -1043,7 +974,7 @@
         <div class="card border-0 shadow-sm border-start border-4 border-primary mb-3 fila-busqueda" data-estado="{{ estado_clase_g }}" data-pago-parcial="{{ 'true' if g.monto_pagado > 0 and not g.pagado else 'false' }}">
 
             {# CARD HEADER DEL GRUPO #}
-            <div class="card-header bg-white py-3">
+            <div class="card-header bg-white py-3 grupo-card-header-scroll">
                 <div class="grupo-header-mobile">
 
                     {# Nombre + badge + colapsar #}
@@ -1170,7 +1101,7 @@
 
             {# TABLA INTERNA DEL GRUPO #}
             <div class="collapse show" id="collapseGrupo{{ g.grupo_id }}">
-                <div class="card-body p-0 table-responsive">
+                <div class="card-body p-0 table-responsive tabla-grupos-wrap">
                     <table class="table table-hover align-middle mb-0 buscar-tabla tabla-grupos-inner">
 
                         <thead class="table-light">
@@ -1202,13 +1133,13 @@
                                 </td>
 
                                 {# Montos desktop #}
-                                <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">
+                                <td class="text-end font-monospace text-muted">
                                     ${{ item.abono | pesos }}
                                 </td>
-                                <td class="text-end font-monospace text-muted d-none d-md-table-cell d-print-table-cell">
+                                <td class="text-end font-monospace text-muted">
                                     ${{ item.extras | pesos }}
                                 </td>
-                                <td class="text-end font-monospace d-none d-md-table-cell d-print-table-cell">
+                                <td class="text-end font-monospace">
                                     {% if item.saldo_anterior < -0.1 %}
                                         <span class="text-success fw-bold">-${{ item.saldo_anterior | abs | pesos }}</span>
                                     {% elif item.saldo_anterior > 0.1 %}
@@ -1345,7 +1276,7 @@
                                 </td>
 
                                 {# Estado desktop #}
-                                <td data-estado-clave="casa-{{ item.id_historial }}" class="p-1 align-middle text-center pe-3 d-none d-md-table-cell d-print-none" style="width: 140px;">
+                                <td data-estado-clave="casa-{{ item.id_historial }}" class="p-1 align-middle text-center pe-3 d-print-none" style="width: 140px;">
                                     {% if item.pausado %}
                                         <button onclick="abrirModalDeshacerPausa({{ item.casa.id }}, '{{ item.casa.nombre_formateado() }}', {{ mes }}, {{ anio }})"
                                                 class="btn btn-secondary btn-sm w-100 shadow-sm"
