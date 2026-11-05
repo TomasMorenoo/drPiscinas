@@ -2,9 +2,9 @@
 {% block title %}Gestión de Grupos - Dr. Piscinas{% endblock %}
 
 {% block navbar_center %}
-<span class="d-md-none text-white fw-bold" style="font-size:0.85rem;opacity:0.75;">
-    {{ grupos|length }} grupo{{ 's' if grupos|length != 1 else '' }}
-</span>
+<a href="{{ url_for('main.home') }}" class="d-md-none text-white text-decoration-none fw-bold" style="font-size:0.82rem;opacity:0.75;">
+    <i class="bi bi-arrow-left me-1"></i>Volver
+</a>
 {% endblock %}
 
 {% block content %}
@@ -69,6 +69,9 @@
 
     {# Cards #}
     <div style="background:#f1f5f9;padding:16px 12px 88px;">
+        <div style="text-align:center;font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:#94a3b8;margin-bottom:14px;">
+            &mdash;&mdash; {{ grupos|length }} Grupo{{ 's' if grupos|length != 1 else '' }} &mdash;&mdash;
+        </div>
         {% for grupo in grupos %}
         <div style="background:#fff;border-radius:12px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);border-left:4px solid #0d1a2e;">
             <div style="padding:12px 14px;">
@@ -107,6 +110,7 @@
         <p style="text-align:center;color:#94a3b8;padding:2rem 0;">No hay grupos creados todavía.</p>
         {% endfor %}
     </div>
+
 
 </div>
 
