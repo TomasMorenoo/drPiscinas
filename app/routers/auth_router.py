@@ -30,7 +30,7 @@ def login():
             session.permanent = False
             registrar_auditoria(user.username, 'LOGIN', None)
             db.session.commit()
-            flash('¡Bienvenido de nuevo!', 'success')
+            flash(f'¡Bienvenido de nuevo, {user.username}!', 'success')
             
             # Redirección inteligente
             next_page = request.args.get('next')
@@ -58,7 +58,7 @@ def acceso_root():
         if user and user.check_password(password):
             login_user(user, remember=False)
             session.permanent = False
-            flash('¡Bienvenido de nuevo!', 'success')
+            flash(f'¡Bienvenido de nuevo, {user.username}!', 'success')
             next_page = request.args.get('next')
             return redirect(next_page or url_for('main.home'))
         else:
