@@ -1,81 +1,199 @@
 {% extends "base.html" %}
 {% block title %}Administrar Grupo - Dr. Piscinas{% endblock %}
 
+{% block navbar_center %}
+<span class="d-md-none text-white fw-bold" style="font-size:0.85rem;opacity:0.75;">
+    {{ grupo.nombre_display }}
+</span>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h3 mb-0 text-gray-800 fw-bold"><i class="bi bi-gear-fill me-2 text-primary"></i>Administrar Grupo: {{ grupo.nombre_display }}</h1>
-    <a href="{{ url_for('grupos.listar_grupos') }}" class="btn btn-outline-secondary fw-bold shadow-sm">Volver</a>
-</div>
 
-<div class="row g-4">
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white pt-3 pb-2 border-0"><h5 class="fw-bold m-0">Editar Nombres</h5></div>
-            <div class="card-body">
-                <form action="{{ url_for('grupos.editar_grupo', id=grupo.id) }}" method="POST">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <div class="mb-2">
-                        <label class="form-label small fw-bold text-uppercase text-muted">Dashboard / Planilla</label>
-                        <input type="text" name="nombre_identificador" class="form-control fw-bold border-primary"
-                               value="{{ grupo.nombre_identificador or '' }}"
-                               placeholder="Ej: Calle Falsa 123">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-uppercase text-muted">WhatsApp <span class="text-danger">*</span></label>
-                        <input type="text" name="nombre" class="form-control fw-bold" value="{{ grupo.nombre }}" required
-                               placeholder="Ej: Martín">
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100 fw-bold">Guardar</button>
-                </form>
+{# ── DESKTOP ─────────────────────────────────────────────────────────── #}
+<div class="d-none d-md-block">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800 fw-bold"><i class="bi bi-gear-fill me-2 text-primary"></i>Administrar Grupo: {{ grupo.nombre_display }}</h1>
+        <a href="{{ url_for('grupos.listar_grupos') }}" class="btn btn-outline-secondary fw-bold shadow-sm">Volver</a>
+    </div>
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white pt-3 pb-2 border-0"><h5 class="fw-bold m-0">Editar Nombres</h5></div>
+                <div class="card-body">
+                    <form action="{{ url_for('grupos.editar_grupo', id=grupo.id) }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Dashboard / Planilla</label>
+                            <input type="text" name="nombre_identificador" class="form-control fw-bold border-primary"
+                                   value="{{ grupo.nombre_identificador or '' }}" placeholder="Ej: Calle Falsa 123">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-uppercase text-muted">WhatsApp <span class="text-danger">*</span></label>
+                            <input type="text" name="nombre" class="form-control fw-bold" value="{{ grupo.nombre }}" required placeholder="Ej: Martín">
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold">Guardar</button>
+                    </form>
+                </div>
             </div>
         </div>
-    </div>
-
-    <div class="col-md-8">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white pt-3 pb-2 border-0"><h5 class="fw-bold m-0">Agregar Integrante</h5></div>
-            <div class="card-body">
-                <form action="{{ url_for('grupos.agregar_casa', grupo_id=grupo.id) }}" method="POST" class="d-flex gap-2">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <select name="casa_id" class="form-select border-secondary fw-bold" required>
-                        <option value="">Seleccionar casa suelta para añadir...</option>
-                        {% for c in casas_libres %}
-                        <option value="{{ c.id }}">{{ c.nombre_formateado() }} ({{ c.country.nombre }})</option>
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white pt-3 pb-2 border-0"><h5 class="fw-bold m-0">Agregar Integrante</h5></div>
+                <div class="card-body">
+                    <form action="{{ url_for('grupos.agregar_casa', grupo_id=grupo.id) }}" method="POST" class="d-flex gap-2">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <select name="casa_id" class="form-select border-secondary fw-bold" required>
+                            <option value="">Seleccionar casa suelta para añadir...</option>
+                            {% for c in casas_libres %}
+                            <option value="{{ c.id }}">{{ c.nombre_formateado() }} ({{ c.country.nombre }})</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-success fw-bold text-nowrap"><i class="bi bi-plus-lg"></i> Añadir</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-dark text-white pt-3 pb-2"><h5 class="fw-bold m-0"><i class="bi bi-people-fill me-2"></i>Casas Integrantes</h5></div>
+                <table class="table table-hover align-middle m-0">
+                    <tbody>
+                        {% for c in grupo.casas %}
+                        <tr class="{{ 'table-secondary text-muted' if not c.activo else '' }}">
+                            <td class="ps-4 fw-bold fs-5">
+                                {{ c.nombre_formateado() }}
+                                {% if not c.activo %}<span class="badge bg-danger ms-2 fs-6 fw-bold">Dada de baja</span>{% endif %}
+                            </td>
+                            <td class="text-muted"><i class="bi bi-geo-alt-fill"></i> {{ c.country.nombre }}</td>
+                            <td class="text-end pe-4">
+                                <form action="{{ url_for('grupos.quitar_casa', casa_id=c.id) }}" method="POST" onsubmit="return confirm('¿Quitar a {{ c.nombre_formateado() }} del grupo?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger shadow-sm"><i class="bi bi-x-circle-fill"></i> Quitar del Grupo</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-center py-4 text-muted">Este grupo quedó vacío. Añadí casas arriba.</td></tr>
                         {% endfor %}
-                    </select>
-                    <button type="submit" class="btn btn-success fw-bold text-nowrap"><i class="bi bi-plus-lg"></i> Añadir</button>
-                </form>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
+</div>
 
-    <div class="col-12">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-dark text-white pt-3 pb-2"><h5 class="fw-bold m-0"><i class="bi bi-people-fill me-2"></i>Casas Integrantes</h5></div>
-            <table class="table table-hover align-middle m-0">
-                <tbody>
-                    {% for c in grupo.casas %}
-                    <tr class="{{ 'table-secondary text-muted' if not c.activo else '' }}">
-                        <td class="ps-4 fw-bold fs-5">
-                            {{ c.nombre_formateado() }}
-                            {% if not c.activo %}
-                            <span class="badge bg-danger ms-2 fs-6 fw-bold">Dada de baja</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-muted"><i class="bi bi-geo-alt-fill"></i> {{ c.country.nombre }}</td>
-                        <td class="text-end pe-4">
-                            <form action="{{ url_for('grupos.quitar_casa', casa_id=c.id) }}" method="POST" onsubmit="return confirm('¿Quitar a {{ c.nombre_formateado() }} del grupo?');">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                <button type="submit" class="btn btn-sm btn-outline-danger shadow-sm"><i class="bi bi-x-circle-fill"></i> Quitar del Grupo</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="3" class="text-center py-4 text-muted">Este grupo quedó vacío. Añadí casas arriba.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+{# ── MOBILE: tabs ─────────────────────────────────────────────────────── #}
+<div class="d-md-none" style="margin:-1rem -12px 0;">
+
+    <style>
+        .ge-top { background: linear-gradient(135deg,#0d1a2e,#1a2f4e); padding: 0 16px; }
+        .ge-tabs { display: flex; }
+        .ge-tab { flex: 1; padding: 11px 0; text-align: center; font-size: 0.82rem; font-weight: 700;
+                  color: rgba(255,255,255,0.45); cursor: pointer; border-bottom: 3px solid transparent;
+                  text-decoration: none; }
+        .ge-tab.active { color: #fff; border-bottom-color: #fff; }
+
+        .ge-pane { display: none; padding: 14px 12px 100px; background: #f1f5f9; min-height: 60vh; }
+        .ge-pane.active { display: block; }
+
+        .ge-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 5px; display: block; }
+        .ge-input { border: 1.5px solid #e2e8f0; border-radius: 9px; padding: 10px 12px; font-size: 0.88rem; font-weight: 600; width: 100%; outline: none; background: #fff; }
+        .ge-input:focus { border-color: #0d1a2e; }
+        .ge-btn-save { background: #0d1a2e; color: #fff; border: none; border-radius: 9px; padding: 11px; font-size: 0.88rem; font-weight: 700; width: 100%; margin-top: 4px; }
+
+        .ge-card { background: #fff; border-radius: 12px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); margin-bottom: 12px; }
+
+        .ge-agregar { display: flex; gap: 8px; }
+        .ge-select { flex: 1; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: 10px 12px; font-size: 0.82rem; outline: none; background: #fff; }
+        .ge-btn-add { background: #198754; color: #fff; border: none; border-radius: 9px; padding: 10px 16px; font-size: 0.88rem; font-weight: 700; }
+
+        .ge-casa { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+        .ge-casa:last-child { border-bottom: none; padding-bottom: 0; }
+        .ge-casa-nombre { font-weight: 700; font-size: 0.88rem; color: #1e293b; }
+        .ge-casa-sub { font-size: 0.72rem; color: #94a3b8; margin-top: 1px; }
+        .ge-btn-quitar { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #ef4444; border-radius: 7px; padding: 5px 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .ge-baja { background: #fee2e2; color: #ef4444; border-radius: 4px; padding: 1px 6px; font-size: 0.65rem; font-weight: 700; margin-left: 5px; }
+    </style>
+
+    <div class="ge-top">
+        <div class="ge-tabs">
+            <a class="ge-tab active" onclick="geTab('casas',this)">
+                <i class="bi bi-people-fill me-1"></i>Casas ({{ grupo.casas|length }})
+            </a>
+            <a class="ge-tab" onclick="geTab('config',this)">
+                <i class="bi bi-gear-fill me-1"></i>Configurar
+            </a>
         </div>
     </div>
+
+    {# Tab: Casas #}
+    <div class="ge-pane active" id="ge-casas">
+
+        <div class="ge-card">
+            <div class="ge-label"><i class="bi bi-plus-circle-fill me-1 text-success"></i>Agregar integrante</div>
+            <form action="{{ url_for('grupos.agregar_casa', grupo_id=grupo.id) }}" method="POST" class="ge-agregar">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <select name="casa_id" class="ge-select" required>
+                    <option value="">Seleccionar casa suelta...</option>
+                    {% for c in casas_libres %}
+                    <option value="{{ c.id }}">{{ c.nombre_formateado() }} ({{ c.country.nombre }})</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="ge-btn-add"><i class="bi bi-plus-lg"></i></button>
+            </form>
+        </div>
+
+        <div class="ge-card">
+            {% for c in grupo.casas %}
+            <div class="ge-casa {% if not c.activo %}opacity-50{% endif %}">
+                <div style="flex:1;">
+                    <div class="ge-casa-nombre">
+                        {{ c.nombre_formateado() }}
+                        {% if not c.activo %}<span class="ge-baja">Dada de baja</span>{% endif %}
+                    </div>
+                    <div class="ge-casa-sub"><i class="bi bi-geo-alt-fill me-1"></i>{{ c.country.nombre }}</div>
+                </div>
+                <form action="{{ url_for('grupos.quitar_casa', casa_id=c.id) }}" method="POST"
+                      onsubmit="return confirm('¿Quitar a {{ c.nombre_formateado() }} del grupo?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="ge-btn-quitar"><i class="bi bi-x-circle-fill me-1"></i>Quitar</button>
+                </form>
+            </div>
+            {% else %}
+            <p class="text-muted text-center py-2 mb-0">Grupo vacío. Agregá casas arriba.</p>
+            {% endfor %}
+        </div>
+
+    </div>
+
+    {# Tab: Configurar #}
+    <div class="ge-pane" id="ge-config">
+        <div class="ge-card">
+            <form action="{{ url_for('grupos.editar_grupo', id=grupo.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="mb-3">
+                    <label class="ge-label">Dashboard / Planilla</label>
+                    <input type="text" name="nombre_identificador" class="ge-input"
+                           value="{{ grupo.nombre_identificador or '' }}" placeholder="Ej: Calle Falsa 123">
+                </div>
+                <div class="mb-3">
+                    <label class="ge-label">WhatsApp <span class="text-danger">*</span></label>
+                    <input type="text" name="nombre" class="ge-input" value="{{ grupo.nombre }}" required placeholder="Ej: Martín">
+                </div>
+                <button type="submit" class="ge-btn-save"><i class="bi bi-check-lg me-1"></i>Guardar cambios</button>
+            </form>
+        </div>
+    </div>
+
 </div>
+
+<script>
+function geTab(id, el) {
+    document.querySelectorAll('.ge-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.ge-pane').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('ge-' + id).classList.add('active');
+}
+</script>
+
 {% endblock %}
