@@ -2,141 +2,366 @@
 {% block title %}Nueva Visita{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-10 col-lg-8">
-        <div class="d-flex align-items-center mb-3 mt-2">
-            <h2 class="h4 mb-0">
-                <i class="bi bi-clipboard-plus-fill text-primary me-2"></i>
-                Registrar Visita
-            </h2>
+<style>
+/* ── Layout mobile: sin padding del content ── */
+@media (max-width: 1023px) {
+    .cv-wrap {
+        display: flex; flex-direction: column; min-height: calc(100dvh - 58px);
+        margin-left: calc(-1 * var(--bs-gutter-x, 0.75rem));
+        margin-right: calc(-1 * var(--bs-gutter-x, 0.75rem));
+        margin-top: calc(-1 * 1.5rem);
+    }
+}
+
+/* ── Header oscuro ── */
+.cv-header {
+    background: linear-gradient(135deg, #0d1a2e, #1a2f4e);
+    padding: 32px 16px 0;
+    display: flex; align-items: center; justify-content: space-between;
+}
+.cv-header-back {
+    color: rgba(255,255,255,0.5); font-size: 1.3rem; text-decoration: none;
+    display: flex; align-items: center; gap: 4px; padding: 4px 0;
+}
+.cv-header-back:hover { color: rgba(255,255,255,0.8); }
+.cv-header-title { font-size: 1rem; font-weight: 700; color: #fff; }
+
+/* Última cargada */
+.cv-last {
+    background: linear-gradient(135deg, #0d1a2e, #1a2f4e);
+    padding: 5px 16px 0;
+    font-size: 0.72rem; color: rgba(255,255,255,0.35);
+}
+.cv-last strong { color: rgba(255,255,255,0.6); font-weight: 600; }
+
+/* Búsqueda de casa */
+.cv-search-wrap {
+    background: linear-gradient(135deg, #0d1a2e, #1a2f4e);
+    padding: 8px 16px 8px; position: relative;
+}
+.cv-search-box {
+    background: rgba(255,255,255,0.09); border: 1.5px solid rgba(255,255,255,0.15);
+    border-radius: 24px; padding: 9px 14px;
+    display: flex; align-items: center; gap: 8px;
+}
+.cv-search-box input {
+    background: transparent; border: none; outline: none;
+    color: #fff; font-size: 0.85rem; flex: 1; width: 100%;
+}
+.cv-search-box input::placeholder { color: rgba(255,255,255,0.35); }
+.cv-search-box .cv-search-ok { font-size: 0.9rem; color: #22c55e; }
+#custom-autocomplete-list {
+    position: absolute; left: 16px; right: 16px; top: 100%;
+    z-index: 1050; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3); display: none;
+    background: #fff; max-height: 240px; overflow-y: auto;
+}
+
+/* Fecha + Promo */
+.cv-quick {
+    background: linear-gradient(135deg, #0d1a2e, #1a2f4e);
+    padding: 0 16px 12px; display: flex; gap: 8px;
+}
+.cv-q {
+    flex: 1; background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px; padding: 8px 10px; cursor: pointer;
+    position: relative;
+}
+.cv-qlbl {
+    font-size: 0.6rem; color: rgba(255,255,255,0.3);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;
+}
+.cv-qval { font-size: 0.82rem; color: rgba(255,255,255,0.75); font-weight: 600; }
+.cv-qval.ph { color: rgba(255,255,255,0.3); }
+/* date input oculto */
+.cv-q input[type="date"] {
+    position: absolute; opacity: 0; pointer-events: none; height: 1px; width: 1px;
+}
+/* select superpuesto transparente, recibe el click directo */
+.cv-q select {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; cursor: pointer; z-index: 1;
+}
+
+/* Bottom sheet */
+.cv-sheet {
+    background: #fff; border-radius: 20px 20px 0 0;
+    flex: 1; padding: 12px 16px 80px;
+}
+.cv-handle {
+    width: 36px; height: 3px; background: #e5e7eb;
+    border-radius: 2px; margin: 0 auto 14px;
+}
+.cv-section { margin-bottom: 16px; }
+.cv-section-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+}
+.cv-section-title { font-size: 0.82rem; font-weight: 700; color: #111; }
+.cv-add-btn {
+    background: #0d1a2e; color: #fff; border: none;
+    border-radius: 20px; padding: 4px 12px; font-size: 0.72rem; font-weight: 700;
+    cursor: pointer;
+}
+.cv-obs {
+    width: 100%; background: #f8fafc; border: 1px solid #e5e7eb;
+    border-radius: 10px; padding: 10px 12px; font-size: 0.82rem;
+    color: #374151; resize: none; outline: none;
+    font-family: inherit;
+}
+.cv-obs:focus { border-color: #93c5fd; }
+
+/* Fotos */
+.cv-fotos-row { display: flex; gap: 8px; align-items: flex-start; }
+.cv-foto-btn {
+    flex: 1; background: #f8fafc; border: 1.5px dashed #cbd5e1;
+    border-radius: 10px; padding: 10px 8px; text-align: center;
+    font-size: 0.72rem; color: #64748b; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.cv-foto-btn i { font-size: 1.3rem; }
+.cv-foto-btn.cam { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+.cv-fotos-preview {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+}
+.cv-foto-thumb {
+    width: 52px; height: 52px; border-radius: 8px; object-fit: cover;
+    border: 1px solid #e5e7eb;
+}
+
+/* Sticky CTA */
+.cv-sticky {
+    position: fixed; bottom: 58px; left: 0; right: 0;
+    background: #fff; padding: 10px 16px 10px;
+    border-top: 1px solid #f1f5f9; z-index: 100;
+}
+.cv-sticky-btn {
+    background: #16a34a; color: #fff; border: none; border-radius: 12px;
+    padding: 13px 0; width: 100%; font-size: 1rem; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.cv-sticky-btn:active { background: #15803d; }
+
+/* Desktop: ancho máximo centrado, sin el diseño mobile */
+@media (min-width: 1024px) {
+    .cv-header, .cv-last, .cv-search-wrap, .cv-quick { border-radius: 0; }
+    .cv-sheet { border-radius: 0; padding-bottom: 20px; }
+    .cv-sticky { position: static; border-top: none; padding: 0; margin-top: 8px; }
+    .cv-sticky-btn { border-radius: 10px; }
+    .cv-wrap { max-width: 640px; margin: 0 auto; }
+}
+</style>
+
+<div class="cv-wrap">
+<form method="POST" action="{{ url_for('visits.crear_visit') }}" id="visitForm" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+    <!-- Header -->
+    <div class="cv-header">
+        <a href="{{ url_for('visits.listar_visits') }}" class="cv-header-back">
+            <i class="bi bi-chevron-left"></i>
+        </a>
+        <span class="cv-header-title">Nueva Visita</span>
+        <span style="width:32px;"></span>
+    </div>
+
+    <!-- Última cargada -->
+    {% if ultima_visita %}
+    <div class="cv-last">
+        Última casa cargada: <strong>{{ ultima_visita.casa.nombre_formateado() }}</strong>
+    </div>
+    {% endif %}
+
+    <!-- Búsqueda casa -->
+    <div class="cv-search-wrap">
+        <div class="cv-search-box">
+            <i class="bi bi-search" style="color:rgba(255,255,255,0.3);font-size:1rem;"></i>
+            <input type="text" id="casa_search" placeholder="Escribí barrio o lote..." autocomplete="off">
+            <i class="bi bi-check-circle-fill cv-search-ok d-none" id="casa-ok-icon"></i>
         </div>
+        <input type="hidden" name="casa_id" id="casa_id_hidden" required>
+        <div id="custom-autocomplete-list"></div>
+    </div>
 
-        {% if ultima_visita %}
-        <div class="alert alert-light border py-2 px-3 mb-3 small text-muted d-flex align-items-center gap-2">
-            <i class="bi bi-clock-history"></i>
-            <span>Última cargada: <strong class="text-dark">{{ ultima_visita.casa.nombre_formateado() }}</strong> — {{ ultima_visita.fecha.strftime('%d/%m/%Y') }}{% if ultima_visita.productos %} · {% for vp in ultima_visita.productos %}{% set cant = vp.cantidad | int if vp.cantidad == vp.cantidad | int else vp.cantidad %}{{ vp.product.nombre }} {{ cant }} {{ vp.product.unidad }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}{% if ultima_visita.promo %} · {{ ultima_visita.promo.nombre }}{% endif %}</span>
+    <!-- Fecha + Promo -->
+    <div class="cv-quick">
+        <div class="cv-q" onclick="document.getElementById('fecha_visita').showPicker ? document.getElementById('fecha_visita').showPicker() : document.getElementById('fecha_visita').focus()">
+            <div class="cv-qlbl">Fecha</div>
+            <div class="cv-qval" id="fecha-display">Hoy</div>
+            <input type="date" name="fecha" id="fecha_visita" required>
         </div>
-        {% endif %}
+        <div class="cv-q">
+            <div class="cv-qlbl">Promo</div>
+            <div class="cv-qval ph" id="promo-display">Sin promo</div>
+            <select name="promo_id" id="promo_select">
+                <option value="">Sin promo</option>
+                {% for promo in promos %}
+                <option value="{{ promo.id }}">
+                    {% if current_user.is_admin() %}{{ promo.nombre }} (${{ promo.precio | pesos }}){% else %}{{ promo.nombre }}{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
 
-        <form method="POST" action="{{ url_for('visits.crear_visit') }}" id="visitForm" enctype="multipart/form-data">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <!-- Sheet -->
+    <div class="cv-sheet">
+        <div class="cv-handle"></div>
 
-            <div class="card shadow-sm border-0 mb-3">
-                <div class="card-body p-4">
-
-                    <div class="mb-3 position-relative">
-                        <label class="form-label fw-bold">¿Qué casa visitaste?</label>
-                        <div class="input-group input-group-lg">
-                            <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
-                            <input type="text" id="casa_search" class="form-control"
-                                   placeholder="🔍 Escribí Barrio o Lote (Ej: Acacias 43)..." autocomplete="off">
-                        </div>
-                        <input type="hidden" name="casa_id" id="casa_id_hidden" required>
-                        <div id="custom-autocomplete-list" class="dropdown-menu w-100 shadow-lg mt-1 border-0"
-                             style="max-height: 250px; overflow-y: auto; display: none; position: absolute; z-index: 1050;">
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-6">
-                            <label class="form-label fw-bold small text-muted">Fecha</label>
-                            <input type="date" name="fecha" id="fecha_visita" class="form-control" required>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label fw-bold small text-muted">Promo Aplicada</label>
-                            <select name="promo_id" class="form-select">
-                                <option value="">-- Sin promo --</option>
-                                {% for promo in promos %}
-                                    <option value="{{ promo.id }}">
-                                        {% if current_user.is_admin() %}
-                                            {{ promo.nombre }} (${{ promo.precio | pesos }})
-                                        {% else %}
-                                            {{ promo.nombre }}
-                                        {% endif %}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card shadow-sm border-0 mb-3">
-                <div class="card-header bg-light d-flex justify-content-between align-items-center py-3">
-                    <h5 class="mb-0 h6 fw-bold text-dark"><i class="bi bi-box-seam me-2"></i>Productos Adicionales</h5>
-                    <button type="button" class="btn btn-sm btn-dark rounded-pill px-3" onclick="agregarProducto()">
-                        <i class="bi bi-plus-lg"></i> Agregar
-                    </button>
-                </div>
-                <div class="card-body p-3">
-                    <div id="productos-container"></div>
-                    <div id="empty-products" class="text-center py-3 text-muted small">
-                        No se agregaron productos manuales.
-                    </div>
-                </div>
-            </div>
-
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-body p-3">
-                    <label class="form-label fw-bold small text-muted">Observaciones / Notas del trabajo</label>
-                    <textarea name="observaciones" class="form-control" rows="2" placeholder="Ej: Se limpió fondo y se ajustó timer..."></textarea>
-                </div>
-            </div>
-
-            <div class="card shadow-sm border-0 mb-3">
-                <div class="card-body p-3">
-                    <label class="form-label fw-bold small text-muted"><i class="bi bi-images me-1"></i>Fotos / Videos (opcional)</label>
-                    <input type="file" name="archivos" multiple accept="image/*,video/*" class="form-control">
-                </div>
-            </div>
-
-            <div class="d-grid gap-2 mb-5">
-                <button type="submit" class="btn btn-success btn-lg shadow py-3">
-                    <i class="bi bi-save-fill me-2"></i>GUARDAR VISITA
+        <!-- Productos -->
+        <div class="cv-section">
+            <div class="cv-section-hdr">
+                <span class="cv-section-title"><i class="bi bi-box-seam me-1 opacity-75"></i>Productos adicionales</span>
+                <button type="button" class="cv-add-btn" onclick="agregarProducto()">
+                    <i class="bi bi-plus-lg"></i> Agregar
                 </button>
-                <a href="{{ url_for('visits.listar_visits') }}" class="btn btn-link text-muted">Cancelar</a>
             </div>
-        </form>
+            <div id="productos-container"></div>
+            <div id="empty-products" class="text-muted small text-center py-2" style="font-size:0.78rem;">
+                Sin productos adicionales.
+            </div>
+        </div>
+
+        <!-- Observaciones -->
+        <div class="cv-section">
+            <div class="cv-section-hdr">
+                <span class="cv-section-title"><i class="bi bi-chat-left-text me-1 opacity-75"></i>Observaciones</span>
+            </div>
+            <textarea name="observaciones" class="cv-obs" rows="2"
+                placeholder="Ej: Se limpió fondo y se ajustó timer..."></textarea>
+        </div>
+
+        <!-- Fotos -->
+        <div class="cv-section">
+            <div class="cv-section-hdr">
+                <span class="cv-section-title"><i class="bi bi-images me-1 opacity-75"></i>Fotos</span>
+                <span style="font-size:0.68rem;color:#9ca3af;">opcional</span>
+            </div>
+            <div class="cv-fotos-row">
+                <button type="button" class="cv-foto-btn cam" onclick="abrirCamara()">
+                    <i class="bi bi-camera-fill"></i>
+                    <span>Cámara</span>
+                </button>
+                <label class="cv-foto-btn" for="file-galeria">
+                    <i class="bi bi-image"></i>
+                    <span>Galería</span>
+                </label>
+            </div>
+            <input type="file" id="file-galeria" name="archivos" multiple accept="image/*,video/*"
+                   style="display:none;">
+            <div class="cv-fotos-preview" id="fotos-preview"></div>
+        </div>
+
+        <!-- Desktop: botón submit acá -->
+        <div class="d-none d-lg-block cv-sticky">
+            <button type="submit" class="cv-sticky-btn">
+                <i class="bi bi-save-fill"></i> GUARDAR VISITA
+            </button>
+        </div>
+    </div>
+
+    <!-- Mobile: sticky bottom -->
+    <div class="d-lg-none cv-sticky">
+        <button type="submit" class="cv-sticky-btn">
+            <i class="bi bi-save-fill"></i> GUARDAR VISITA
+        </button>
+    </div>
+
+</form>
+
+<!-- Modal cámara -->
+<div id="modal-camara" style="display:none;position:fixed;inset:0;z-index:3000;background:#000;flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;">
+        <span style="color:#fff;font-size:1rem;font-weight:700;">Cámara</span>
+        <button type="button" onclick="cerrarCamara()" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:1.6rem;line-height:1;cursor:pointer;">×</button>
+    </div>
+    <video id="camara-video" autoplay playsinline style="flex:1;width:100%;object-fit:cover;"></video>
+    <canvas id="camara-canvas" style="display:none;"></canvas>
+    <div style="padding:20px 16px 36px;display:flex;justify-content:center;">
+        <button type="button" onclick="capturarFoto()"
+                style="width:68px;height:68px;border-radius:50%;background:#fff;border:4px solid rgba(255,255,255,0.4);cursor:pointer;box-shadow:0 0 0 2px #fff;">
+        </button>
     </div>
 </div>
 
+<!-- Modal cantidad personalizada -->
+<div id="modal-qty" style="display:none;position:fixed;inset:0;z-index:2000;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0.45);">
+    <div style="background:#fff;border-radius:20px 20px 0 0;padding:24px 20px 32px;width:100%;max-width:480px;">
+        <div style="width:36px;height:3px;background:#e5e7eb;border-radius:2px;margin:0 auto 20px;"></div>
+        <div style="font-size:0.95rem;font-weight:700;color:#111;margin-bottom:14px;">Ingresá la cantidad</div>
+        <input id="modal-qty-input" type="number" step="0.01" min="0" placeholder="Ej: 2.5"
+               style="width:100%;border:1.5px solid #dee2e6;border-radius:12px;padding:12px 14px;font-size:1.1rem;outline:none;margin-bottom:12px;">
+        <div style="display:flex;gap:10px;">
+            <button type="button" onclick="cerrarModalQty()"
+                    style="flex:1;background:#f1f5f9;border:none;border-radius:10px;padding:12px;font-size:0.9rem;font-weight:600;color:#374151;cursor:pointer;">
+                Cancelar
+            </button>
+            <button type="button" onclick="confirmarModalQty()"
+                    style="flex:2;background:#0d1a2e;border:none;border-radius:10px;padding:12px;font-size:0.9rem;font-weight:700;color:#fff;cursor:pointer;">
+                Confirmar
+            </button>
+        </div>
+    </div>
+</div>
+</div>
+
 <template id="producto-template">
-    <div class="producto-row border-0 rounded-3 p-3 mb-2 shadow-sm" style="background:#f8fafc;">
-        <div class="row g-2 align-items-center">
-            <div class="col-7">
-                <div class="dropdown product-picker">
-                    <button type="button" class="form-select form-select-sm text-start product-pick-btn"
-                            style="cursor:pointer;"
-                            data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false">
-                        <span class="product-pick-label text-muted">
-                            <i class="bi bi-box-seam me-1 opacity-50"></i>Seleccioná un producto...
-                        </span>
-                    </button>
-                    <ul class="dropdown-menu w-100 border-0 shadow-lg rounded-3 p-1 product-pick-menu" style="max-height:320px;overflow-y:auto;"></ul>
-                </div>
-                <select name="product_id[]" class="product-select"
-                        style="position:absolute;opacity:0;pointer-events:none;height:1px;width:1px;overflow:hidden;">
-                    <option value="">-- Producto --</option>
-                    {% for product in products %}
-                        <option value="{{ product.id }}"
-                            data-stock="{{ product.stock_actual | float }}"
-                            data-minimo="{{ product.stock_minimo | float if product.stock_minimo is not none else '' }}">
-                            {{ product.nombre }} ({{ product.unidad }})
-                        </option>
-                    {% endfor %}
-                </select>
-                <div class="stock-alerta alert py-1 px-2 mt-1 mb-0 small d-none">
-                    <span class="stock-alerta-icono me-1"></span><span class="stock-alerta-texto"></span>
-                </div>
-            </div>
-            <div class="col-3">
-                <input type="number" step="0.01" min="0" name="cantidad[]"
-                       class="form-control form-control-sm" placeholder="Cant." required>
-            </div>
-            <div class="col-2 text-end">
-                <button type="button" class="btn btn-outline-danger btn-sm border-0" onclick="quitarProducto(this)">
-                    <i class="bi bi-trash"></i>
-                </button>
+    <div class="producto-row mb-2" style="background:#f8fafc;border:1px solid #e9ecef;border-radius:12px;padding:10px 12px;">
+        <div class="producto-editor">
+        <div class="dropdown product-picker mb-2">
+            <button type="button" class="w-100 text-start product-pick-btn"
+                    style="background:#fff;border:1.5px solid #dee2e6;border-radius:10px;padding:10px 12px;cursor:pointer;font-size:0.88rem;display:flex;align-items:center;gap:8px;"
+                    data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false">
+                <i class="bi bi-box-seam opacity-40" style="font-size:1rem;flex-shrink:0;"></i>
+                <span class="product-pick-label text-muted flex-grow-1">Seleccioná un producto...</span>
+                <i class="bi bi-chevron-down opacity-40" style="font-size:0.75rem;flex-shrink:0;"></i>
+            </button>
+            <ul class="dropdown-menu w-100 border-0 shadow-lg rounded-3 p-1 product-pick-menu" style="max-height:320px;overflow-y:auto;"></ul>
+        </div>
+        <select name="product_id[]" class="product-select"
+                style="position:absolute;opacity:0;pointer-events:none;height:1px;width:1px;overflow:hidden;">
+            <option value="">-- Producto --</option>
+            {% for product in products %}
+                <option value="{{ product.id }}"
+                    data-stock="{{ product.stock_actual | float }}"
+                    data-minimo="{{ product.stock_minimo | float if product.stock_minimo is not none else '' }}">
+                    {{ product.nombre }} ({{ product.unidad }})
+                </option>
+            {% endfor %}
+        </select>
+        <div class="d-flex align-items-center justify-content-between" style="flex-wrap:nowrap;gap:4px;">
+            {% for n in [1,2,3,4,5] %}
+            <button type="button" class="qty-preset btn"
+                    style="flex:1;height:36px;padding:0;border-radius:8px;font-size:0.85rem;font-weight:600;background:#f1f5f9;border:1.5px solid #e2e8f0;color:#374151;">
+                {{ n }}
+            </button>
+            {% endfor %}
+            <button type="button" class="qty-custom-btn btn"
+                    style="flex:1;height:36px;padding:0;border-radius:8px;font-size:0.8rem;font-weight:600;background:#f1f5f9;border:1.5px solid #e2e8f0;color:#374151;">
+                ···
+            </button>
+            <input type="number" step="0.01" min="0" name="cantidad[]"
+                   class="form-control qty-input"
+                   style="position:absolute;opacity:0;pointer-events:none;height:1px;width:1px;">
+            <button type="button" class="btn btn-link text-danger p-0 ms-1" onclick="quitarProducto(this)"
+                    style="font-size:1.2rem;line-height:1;">
+                <i class="bi bi-trash3"></i>
+            </button>
+        </div>
+        <div class="stock-alerta alert py-1 px-2 mt-2 mb-0 small d-none">
+            <span class="stock-alerta-icono me-1"></span><span class="stock-alerta-texto"></span>
+        </div>
+        </div>{# /producto-editor #}
+        <!-- Vista colapsada -->
+        <div class="producto-confirmado" style="display:none;">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-check-circle-fill text-success" style="font-size:1rem;flex-shrink:0;"></i>
+                <span class="prod-resumen flex-grow-1" style="font-size:0.88rem;font-weight:600;color:#111;"></span>
+                <button type="button" class="btn btn-link p-0 text-secondary" onclick="editarProducto(this)"
+                        style="font-size:0.8rem;text-decoration:none;">Editar</button>
+                <button type="button" class="btn btn-link text-danger p-0" onclick="quitarProducto(this)"
+                        style="font-size:1.1rem;line-height:1;"><i class="bi bi-trash3"></i></button>
             </div>
         </div>
     </div>
@@ -173,12 +398,43 @@
 </div>
 
 <script>
+    // ── Fecha display ──
     const fechaInput = document.getElementById('fecha_visita');
+    const fechaDisplay = document.getElementById('fecha-display');
+    function updateFechaDisplay() {
+        if (!fechaInput.value) return;
+        const [y, m, d] = fechaInput.value.split('-');
+        const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+        fechaDisplay.textContent = `${d} ${meses[parseInt(m)-1]} ${y}`;
+        fechaDisplay.classList.remove('ph');
+    }
     if (!fechaInput.value) fechaInput.valueAsDate = new Date();
+    updateFechaDisplay();
+    fechaInput.addEventListener('change', function() {
+        updateFechaDisplay();
+        bypassDuplicateCheck = false;
+        actualizarCasasFiltradas();
+        verificarDuplicado();
+    });
 
+    // ── Promo display ──
+    const promoSelect = document.getElementById('promo_select');
+    const promoDisplay = document.getElementById('promo-display');
+    promoSelect.addEventListener('change', function() {
+        if (this.value) {
+            promoDisplay.textContent = this.options[this.selectedIndex].text.split('(')[0].trim();
+            promoDisplay.classList.remove('ph');
+        } else {
+            promoDisplay.textContent = 'Sin promo';
+            promoDisplay.classList.add('ph');
+        }
+    });
+
+    // ── Autocomplete casa ──
     const searchInput = document.getElementById('casa_search');
     const hiddenInput = document.getElementById('casa_id_hidden');
     const autocompleteList = document.getElementById('custom-autocomplete-list');
+    const casaOkIcon = document.getElementById('casa-ok-icon');
 
     const casasData = [
         {% for casa in casas %}
@@ -209,7 +465,7 @@
         if (idActual && !casasFiltradas.find(c => c.id === idActual)) {
             searchInput.value = '';
             hiddenInput.value = '';
-            searchInput.classList.remove('is-valid');
+            casaOkIcon.classList.add('d-none');
             autocompleteList.style.display = 'none';
         }
     }
@@ -221,7 +477,7 @@
         const val = this.value.toLowerCase();
         autocompleteList.innerHTML = '';
         hiddenInput.value = '';
-        searchInput.classList.remove('is-valid');
+        casaOkIcon.classList.add('d-none');
         if (!val) { autocompleteList.style.display = 'none'; return; }
         let matches = casasFiltradas.filter(c => c.nombre.toLowerCase().includes(val));
         if (matches.length > 0) {
@@ -236,7 +492,7 @@
                     e.preventDefault();
                     searchInput.value = match.nombre;
                     hiddenInput.value = match.id;
-                    searchInput.classList.add('is-valid');
+                    casaOkIcon.classList.remove('d-none');
                     autocompleteList.style.display = 'none';
                     verificarDuplicado();
                 });
@@ -249,10 +505,63 @@
     });
 
     document.addEventListener('click', function(e) {
-        if (e.target !== searchInput && e.target !== autocompleteList)
+        if (!e.target.closest('#custom-autocomplete-list') && e.target !== searchInput)
             autocompleteList.style.display = 'none';
     });
 
+    // ── Cámara ──
+    let _camaraStream = null;
+    let _camaraFiles = [];
+
+    async function abrirCamara() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Tu navegador no soporta acceso a la cámara.'); return;
+        }
+        try {
+            _camaraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+            document.getElementById('camara-video').srcObject = _camaraStream;
+            const modal = document.getElementById('modal-camara');
+            modal.style.display = 'flex';
+        } catch(e) {
+            alert('No se pudo acceder a la cámara. Verificá los permisos.');
+        }
+    }
+
+    function cerrarCamara() {
+        if (_camaraStream) { _camaraStream.getTracks().forEach(t => t.stop()); _camaraStream = null; }
+        document.getElementById('modal-camara').style.display = 'none';
+        document.getElementById('camara-video').srcObject = null;
+    }
+
+    function capturarFoto() {
+        const video = document.getElementById('camara-video');
+        const canvas = document.getElementById('camara-canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        canvas.toBlob(function(blob) {
+            const file = new File([blob], `foto_${Date.now()}.jpg`, { type: 'image/jpeg' });
+            _camaraFiles.push(file);
+            agregarThumb(file);
+            cerrarCamara();
+        }, 'image/jpeg', 0.9);
+    }
+
+    // ── Fotos preview ──
+    function agregarThumb(file) {
+        const preview = document.getElementById('fotos-preview');
+        const img = document.createElement('img');
+        img.className = 'cv-foto-thumb';
+        img.src = URL.createObjectURL(file);
+        preview.appendChild(img);
+    }
+
+    function handleFiles(files) {
+        Array.from(files).forEach(f => { if (f.type.startsWith('image/') || f.type.startsWith('video/')) agregarThumb(f); });
+    }
+    document.getElementById('file-galeria').addEventListener('change', function() { handleFiles(this.files); });
+
+    // ── Duplicado ──
     let bypassDuplicateCheck = false;
 
     window.addEventListener('pageshow', function(e) {
@@ -260,6 +569,28 @@
         if (e.persisted || (nav && nav.type === 'back_forward')) location.reload();
     });
 
+    function verificarDuplicado() {
+        const casaId = hiddenInput.value;
+        const fecha = fechaInput.value;
+        if (!casaId || !fecha) return;
+        fetch(`/visits/check_duplicate?casa_id=${casaId}&fecha=${fecha}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.exists) {
+                    document.getElementById('detalle-duplicado').innerText = data.detalles.replace("Productos:", "\nProductos:");
+                    const modalObj = new bootstrap.Modal(document.getElementById('modalDuplicado'));
+                    modalObj.show();
+                    document.getElementById('btn-cancelar-duplicado').onclick = function() {
+                        searchInput.value = ""; hiddenInput.value = "";
+                        casaOkIcon.classList.add('d-none');
+                        modalObj.hide();
+                    };
+                    document.getElementById('btn-aceptar-duplicado').onclick = function() { bypassDuplicateCheck = true; modalObj.hide(); };
+                }
+            });
+    }
+
+    // ── Productos ──
     const PINNED_SEARCHES = [['pastilla'], ['clarificador'], ['granulado'], ['granulado', 'lento'], ['granulado', 'rapid']];
     function normStr(s) { return s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, ''); }
     function matchesPinned(text, terms) { const n = normStr(text); return terms.every(t => n.includes(normStr(t))); }
@@ -271,7 +602,7 @@
             const unit = (opt.text.match(/\(([^)]+)\)$/) || [])[1] || '';
             const li = document.createElement('li');
             const a  = document.createElement('a');
-            a.className = 'dropdown-item rounded-2 py-2 px-3 d-flex align-items-center gap-2';
+            a.className = 'dropdown-item rounded-2 py-3 px-3 d-flex align-items-center gap-2';
             a.href = '#';
             a.innerHTML = `<i class="bi bi-droplet-fill text-primary opacity-75 flex-shrink-0" style="font-size:.75rem;"></i>
                            <span class="flex-grow-1">${name}</span>
@@ -283,6 +614,8 @@
                 const lbl = btn.querySelector('.product-pick-label');
                 lbl.innerHTML = `<i class="bi bi-check-circle-fill text-success me-1" style="font-size:.8rem;"></i>${name}`;
                 lbl.classList.remove('text-muted');
+                const row = sel.closest('.producto-row');
+                if (row && row.querySelector('.qty-input').value) colapsar(row);
             };
             li.appendChild(a);
             ul.appendChild(li);
@@ -313,19 +646,84 @@
         const ul  = row.querySelector('.product-pick-menu');
         const allOpts    = Array.from(sel.options).filter(o => o.value);
         const pinnedOpts = PINNED_SEARCHES.map(s => allOpts.find(o => matchesPinned(o.text, s))).filter(Boolean);
-
-        if (sel.value) {
-            const cur = allOpts.find(o => o.value === sel.value);
-            if (cur) {
-                const lbl = btn.querySelector('.product-pick-label');
-                lbl.innerHTML = `<i class="bi bi-check-circle-fill text-success me-1" style="font-size:.8rem;"></i>${cur.text.replace(/\s*\([^)]+\)$/, '')}`;
-                lbl.classList.remove('text-muted');
-            }
-        }
-
         buildMenuItems(ul, pinnedOpts, sel, btn, allOpts, pinnedOpts);
         btn.addEventListener('hidden.bs.dropdown', () =>
             buildMenuItems(ul, pinnedOpts, sel, btn, allOpts, pinnedOpts));
+    }
+
+    function colapsar(row) {
+        const sel = row.querySelector('.product-select');
+        const qty = row.querySelector('.qty-input').value;
+        const name = sel.options[sel.selectedIndex].text.replace(/\s*\([^)]+\)$/, '');
+        const unit = (sel.options[sel.selectedIndex].text.match(/\(([^)]+)\)$/) || [])[1] || '';
+        row.querySelector('.prod-resumen').textContent = `${name} · ${qty} ${unit}`;
+        row.querySelector('.producto-editor').style.display = 'none';
+        row.querySelector('.producto-confirmado').style.display = '';
+    }
+
+    function editarProducto(btn) {
+        const row = btn.closest('.producto-row');
+        row.querySelector('.producto-confirmado').style.display = 'none';
+        row.querySelector('.producto-editor').style.display = '';
+    }
+
+    let _activeQtyRow = null;
+
+    function abrirModalQty(row) {
+        _activeQtyRow = row;
+        const modal = document.getElementById('modal-qty');
+        const inp = document.getElementById('modal-qty-input');
+        inp.value = row.querySelector('.qty-input').value || '';
+        modal.style.display = 'flex';
+        setTimeout(() => inp.focus(), 100);
+    }
+
+    function cerrarModalQty() {
+        document.getElementById('modal-qty').style.display = 'none';
+        _activeQtyRow = null;
+    }
+
+    function confirmarModalQty() {
+        const val = document.getElementById('modal-qty-input').value;
+        if (!val || !_activeQtyRow) return;
+        const row = _activeQtyRow;
+        row.querySelector('.qty-input').value = val;
+        cerrarModalQty();
+        const sel = row.querySelector('.product-select');
+        if (sel.value) colapsar(row);
+    }
+
+    document.getElementById('modal-qty').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalQty();
+    });
+
+    document.getElementById('modal-qty-input').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); confirmarModalQty(); }
+    });
+
+    function initQtyPresets(row) {
+        const input = row.querySelector('.qty-input');
+        const customBtn = row.querySelector('.qty-custom-btn');
+
+        function resetPresets() {
+            row.querySelectorAll('.qty-preset').forEach(b => {
+                b.style.background = '#f1f5f9'; b.style.borderColor = '#e2e8f0'; b.style.color = '#374151';
+            });
+            customBtn.textContent = '···';
+            customBtn.style.background = '#f1f5f9'; customBtn.style.borderColor = '#e2e8f0'; customBtn.style.color = '#374151';
+        }
+
+        row.querySelectorAll('.qty-preset').forEach(btn => {
+            btn.addEventListener('click', function() {
+                resetPresets();
+                input.value = this.textContent.trim();
+                this.style.background = '#0d1a2e'; this.style.borderColor = '#0d1a2e'; this.style.color = '#fff';
+                const sel = row.querySelector('.product-select');
+                if (sel.value) colapsar(row);
+            });
+        });
+
+        customBtn.addEventListener('click', function() { abrirModalQty(row); });
     }
 
     function agregarProducto() {
@@ -333,15 +731,57 @@
         const container = document.getElementById("productos-container");
         container.appendChild(document.getElementById("producto-template").content.cloneNode(true));
         initProductPicker(container.lastElementChild);
+        initQtyPresets(container.lastElementChild);
+    }
+
+    function quitarProducto(btn) {
+        btn.closest('.producto-row').remove();
+        if (document.getElementById("productos-container").children.length === 0)
+            document.getElementById("empty-products").classList.remove("d-none");
+    }
+
+    function mostrarToastError(msgs) {
+        let toast = document.getElementById('cv-toast-error');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'cv-toast-error';
+            toast.style.cssText = 'position:fixed;bottom:80px;left:16px;right:16px;z-index:4000;background:#1e293b;color:#fff;border-radius:14px;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.4);font-size:0.85rem;';
+            document.body.appendChild(toast);
+        }
+        toast.innerHTML = '<div style="font-weight:700;margin-bottom:6px;color:#f87171;">⚠ Faltan datos</div>' +
+            msgs.map(m => `<div style="color:rgba(255,255,255,0.75);margin-bottom:2px;">• ${m}</div>`).join('');
+        toast.style.display = 'block';
+        clearTimeout(toast._t);
+        toast._t = setTimeout(() => { toast.style.display = 'none'; }, 4000);
     }
 
     document.getElementById('visitForm').addEventListener('submit', async function(e) {
+        // validación client-side — no pierde datos
+        const errores = [];
+        if (!hiddenInput.value) errores.push('Seleccioná una casa');
+        if (!fechaInput.value) errores.push('Elegí una fecha');
         for (const row of document.querySelectorAll('.producto-row')) {
             if (!row.querySelector('.product-select').value) {
-                e.preventDefault();
+                errores.push('Hay un producto sin seleccionar');
+                row.querySelector('.producto-editor').style.display = '';
+                row.querySelector('.producto-confirmado').style.display = 'none';
                 row.querySelector('.product-pick-btn').classList.add('is-invalid');
-                return;
+            } else if (!row.querySelector('.qty-input').value) {
+                errores.push('Hay un producto sin cantidad');
+                row.querySelector('.producto-editor').style.display = '';
+                row.querySelector('.producto-confirmado').style.display = 'none';
             }
+        }
+        if (errores.length) { e.preventDefault(); mostrarToastError(errores); return; }
+
+        // inyectar fotos de cámara
+        if (_camaraFiles.length) {
+            const dt = new DataTransfer();
+            _camaraFiles.forEach(f => dt.items.add(f));
+            const extra = document.createElement('input');
+            extra.type = 'file'; extra.name = 'archivos'; extra.style.display = 'none';
+            extra.files = dt.files;
+            this.appendChild(extra);
         }
         if (bypassDuplicateCheck) return;
         const casaId = hiddenInput.value;
@@ -357,9 +797,8 @@
                     const modalObj = new bootstrap.Modal(modalEl);
                     modalObj.show();
                     document.getElementById('btn-cancelar-duplicado').onclick = function() {
-                        searchInput.value = "";
-                        hiddenInput.value = "";
-                        searchInput.classList.remove('is-valid');
+                        searchInput.value = ""; hiddenInput.value = "";
+                        casaOkIcon.classList.add('d-none');
                         modalObj.hide();
                     };
                     document.getElementById('btn-aceptar-duplicado').onclick = function() {
@@ -376,41 +815,6 @@
         }
     });
 
-    function quitarProducto(btn) {
-        btn.closest('.producto-row').remove();
-        if (document.getElementById("productos-container").children.length === 0)
-            document.getElementById("empty-products").classList.remove("d-none");
-    }
-
-    function verificarDuplicado() {
-        const casaId = hiddenInput.value;
-        const fecha = fechaInput.value;
-        if (casaId && fecha) {
-            fetch(`/visits/check_duplicate?casa_id=${casaId}&fecha=${fecha}`)
-                .then(r => r.json())
-                .then(data => {
-                    if (data.exists) {
-                        document.getElementById('detalle-duplicado').innerText = data.detalles.replace("Productos:", "\nProductos:");
-                        const modalObj = new bootstrap.Modal(document.getElementById('modalDuplicado'));
-                        modalObj.show();
-                        document.getElementById('btn-cancelar-duplicado').onclick = function() {
-                            searchInput.value = "";
-                            hiddenInput.value = "";
-                            searchInput.classList.remove('is-valid');
-                            modalObj.hide();
-                        };
-                        document.getElementById('btn-aceptar-duplicado').onclick = function() { bypassDuplicateCheck = true; modalObj.hide(); };
-                    }
-                });
-        }
-    }
-
-    fechaInput.addEventListener('change', function() {
-        bypassDuplicateCheck = false;
-        actualizarCasasFiltradas();
-        verificarDuplicado();
-    });
-
     document.getElementById('productos-container').addEventListener('change', function(e) {
         if (!e.target.classList.contains('product-select')) return;
         const sel = e.target;
@@ -421,9 +825,7 @@
         const texto = row.querySelector('.stock-alerta-texto');
         const stock = parseFloat(opt.dataset.stock);
         const minimo = opt.dataset.minimo !== '' ? parseFloat(opt.dataset.minimo) : null;
-
         if (!opt.value) { alerta.classList.add('d-none'); return; }
-
         if (stock <= 0) {
             alerta.className = 'stock-alerta alert alert-danger py-1 px-2 mt-1 mb-0 small';
             icono.innerHTML = '<i class="bi bi-x-circle-fill"></i>';
