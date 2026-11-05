@@ -249,6 +249,7 @@
         <a class="navbar-brand" href="{{ url_for('main.home') }}">
             <img src="{{ url_for('static', filename='DRPiscinas2.png') }}" alt="DR. PISCINAS" style="height:30px;width:auto;object-fit:contain;margin-left:-5px;">
         </a>
+        {% block navbar_center %}{% endblock %}
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
             <span class="navbar-toggler-icon"></span>
         </button>

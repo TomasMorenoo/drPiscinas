@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Gestión de Grupos - Dr. Piscinas{% endblock %}
 
+{% block navbar_center %}
+<span class="d-md-none text-white fw-bold" style="font-size:0.85rem;opacity:0.75;">
+    {{ grupos|length }} grupo{{ 's' if grupos|length != 1 else '' }}
+</span>
+{% endblock %}
+
 {% block content %}
 <div class="d-none d-md-flex justify-content-between align-items-center mb-4">
     <h1 class="h3 mb-0 text-gray-800 fw-bold"><i class="bi bi-collection-fill me-2 text-success"></i>Grupos de Clientes</h1>
@@ -55,9 +61,7 @@
 <div class="d-md-none" style="margin: -1rem -12px 0;">
 
     {# Header oscuro #}
-    <div style="background:linear-gradient(135deg,#0d1a2e,#1a2f4e);padding:16px 16px 20px;">
-        <span style="font-size:0.82rem;color:rgba(255,255,255,0.4);">{{ grupos|length }} grupo{{ 's' if grupos|length != 1 else '' }}</span>
-    </div>
+    <div style="background:linear-gradient(135deg,#0d1a2e,#1a2f4e);padding:12px 16px 20px;"></div>
 
     {# FAB #}
     <a href="{{ url_for('grupos.crear_grupo') }}"
