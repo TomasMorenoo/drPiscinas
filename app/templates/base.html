@@ -136,32 +136,57 @@
                 position: fixed;
                 bottom: 58px; left: 0; right: 0;
                 background: #1a1d20;
-                border-top: 1px solid #343a40;
+                border-top: 1px solid #2a2d30;
+                border-radius: 16px 16px 0 0;
                 z-index: 1049;
-                padding: 8px 0;
-                box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+                padding: 10px 12px 12px;
+                box-shadow: 0 -8px 24px rgba(0,0,0,0.5);
             }
             .mas-drawer.open { display: block; }
-            .mas-drawer a {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                padding: 12px 20px;
-                color: #adb5bd;
-                font-size: 0.9rem;
-                font-weight: 500;
-                border-bottom: 1px solid #232629;
+            .mas-drawer .drawer-handle {
+                width: 32px; height: 3px; background: #3a3d40;
+                border-radius: 2px; margin: 0 auto 10px;
             }
-            .mas-drawer a:last-child { border-bottom: none; }
-            .mas-drawer a:hover { background: rgba(255,255,255,0.05); color: #fff; }
-            .mas-drawer a i { font-size: 1.1rem; width: 20px; text-align: center; }
             .mas-drawer .drawer-user {
-                padding: 10px 20px 6px;
-                font-size: 0.75rem;
+                font-size: 0.7rem;
                 color: #495057;
                 letter-spacing: 0.5px;
                 text-transform: uppercase;
+                padding-bottom: 10px;
+                border-bottom: 1px solid #2a2d30;
+                margin-bottom: 10px;
             }
+            .mas-drawer .drawer-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+                margin-bottom: 10px;
+            }
+            .mas-drawer .drawer-cell {
+                display: flex; flex-direction: column;
+                align-items: center; gap: 4px;
+                padding: 10px 4px; border-radius: 12px;
+                background: #242729;
+                text-decoration: none;
+                color: #adb5bd;
+                font-size: 0.65rem;
+                font-weight: 600;
+                text-align: center;
+                transition: background 0.15s;
+            }
+            .mas-drawer .drawer-cell:hover { background: #2e3133; color: #fff; }
+            .mas-drawer .drawer-cell i { font-size: 1.3rem; }
+            .mas-drawer .drawer-cell.root-cell { background: #2a1515; color: #f87171; }
+            .mas-drawer .drawer-cell.root-cell:hover { background: #3a1a1a; }
+            .mas-drawer .drawer-logout {
+                display: flex; align-items: center; justify-content: center;
+                gap: 6px; padding: 9px; border-radius: 10px;
+                background: rgba(239,68,68,0.12);
+                color: #ef4444; font-size: 0.85rem; font-weight: 600;
+                text-decoration: none;
+                transition: background 0.15s;
+            }
+            .mas-drawer .drawer-logout:hover { background: rgba(239,68,68,0.2); }
 
             .mas-overlay {
                 display: none;
@@ -312,28 +337,35 @@
 
 {# ── Drawer "Más" ── #}
 <div class="mas-drawer" id="mas-drawer">
+    <div class="drawer-handle"></div>
     <div class="drawer-user"><i class="bi bi-person-circle me-1"></i>{{ current_user.username }}</div>
 
-    {% if current_user.is_admin() %}
-    <a href="{{ url_for('estadisticas.index') }}"><i class="bi bi-bar-chart"></i> Estadísticas</a>
-    <a href="{{ url_for('stock.index') }}"><i class="bi bi-boxes"></i> Stock</a>
-    <a href="{{ url_for('users.listar_usuarios') }}"><i class="bi bi-person-badge-fill"></i> Empleados</a>
-    <a href="{{ url_for('config.listar_plantillas') }}"><i class="bi bi-gear"></i> Configuración</a>
-    {% endif %}
+    <div class="drawer-grid">
+        {% if current_user.is_admin() %}
+        <a class="drawer-cell" href="{{ url_for('estadisticas.index') }}"><i class="bi bi-bar-chart"></i>Estadísticas</a>
+        <a class="drawer-cell" href="{{ url_for('stock.index') }}"><i class="bi bi-boxes"></i>Stock</a>
+        <a class="drawer-cell" href="{{ url_for('users.listar_usuarios') }}"><i class="bi bi-person-badge-fill"></i>Empleados</a>
+        <a class="drawer-cell" href="{{ url_for('config.listar_plantillas') }}"><i class="bi bi-gear"></i>Config</a>
+        <a class="drawer-cell" href="{{ url_for('dashboard.auditoria') }}"><i class="bi bi-shield-check"></i>Auditoría</a>
+        {% endif %}
+        {% if current_user.username == 'root' %}
+        <a class="drawer-cell root-cell" href="{{ url_for('root.panel') }}"><i class="bi bi-shield-lock-fill"></i>Panel Root</a>
+        {% endif %}
+    </div>
 
-    {% if current_user.username == 'root' %}
-    <a href="{{ url_for('root.panel') }}"><i class="bi bi-shield-lock-fill text-danger"></i> Panel Root</a>
-    {% endif %}
-
-    {% if current_user.is_admin() %}
-    <a href="{{ url_for('dashboard.auditoria') }}"><i class="bi bi-shield-check"></i> Auditoría</a>
-    {% endif %}
-
-    <a href="{{ url_for('auth.logout') }}" style="color:#ef4444"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</a>
+    <a class="drawer-logout" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</a>
 </div>
 
 {# ── Bottom tab bar ── #}
 <nav class="bottom-tab-bar">
+    {% if current_user.is_admin() %}
+    <a class="tab-item {% if request.endpoint and request.endpoint.startswith('dashboard.') %}active{% endif %}"
+       href="{{ url_for('dashboard.index') }}">
+        <i class="bi bi-speedometer2"></i>
+        <span>Panel</span>
+    </a>
+    {% endif %}
+
     <a class="tab-item {% if request.endpoint and request.endpoint.startswith('visits.') %}active{% endif %}"
        href="{{ url_for('visits.listar_visits') }}">
         <i class="bi bi-calendar-check"></i>
@@ -345,11 +377,6 @@
        href="{{ url_for('casas.listar_casas') }}">
         <i class="bi bi-house-door"></i>
         <span>Clientes</span>
-    </a>
-    <a class="tab-item {% if request.endpoint and request.endpoint.startswith('dashboard.') %}active{% endif %}"
-       href="{{ url_for('dashboard.index') }}">
-        <i class="bi bi-speedometer2"></i>
-        <span>Panel</span>
     </a>
     {% endif %}
 
