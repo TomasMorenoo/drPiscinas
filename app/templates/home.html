@@ -2,7 +2,9 @@
 
 {% block content %}
 
-<div class="row align-items-center mb-5">
+<div class="home-wrap">
+
+<div class="home-header row align-items-center mb-5">
     <div class="col-md-8">
         <h1 class="display-5 fw-bold text-dark text-uppercase" style="letter-spacing: -1px;">
             <i class="bi bi-building-gear"></i> Centro de Control
@@ -17,29 +19,59 @@
     </div>
 </div>
 
-<div class="row mb-5">
+<div class="home-hero row mb-5">
     <div class="col-12">
         <div class="card bg-dark text-white border-0 shadow overflow-hidden">
             <div class="card-body p-4 p-md-5 position-relative">
-                <div class="position-absolute end-0 top-50 translate-middle-y opacity-10 pe-4 d-none d-md-block" style="font-size: 8rem;">
-                    <i class="bi bi-stopwatch-fill"></i>
-                </div>
-
-                <div class="position-relative z-1">
-                    <h2 class="fw-bold text-uppercase mb-3">Operación Diaria</h2>
-                    <p class="text-light opacity-75 mb-4 col-md-8" style="font-size: 1.1rem;">
-                        Acceso directo al registro de actividad en campo. Ingrese aquí para cargar una nueva visita, productos utilizados y observaciones.
-                    </p>
-                    <a href="{{ url_for('visits.crear_visit') }}" class="btn btn-light btn-lg fw-bold px-5 py-3 rounded-1 text-uppercase shadow-sm">
-                        <i class="bi bi-plus-lg me-2"></i> Registrar Nueva Visita
-                    </a>
+                <div class="d-flex align-items-center gap-4">
+                    <div>
+                        <h2 class="fw-bold text-uppercase mb-2">Registrar Visita</h2>
+                        <p class="text-light opacity-75 mb-3" style="font-size:1rem;">
+                            Cargá el trabajo de hoy: productos, observaciones y fotos.
+                        </p>
+                        <a href="{{ url_for('visits.crear_visit') }}" class="btn btn-light fw-bold px-4 py-2 rounded-1 text-uppercase shadow-sm">
+                            <i class="bi bi-plus-lg me-2"></i> Nueva Visita
+                        </a>
+                    </div>
+                    <i class="bi bi-file-earmark-text-fill text-white ms-auto" style="font-size:4rem;flex-shrink:0;opacity:0.6;"></i>
                 </div>
             </div>
         </div>
+
+        {# Alertas de stock estilo D con ticker #}
+        {% if sin_stock or stock_bajo %}
+        <div class="d-flex flex-column gap-2 mt-2">
+            {% if sin_stock %}
+            <div class="d-flex align-items-center gap-2 bg-white rounded-2 border overflow-hidden" style="font-size:0.82rem;height:2.2rem;">
+                <span style="width:9px;height:9px;border-radius:50%;background:#dc3545;flex-shrink:0;display:inline-block;margin-left:0.75rem;"></span>
+                <span class="fw-bold text-dark text-nowrap">Sin stock</span>
+                <div class="overflow-hidden flex-grow-1 position-relative" style="height:100%;">
+                    <div class="{{ 'stock-ticker-d' if sin_stock|length > 1 else '' }} d-flex align-items-center gap-3 position-absolute h-100" style="white-space:nowrap;padding-left:0.5rem;">
+                        {% for p in sin_stock %}<span class="text-danger">{{ p.nombre }}</span><span class="text-muted">·</span>{% endfor %}
+                        {% if sin_stock|length > 1 %}{% for p in sin_stock %}<span class="text-danger">{{ p.nombre }}</span><span class="text-muted">·</span>{% endfor %}{% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if stock_bajo %}
+            <div class="d-flex align-items-center gap-2 bg-white rounded-2 border overflow-hidden" style="font-size:0.82rem;height:2.2rem;">
+                <span style="width:9px;height:9px;border-radius:50%;background:#ffc107;flex-shrink:0;display:inline-block;margin-left:0.75rem;"></span>
+                <span class="fw-bold text-dark text-nowrap">Stock bajo</span>
+                <div class="overflow-hidden flex-grow-1 position-relative" style="height:100%;">
+                    <div class="{{ 'stock-ticker-slow' if stock_bajo|length > 1 else '' }} d-flex align-items-center gap-3 position-absolute h-100" style="white-space:nowrap;padding-left:0.5rem;">
+                        {% for p in stock_bajo %}<span class="text-dark">{{ p.nombre }}</span><span class="text-muted">·</span>{% endfor %}
+                        {% if stock_bajo|length > 1 %}{% for p in stock_bajo %}<span class="text-dark">{{ p.nombre }}</span><span class="text-muted">·</span>{% endfor %}{% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 </div>
 
 {% if novedades %}
+<div class="home-nov">
 <div class="row mb-5">
     <div class="col-12">
         <div class="card border-warning border-2 shadow-sm">
@@ -90,78 +122,14 @@
         </div>
     </div>
 </div>
-{% endif %}
-
-{% if sin_stock or stock_bajo %}
-<div class="row mb-4">
-    <div class="col-12 d-flex flex-column gap-2">
-
-        {% if sin_stock %}
-        <div class="stock-ticker-wrap rounded-1 overflow-hidden" style="background:#f8d7da;border:1px solid #f5c2c7;">
-            <div class="d-flex align-items-center">
-                <div class="flex-shrink-0 px-3 py-2 fw-bold text-white" style="background:#dc3545;white-space:nowrap;">
-                    <i class="bi bi-x-circle-fill me-1"></i> SIN STOCK
-                </div>
-                <div class="overflow-hidden flex-grow-1 py-2" style="position:relative;height:2.2rem;">
-                    <div class="stock-ticker-inner d-flex align-items-center gap-4" style="position:absolute;white-space:nowrap;padding-left:1rem;">
-                        {% for p in sin_stock %}
-                        <span class="text-danger fw-bold">
-                            <i class="bi bi-box-seam me-1"></i>{{ p.nombre }}
-                        </span>
-                        <span class="text-muted">·</span>
-                        {% endfor %}
-                        {% for p in sin_stock %}
-                        <span class="text-danger fw-bold">
-                            <i class="bi bi-box-seam me-1"></i>{{ p.nombre }}
-                        </span>
-                        <span class="text-muted">·</span>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        {% if stock_bajo %}
-        <div class="stock-ticker-wrap rounded-1 overflow-hidden" style="background:#fff3cd;border:1px solid #ffc107;">
-            <div class="d-flex align-items-center">
-                <div class="flex-shrink-0 px-3 py-2 fw-bold text-dark" style="background:#ffc107;white-space:nowrap;">
-                    <i class="bi bi-exclamation-triangle-fill me-1"></i> STOCK BAJO
-                </div>
-                <div class="overflow-hidden flex-grow-1 py-2" style="position:relative;height:2.2rem;">
-                    <div class="stock-ticker-inner d-flex align-items-center gap-4" style="position:absolute;white-space:nowrap;padding-left:1rem;">
-                        {% for p in stock_bajo %}
-                        {% set s = p.stock_actual | float %}
-                        {% set sv = (s | int) if (s - (s | int)) < 0.1 else s %}
-                        <span class="text-dark">
-                            <i class="bi bi-box-seam me-1 text-warning"></i>
-                            <strong>{{ p.nombre }}</strong>: {{ sv }} {{ p.unidad }}
-                        </span>
-                        <span class="text-muted">·</span>
-                        {% endfor %}
-                        {% for p in stock_bajo %}
-                        {% set s = p.stock_actual | float %}
-                        {% set sv = (s | int) if (s - (s | int)) < 0.1 else s %}
-                        <span class="text-dark">
-                            <i class="bi bi-box-seam me-1 text-warning"></i>
-                            <strong>{{ p.nombre }}</strong>: {{ sv }} {{ p.unidad }}
-                        </span>
-                        <span class="text-muted">·</span>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-    </div>
 </div>
 {% endif %}
 
-<div class="row g-4">
+
+<div class="home-cards row g-4">
 
     {% if current_user.is_admin() %}
-    <div class="col-md-6 col-xl-3">
+    <div class="col-6 col-md-6 col-xl-3">
         <a href="{{ url_for('dashboard.index') }}" class="text-decoration-none text-dark">
             <div class="card h-100 border shadow-sm hover-card">
                 <div class="card-body p-4">
@@ -182,7 +150,7 @@
         </a>
     </div>
 
-    <div class="col-md-6 col-xl-3">
+    <div class="col-6 col-md-6 col-xl-3">
         <a href="{{ url_for('casas.listar_casas') }}" class="text-decoration-none text-dark">
             <div class="card h-100 border shadow-sm hover-card">
                 <div class="card-body p-4">
@@ -204,7 +172,7 @@
     </div>
     {% endif %}
 
-    <div class="col-md-6 col-xl-3">
+    <div class="col-6 col-md-6 col-xl-3">
         <a href="{{ url_for('visits.listar_visits') }}" class="text-decoration-none text-dark">
             <div class="card h-100 border shadow-sm hover-card">
                 <div class="card-body p-4">
@@ -226,7 +194,7 @@
     </div>
 
     {% if current_user.is_admin() %}
-    <div class="col-md-6 col-xl-3">
+    <div class="col-6 col-md-6 col-xl-3">
         <a href="{{ url_for('estadisticas.index') }}" class="text-decoration-none text-dark">
             <div class="card h-100 border shadow-sm hover-card">
                 <div class="card-body p-4">
@@ -250,6 +218,8 @@
 
 </div>
 
+</div>{# /home-wrap #}
+
 <style>
     .hover-card {
         transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -259,14 +229,71 @@
         box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
         border-color: #dee2e6 !important;
     }
+    /* ── Mobile layout ───────────────────────────────────────── */
+    @media (max-width: 768px) {
+        .home-wrap {
+            display: flex;
+            flex-direction: column;
+        }
+        .home-header { order: 1; margin-bottom: 0 !important; }
+        .home-hero   { order: 2; margin-bottom: 0 !important; }
+        .home-nov    { order: 3; margin-top: 1rem; }
+        .home-cards  { order: 4; }
+
+        /* Header mobile: ocultar h1, mostrar solo fecha compacta */
+        .home-header h1,
+        .home-header p.lead { display: none; }
+        .home-header .col-md-4 { width: 100%; margin-top: 0; }
+        .home-header .border-start {
+            border: none !important;
+            padding: 0 !important;
+            margin-bottom: 10px;
+        }
+        .home-header .border-start p  { font-size: 0.7rem; }
+        .home-header .border-start h4 { font-size: 1rem; }
+
+        /* Hero mobile: más compacto */
+        .home-hero .card-body { padding: 1.25rem !important; }
+        .home-hero h2 { font-size: 1rem; margin-bottom: 0.5rem; }
+        .home-hero p  { font-size: 0.85rem; margin-bottom: 0.75rem; }
+        .home-hero .btn {
+            padding: 0.65rem 1.25rem !important;
+            font-size: 0.85rem !important;
+            width: 100%;
+        }
+        .home-hero .position-absolute { display: none; }
+
+        /* Cards mobile: grid minimalista */
+        .home-cards .card-body p,
+        .home-cards .card-footer { display: none !important; }
+        .home-cards .card-body { padding: 1rem 0.5rem !important; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+        .home-cards .card-body .d-flex { flex-direction: column; align-items: center; margin-bottom: 0 !important; }
+        .home-cards .card-body .bg-light { margin: 0 !important; padding: 0.6rem !important; border-radius: 10px !important; }
+        .home-cards .card-body .bg-light i { font-size: 1.6rem !important; }
+        .home-cards .card-body h4 { font-size: 0.8rem; text-align: center; margin: 0; }
+    }
+
     @keyframes ticker-scroll {
         0%   { transform: translateX(0); }
         100% { transform: translateX(-50%); }
     }
     .stock-ticker-inner {
-        animation: ticker-scroll var(--ticker-duration, 8s) linear infinite;
+        animation: ticker-scroll var(--ticker-duration, 10s) linear infinite;
     }
-    .stock-ticker-wrap:hover .stock-ticker-inner {
+    .stock-ticker-wrap:hover .stock-ticker-inner,
+    .stock-ticker-inner:hover {
+        animation-play-state: paused;
+    }
+    .stock-ticker-d {
+        animation: ticker-scroll 12s linear infinite;
+    }
+    .stock-ticker-d:hover {
+        animation-play-state: paused;
+    }
+    .stock-ticker-slow {
+        animation: ticker-scroll 20s linear infinite;
+    }
+    .stock-ticker-slow:hover {
         animation-play-state: paused;
     }
 </style>
