@@ -56,7 +56,6 @@
             right: -50px;
         }
 
-        /* Foto cuadrada (reemplaza el ícono) */
         .brand-photo {
             width: 110px;
             height: 110px;
@@ -195,42 +194,93 @@
             color: #adb5bd;
         }
 
-        /* ── Alertas ─────────────────────────────────────────────────── */
         .alerts-box {
             width: 100%;
             max-width: 380px;
             margin-bottom: 1rem;
         }
 
-        /* ── Responsive: apilado en móvil ────────────────────────────── */
+        /* ── Mobile ──────────────────────────────────────────────────── */
+        .btn-mobile-enter { display: none; }
+
+        @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+        .anim-fade-in  { animation: fadeIn  0.45s ease forwards; }
+        .anim-fade-out { animation: fadeOut 0.45s ease forwards; }
+
         @media (max-width: 768px) {
-            .login-wrap { flex-direction: column; }
-            .brand-panel {
-                width: 100%;
-                padding: 2.5rem 1.5rem;
-                flex-direction: row;
-                gap: 1rem;
-                justify-content: flex-start;
+            body { background-color: #0d1a2e; }
+
+            .login-wrap {
+                position: relative;
+                height: 100vh;
+                overflow: hidden;
             }
-            .brand-panel::before, .brand-panel::after { display: none; }
-            .brand-photo { width: 48px; height: 48px; margin-bottom: 0; border-radius: 10px; }
-            .brand-logo { width: 48px; height: 48px; margin-bottom: 0; border-radius: 10px; }
-            .brand-icon-fallback { font-size: 2rem; margin-bottom: 0; }
-            .brand-name { font-size: 1.1rem; letter-spacing: 1px; text-align: left; }
-            .brand-tagline { font-size: 0.75rem; text-align: left; margin-top: 0.1rem; }
-            .brand-desc { font-size: 0.7rem; text-align: left; margin-top: 0.1rem; }
-            .brand-divider { display: none; }
-            .form-panel { padding: 2rem 1.5rem; }
-            .login-footer { justify-content: center; text-align: center; }
+
+            .brand-panel {
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                width: 100%;
+                height: 100%;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                padding: 3rem 2rem;
+                overflow: visible;
+                background: linear-gradient(160deg, #1a2535 0%, #0d1a2e 60%, #1a2535 100%);
+            }
+
+            .brand-photo { width: 90px; height: 90px; margin-bottom: 1.25rem; border-radius: 16px; }
+            .brand-logo  { width: 72px; height: 72px; margin-bottom: 1.25rem; }
+            .brand-icon-fallback { font-size: 3.5rem; margin-bottom: 1rem; }
+            .brand-name    { font-size: 1.4rem; }
+            .brand-tagline { font-size: 0.9rem; }
+            .brand-desc    { font-size: 0.8rem; }
+            .brand-divider { display: block; }
+
+            .btn-mobile-enter {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.4rem;
+                position: absolute;
+                bottom: 2.5rem;
+                left: 2rem;
+                right: 2rem;
+                height: 48px;
+                background: rgba(255,255,255,0.1);
+                border: 1px solid rgba(255,255,255,0.22);
+                border-radius: 10px;
+                color: rgba(255,255,255,0.88);
+                font-size: 0.95rem;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                z-index: 10;
+                transition: background 0.2s;
+            }
+            .btn-mobile-enter:hover { background: rgba(255,255,255,0.16); }
+
+            .form-panel {
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                width: 100%;
+                height: 100%;
+                overflow-y: auto;
+                padding: 2.5rem 1.5rem;
+                display: none;
+            }
         }
     </style>
 </head>
 <body>
 
+{% set flashed = get_flashed_messages(with_categories=true) %}
+
 <div class="login-wrap">
 
     {# ── Panel de marca ── #}
-    <div class="brand-panel">
+    <div class="brand-panel" id="brand-panel">
         {% if cfg.login_image %}
             <img src="{{ url_for('root.serve_login_image') }}" alt="logo" class="brand-photo">
         {% elif cfg.app_icon_192 %}
@@ -242,23 +292,25 @@
         <div class="brand-tagline">Tu pileta en buenas manos</div>
         <div class="brand-desc">{{ cfg.app_description or 'Sistema de gestión' }}</div>
         <div class="brand-divider"></div>
+
+        <button class="btn-mobile-enter" id="btn-enter">
+            Ingresar <i class="bi bi-arrow-right"></i>
+        </button>
     </div>
 
     {# ── Panel del formulario ── #}
-    <div class="form-panel">
+    <div class="form-panel" id="form-panel">
 
         <div class="alerts-box">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        {% set bs = 'success' if category == 'success' else 'danger' if category == 'error' else 'warning' if category == 'warning' else 'info' %}
-                        <div class="alert alert-{{ bs }} alert-dismissible fade show py-2 small" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close btn-sm" data-bs-dismiss="alert"></button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
+            {% if flashed %}
+                {% for category, message in flashed %}
+                    {% set bs = 'success' if category == 'success' else 'danger' if category == 'error' else 'warning' if category == 'warning' else 'info' %}
+                    <div class="alert alert-{{ bs }} alert-dismissible fade show py-2 small" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close btn-sm" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
         </div>
 
         <div class="form-box">
@@ -270,7 +322,7 @@
 
                 <div class="form-floating mb-3">
                     <input type="text" name="username" class="form-control"
-                           id="username" placeholder="Usuario" required autofocus autocomplete="username">
+                           id="username" placeholder="Usuario" required autocomplete="username">
                     <label for="username"><i class="bi bi-person me-1"></i>Usuario</label>
                 </div>
 
@@ -292,8 +344,36 @@
 
     </div>
 
-</div>{# /login-wrap #}
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function () {
+    var isMobile = window.innerWidth <= 768;
+    if (!isMobile) return;
+
+    var brand = document.getElementById('brand-panel');
+    var form  = document.getElementById('form-panel');
+    var btn   = document.getElementById('btn-enter');
+
+    {% if flashed %}
+    // Hay error: ir directo al form
+    brand.style.display = 'none';
+    form.style.display  = 'flex';
+    {% endif %}
+
+    if (!btn) return;
+
+    btn.addEventListener('click', function () {
+        form.style.display = 'flex';
+        brand.classList.add('anim-fade-out');
+        form.classList.add('anim-fade-in');
+        setTimeout(function () {
+            brand.style.display = 'none';
+            document.getElementById('username').focus();
+        }, 460);
+    });
+})();
+</script>
 </body>
 </html>

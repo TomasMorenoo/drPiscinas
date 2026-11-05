@@ -77,5 +77,4 @@ def logout():
     db.session.commit()
     logout_user()
     session.clear()
-    flash('Sesión cerrada correctamente.', 'info')
     return redirect(url_for('auth.login'))
