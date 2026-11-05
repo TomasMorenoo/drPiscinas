@@ -128,23 +128,29 @@
         border-radius: 0 !important;
     }
 
-    /* Cards de grupos */
+    /* Cards de grupos: scroll container */
     #collapseGruposMain .card {
         margin-left: -1rem;
         margin-right: -1rem;
         border-radius: 0 !important;
-    }
-
-    /* Header de grupos scrolleable */
-    .grupo-card-header-scroll {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+    }
+
+    /* Wrapper interno: ancho fijo para que header y tabla scrolleen juntos */
+    .grupo-scroll-wrap {
+        min-width: max-content;
+        width: 100%;
+    }
+
+    /* Header: sin scroll propio, fluye con el wrapper */
+    .grupo-card-header-scroll {
+        overflow-x: visible;
     }
     .grupo-header-mobile {
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         align-items: center;
-        min-width: max-content;
         gap: 1rem;
     }
     .grupo-header-mobile > div:first-child {
@@ -972,6 +978,7 @@
         {% set estado_clase_g = g.estado %}
         
         <div class="card border-0 shadow-sm border-start border-4 border-primary mb-3 fila-busqueda" data-estado="{{ estado_clase_g }}" data-pago-parcial="{{ 'true' if g.monto_pagado > 0 and not g.pagado else 'false' }}">
+            <div class="grupo-scroll-wrap">
 
             {# CARD HEADER DEL GRUPO #}
             <div class="card-header bg-white py-3 grupo-card-header-scroll">
@@ -1364,6 +1371,7 @@
                 </div>
             </div>
 
+            </div>{# fin grupo-scroll-wrap #}
         </div>
         {% endfor %}
     </div>
