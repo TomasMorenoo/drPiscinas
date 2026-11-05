@@ -56,22 +56,19 @@
 
     {# Header oscuro #}
     <div style="background:linear-gradient(135deg,#0d1a2e,#1a2f4e);padding:16px 16px 20px;">
-        <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:6px 12px;display:flex;align-items:center;gap:8px;">
-            <i class="bi bi-collection-fill" style="color:rgba(255,255,255,0.3);"></i>
-            <span style="font-size:0.82rem;color:rgba(255,255,255,0.4);">{{ grupos|length }} grupo{{ 's' if grupos|length != 1 else '' }}</span>
-        </div>
+        <span style="font-size:0.82rem;color:rgba(255,255,255,0.4);">{{ grupos|length }} grupo{{ 's' if grupos|length != 1 else '' }}</span>
     </div>
 
     {# FAB #}
     <a href="{{ url_for('grupos.crear_grupo') }}"
-       style="position:fixed;bottom:24px;right:20px;z-index:1000;width:56px;height:56px;border-radius:50%;background:#198754;color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.6rem;box-shadow:0 4px 16px rgba(25,135,84,0.5);text-decoration:none;">
+       style="position:fixed;bottom:80px;right:20px;z-index:1000;width:56px;height:56px;border-radius:50%;background:#198754;color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.6rem;box-shadow:0 4px 16px rgba(25,135,84,0.5);text-decoration:none;">
         <i class="bi bi-plus-lg"></i>
     </a>
 
     {# Cards #}
     <div style="background:#f1f5f9;padding:12px 12px 88px;">
         {% for grupo in grupos %}
-        <div style="background:#fff;border-radius:12px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);border-left:4px solid #198754;">
+        <div style="background:#fff;border-radius:12px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);border-left:4px solid #0d1a2e;">
             <div style="padding:12px 14px;">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">
                     <div>
