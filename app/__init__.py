@@ -47,6 +47,7 @@ def create_app():
     csrf.init_app(app)
     cache.init_app(app)
     login_manager.login_view = "auth.login"
+    login_manager.login_message = None
 
     # --- REGISTRO DE BLUEPRINTS ---
     from app.routers.auth_router import auth_bp
