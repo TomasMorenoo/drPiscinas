@@ -9,7 +9,8 @@
     </a>
 </div>
 
-<div class="card border-0 shadow-sm">
+{# DESKTOP: tabla original #}
+<div class="card border-0 shadow-sm d-none d-md-block">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead class="table-dark">
@@ -36,7 +37,6 @@
                     </td>
                     <td class="text-end pe-4">
                         <a href="{{ url_for('grupos.editar_grupo', id=grupo.id) }}" class="btn btn-sm btn-primary shadow-sm"><i class="bi bi-pencil-square"></i> Administrar</a>
-                        
                         <form action="{{ url_for('grupos.eliminar_grupo', id=grupo.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Seguro que querés desarmar este grupo? Las casas volverán a ser sueltas.');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <button type="submit" class="btn btn-sm btn-outline-danger shadow-sm"><i class="bi bi-trash-fill"></i> Desarmar</button>
@@ -44,10 +44,50 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="3" class="text-center py-4 text-muted">No hay grupos creados todavía.</td></tr>
+                <tr><td colspan="4" class="text-center py-4 text-muted">No hay grupos creados todavía.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+{# MOBILE: cards #}
+<div class="d-md-none">
+    {% for grupo in grupos %}
+    <div class="card border-0 shadow-sm mb-3" style="border-left: 4px solid #198754 !important;">
+        <div class="card-body py-3 px-3">
+            <div class="d-flex align-items-start justify-content-between mb-2">
+                <div>
+                    <div class="fw-bold fs-5 lh-sm">
+                        <a href="{{ url_for('grupos.perfil', id=grupo.id) }}" class="text-dark text-decoration-none">{{ grupo.nombre_display }}</a>
+                    </div>
+                    <div class="text-muted small mt-1">
+                        <i class="bi bi-whatsapp me-1 {% if grupo.nombre_identificador %}text-success{% endif %}"></i>
+                        {% if grupo.nombre_identificador %}
+                            {{ grupo.nombre }}
+                        {% else %}
+                            <span class="fst-italic">(igual al anterior)</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <span class="badge bg-secondary ms-2 mt-1">{{ grupo.casas|length }} casas</span>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('grupos.editar_grupo', id=grupo.id) }}" class="btn btn-primary btn-sm fw-bold flex-grow-1">
+                    <i class="bi bi-pencil-square me-1"></i>Administrar
+                </a>
+                <form action="{{ url_for('grupos.eliminar_grupo', id=grupo.id) }}" method="POST" onsubmit="return confirm('¿Seguro que querés desarmar este grupo? Las casas volverán a ser sueltas.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-outline-danger btn-sm fw-bold">
+                        <i class="bi bi-trash-fill"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <p class="text-center text-muted py-4">No hay grupos creados todavía.</p>
+    {% endfor %}
+</div>
+
 {% endblock %}
