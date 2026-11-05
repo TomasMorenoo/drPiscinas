@@ -2,9 +2,9 @@
 {% block title %}Administrar Grupo - Dr. Piscinas{% endblock %}
 
 {% block navbar_center %}
-<span class="d-md-none text-white fw-bold" style="font-size:0.85rem;opacity:0.75;">
-    {{ grupo.nombre_display }}
-</span>
+<a href="{{ url_for('grupos.listar_grupos') }}" class="d-md-none text-white text-decoration-none fw-bold" style="font-size:0.82rem;opacity:0.75;">
+    <i class="bi bi-arrow-left me-1"></i>Volver
+</a>
 {% endblock %}
 
 {% block content %}
@@ -86,7 +86,8 @@
 <div class="d-md-none" style="margin:-1rem -12px 0; padding-top: 0.5rem;">
 
     <style>
-        .ge-top { background: linear-gradient(135deg,#0d1a2e,#1a2f4e); padding: 0 16px; }
+        .ge-top { background: linear-gradient(135deg,#0d1a2e,#1a2f4e); padding: 10px 16px 0; }
+        .ge-title { color: #fff; font-weight: 700; font-size: 1.05rem; margin-bottom: 10px; }
         .ge-tabs { display: flex; }
         .ge-tab { flex: 1; padding: 11px 0; text-align: center; font-size: 0.82rem; font-weight: 700;
                   color: rgba(255,255,255,0.45); cursor: pointer; border-bottom: 3px solid transparent;
@@ -116,6 +117,7 @@
     </style>
 
     <div class="ge-top">
+        <div class="ge-title">{{ grupo.nombre_display }}</div>
         <div class="ge-tabs">
             <a class="ge-tab active" onclick="geTab('casas',this)">
                 <i class="bi bi-people-fill me-1"></i>Casas ({{ grupo.casas|length }})
