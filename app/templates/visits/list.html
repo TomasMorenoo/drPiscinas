@@ -46,9 +46,25 @@
         {% set mes_next = mes_sel + 1 if mes_sel < 12 else 1 %}
         {% set anio_next = anio_sel if mes_sel < 12 else anio_sel + 1 %}
         <a href="{{ url_for('visits.listar_visits', mes=mes_prev, anio=anio_prev) }}" class="text-secondary fs-5 text-decoration-none px-1">‹</a>
-        <span class="fw-bold text-dark">{{ MESES_LARGO[mes_sel - 1] }} {{ anio_sel }}</span>
+        <span class="fw-bold text-dark" id="mes-label" onclick="document.getElementById('mes-picker').classList.toggle('d-none')" style="cursor:pointer;border-bottom:1px dashed #adb5bd;">{{ MESES_LARGO[mes_sel - 1] }} {{ anio_sel }}</span>
         <a href="{{ url_for('visits.listar_visits', mes=mes_next, anio=anio_next) }}" class="text-secondary fs-5 text-decoration-none px-1">›</a>
     </div>
+    <div id="mes-picker" class="d-none d-flex gap-2 align-items-center mb-2 px-1">
+        <select id="pick-mes" class="form-select form-select-sm" style="max-width:130px;">
+            {% for i in range(1,13) %}
+            <option value="{{ i }}" {% if i == mes_sel %}selected{% endif %}>{{ MESES_LARGO[i-1] }}</option>
+            {% endfor %}
+        </select>
+        <input type="number" id="pick-anio" class="form-control form-control-sm" value="{{ anio_sel }}" min="2020" max="2099" style="max-width:80px;">
+        <button onclick="irAMes()" class="btn btn-sm btn-dark px-3">Ir</button>
+    </div>
+    <script>
+    function irAMes() {
+        var m = document.getElementById('pick-mes').value;
+        var a = document.getElementById('pick-anio').value;
+        window.location.href = '{{ url_for('visits.listar_visits') }}?mes=' + m + '&anio=' + a;
+    }
+    </script>
 
     <div class="d-flex gap-2 mb-2">
         <div class="flex-fill text-center rounded-3 py-2 px-1" style="background:#f0fdf4;border:1px solid #bbf7d0;">
