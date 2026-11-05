@@ -203,10 +203,6 @@
         /* ── Mobile ──────────────────────────────────────────────────── */
         .btn-mobile-enter { display: none; }
 
-        @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
-        .anim-fade-in  { animation: fadeIn  0.45s ease forwards; }
-        .anim-fade-out { animation: fadeOut 0.45s ease forwards; }
 
         @media (max-width: 768px) {
             body { background-color: #0d1a2e; }
@@ -294,7 +290,7 @@
         <div class="brand-divider"></div>
 
         <button class="btn-mobile-enter" id="btn-enter">
-            Ingresar <i class="bi bi-arrow-right"></i>
+            Iniciar sesión <i class="bi bi-arrow-right"></i>
         </button>
     </div>
 
@@ -365,13 +361,9 @@
     if (!btn) return;
 
     btn.addEventListener('click', function () {
-        form.style.display = 'flex';
-        brand.classList.add('anim-fade-out');
-        form.classList.add('anim-fade-in');
-        setTimeout(function () {
-            brand.style.display = 'none';
-            document.getElementById('username').focus();
-        }, 460);
+        brand.style.display = 'none';
+        form.style.display  = 'flex';
+        document.getElementById('username').focus();
     });
 })();
 </script>
