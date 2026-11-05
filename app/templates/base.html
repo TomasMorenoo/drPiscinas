@@ -200,6 +200,46 @@
         @media (min-width: 992px) {
             .bottom-tab-bar, .mas-drawer, .mas-overlay { display: none !important; }
         }
+
+        /* ── Flash toast ── */
+        .flash-toast {
+            position: fixed;
+            bottom: 80px; left: 16px; right: 16px;
+            max-width: 420px;
+            margin: 0 auto;
+            background: #212529;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 14px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+            z-index: 2000;
+            overflow: hidden;
+            animation: toast-in 0.3s ease forwards;
+        }
+        .flash-toast.hide {
+            animation: toast-out 0.35s ease forwards;
+        }
+        @media (min-width: 992px) {
+            .flash-toast { bottom: 24px; left: auto; right: 24px; width: 320px; margin: 0; }
+        }
+        .flash-toast-ic { font-size: 1.3rem; flex-shrink: 0; }
+        .flash-toast-msg { flex: 1; font-size: 0.88rem; font-weight: 600; color: #f9fafb; }
+        .flash-toast-bar {
+            position: absolute;
+            bottom: 0; left: 0;
+            height: 3px;
+            background: #60a5fa;
+            border-radius: 0 0 14px 14px;
+            width: 100%;
+            transform-origin: left;
+            animation: toast-bar 3s linear forwards;
+        }
+        .flash-toast-success .flash-toast-bar { background: #22c55e; }
+        @keyframes toast-in  { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes toast-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(16px); } }
+        @keyframes toast-bar { from { width: 100%; } to { width: 0%; } }
     </style>
 </head>
 <body>
@@ -301,12 +341,11 @@
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
-          {% set bootstrap_class = 'success' if category == 'success' else 'danger' if category == 'error' else 'warning' if category == 'warning' else 'info' %}
-
-          <div class="alert alert-{{ bootstrap_class }} alert-dismissible fade show shadow-sm" role="alert">
-            <i class="bi {{ 'bi-check-circle-fill' if category == 'success' else 'bi-exclamation-triangle-fill' }}"></i>
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          {% set is_success = category == 'success' %}
+          <div class="flash-toast{% if is_success %} flash-toast-success{% endif %}" id="flash-toast-{{ loop.index }}">
+            <span class="flash-toast-ic">{{ '👋' if is_success else '⚠️' }}</span>
+            <span class="flash-toast-msg">{{ message }}</span>
+            <div class="flash-toast-bar"></div>
           </div>
         {% endfor %}
       {% endif %}
@@ -418,6 +457,13 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('mas-overlay').classList.remove('open');
         document.getElementById('btn-mas').classList.remove('active');
     }
+
+    document.querySelectorAll('.flash-toast').forEach(function(el) {
+        setTimeout(function() {
+            el.classList.add('hide');
+            setTimeout(function() { el.remove(); }, 380);
+        }, 3000);
+    });
 
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
