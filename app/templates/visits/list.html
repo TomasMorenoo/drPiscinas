@@ -400,5 +400,14 @@
     });
 
     window.addEventListener('online', () => doSync());
+
+    if (navigator.onLine && 'serviceWorker' in navigator) {
+        const _swMsg = { type: 'CACHE_PAGE', url: location.href };
+        if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage(_swMsg);
+        } else {
+            navigator.serviceWorker.ready.then(reg => { if (reg.active) reg.active.postMessage(_swMsg); }).catch(() => {});
+        }
+    }
 </script>
 {% endblock %}

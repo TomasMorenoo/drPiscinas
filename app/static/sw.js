@@ -10,26 +10,11 @@ const STATIC_ASSETS = [
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
 ];
 
-const KEY_PAGES = [
-  '/visits/',
-  '/visits/create',
-];
-
 // ── Install ───────────────────────────────────────────────────────────────────
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
-    // Cachear assets estáticos (siempre funcionan)
     const staticCache = await caches.open(CACHE_STATIC);
     await staticCache.addAll(STATIC_ASSETS).catch(() => {});
-
-    // Cachear páginas clave (requieren estar logueado)
-    const pagesCache = await caches.open(CACHE_PAGES);
-    await Promise.all(KEY_PAGES.map(url =>
-      fetch(url, { credentials: 'include' })
-        .then(r => { if (r.ok) pagesCache.put(url, r); })
-        .catch(() => {})
-    ));
-
     self.skipWaiting();
   })());
 });
@@ -82,6 +67,17 @@ self.addEventListener('fetch', e => {
       }).catch(() => caches.match(e.request))
     );
     return;
+  }
+});
+
+// ── Message handler (cache on demand) ────────────────────────────────────────
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'CACHE_PAGE') {
+    caches.open(CACHE_PAGES).then(c =>
+      fetch(e.data.url, { credentials: 'include' })
+        .then(r => { if (r.ok) c.put(e.data.url, r); })
+        .catch(() => {})
+    );
   }
 });
 

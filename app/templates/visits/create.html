@@ -854,6 +854,16 @@
         }
     });
 
+    if (navigator.onLine) {
+        try { localStorage.setItem('offline_casas', JSON.stringify(casasData)); } catch(_) {}
+        const _swMsg = { type: 'CACHE_PAGE', url: location.href };
+        if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage(_swMsg);
+        } else if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(reg => { if (reg.active) reg.active.postMessage(_swMsg); }).catch(() => {});
+        }
+    }
+
     document.getElementById('productos-container').addEventListener('change', function(e) {
         if (!e.target.classList.contains('product-select')) return;
         const sel = e.target;
