@@ -353,6 +353,58 @@ def delete_media(visit_id, media_id):
     db.session.commit()
     return redirect(url_for("visits.detalle_visit", id=visit_id))
 
+@visit_bp.route("/sync-offline", methods=["POST"])
+@login_required
+def sync_offline():
+    data = request.get_json(force=True, silent=True)
+    if not data:
+        return jsonify({"ok": False, "error": "no data"}), 400
+
+    fecha_str = data.get("fecha")
+    casa_id = data.get("casa_id")
+    if not fecha_str or not casa_id:
+        return jsonify({"ok": False, "error": "missing fields"}), 400
+
+    try:
+        fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({"ok": False, "error": "invalid date"}), 400
+
+    if is_mes_cerrado(fecha_obj.month, fecha_obj.year):
+        return jsonify({"ok": False, "error": "mes_cerrado"}), 409
+
+    visit = Visit(
+        casa_id=casa_id,
+        fecha=fecha_obj,
+        observaciones=data.get("observaciones", "").strip(),
+        promo_id=data.get("promo_id") or None,
+        usuario_id=current_user.id
+    )
+    db.session.add(visit)
+    db.session.commit()
+
+    for prod in data.get("productos", []):
+        p_id = prod.get("product_id")
+        cant = prod.get("cantidad")
+        if p_id and cant:
+            product = Product.query.get(p_id)
+            if product:
+                vp = VisitProduct(
+                    visit_id=visit.id,
+                    product_id=p_id,
+                    cantidad=float(cant),
+                    precio_unitario=product.precio
+                )
+                db.session.add(vp)
+                mover_stock(product.id, -float(cant), 'visita', current_user.username, visit_id=visit.id)
+
+    db.session.commit()
+    registrar_auditoria(current_user.username, 'CREAR_VISITA_OFFLINE',
+        f"{visit.casa.nombre_formateado()} — {fecha_obj.strftime('%d/%m/%Y')}")
+
+    return jsonify({"ok": True, "visit_id": visit.id})
+
+
 @visit_bp.route("/check_duplicate")
 @login_required
 def check_duplicate():

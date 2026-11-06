@@ -397,6 +397,7 @@
     </div>
 </div>
 
+<script src="{{ url_for('static', filename='offline-visits.js') }}"></script>
 <script>
     // ── Fecha display ──
     const fechaInput = document.getElementById('fecha_visita');
@@ -773,6 +774,41 @@
             }
         }
         if (errores.length) { e.preventDefault(); mostrarToastError(errores); return; }
+
+        // ── OFFLINE: guardar en cola ──────────────────────────────────────────
+        if (!navigator.onLine) {
+            e.preventDefault();
+            const productos = [];
+            document.querySelectorAll('.producto-row').forEach(row => {
+                const pid = row.querySelector('.product-select').value;
+                const cant = row.querySelector('.qty-input').value;
+                const nombre = row.querySelector('.product-pick-label')?.textContent?.trim() || '';
+                if (pid && cant) productos.push({ product_id: pid, cantidad: cant, nombre });
+            });
+            await savePendingVisit({
+                casa_id: hiddenInput.value,
+                casa_nombre: searchInput.value,
+                fecha: fechaInput.value,
+                promo_id: promoSelect.value || null,
+                promo_nombre: promoSelect.value ? promoDisplay.textContent : '',
+                observaciones: document.querySelector('[name=observaciones]').value,
+                productos,
+                csrf_token: document.querySelector('[name=csrf_token]').value
+            });
+            let toast = document.getElementById('cv-toast-error');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'cv-toast-error';
+                toast.style.cssText = 'position:fixed;bottom:80px;left:16px;right:16px;z-index:4000;border-radius:14px;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-size:0.85rem;';
+                document.body.appendChild(toast);
+            }
+            toast.style.background = '#1e3a5f';
+            toast.innerHTML = '<div style="font-weight:700;margin-bottom:4px;color:#93c5fd;"><i class="bi bi-cloud-upload me-1"></i>Sin conexión — visita guardada en cola</div><div style="color:rgba(255,255,255,0.7);font-size:0.78rem;">Se subirá automáticamente cuando recuperes internet.</div>';
+            toast.style.display = 'block';
+            clearTimeout(toast._t);
+            toast._t = setTimeout(() => { toast.style.display = 'none'; }, 5000);
+            return;
+        }
 
         // inyectar fotos de cámara
         if (_camaraFiles.length) {

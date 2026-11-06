@@ -38,6 +38,19 @@
     {% endif %}
 </div>
 
+{# ── Cola offline ── #}
+<div id="offline-queue-section" style="display:none;" class="mb-3">
+    <div style="background:#1e3a5f;border-radius:12px;padding:12px 14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div style="font-size:0.78rem;font-weight:700;color:#93c5fd;"><i class="bi bi-cloud-upload me-1"></i>Visitas en cola</div>
+            <button id="btn-sync" onclick="doSync()" style="background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:0.75rem;font-weight:700;cursor:pointer;">
+                <i class="bi bi-arrow-repeat me-1"></i>Sincronizar
+            </button>
+        </div>
+        <div id="offline-queue-list"></div>
+    </div>
+</div>
+
 {# ── Bloque mobile: mes + pills + consumo ── #}
 <div class="d-lg-none mb-3">
     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -340,5 +353,52 @@
         }
         {% endif %}
     });
+</script>
+
+<script src="{{ url_for('static', filename='offline-visits.js') }}"></script>
+<script>
+    const MESES_CORTO = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+    async function renderOfflineQueue() {
+        const pending = await getPendingVisits().catch(() => []);
+        const section = document.getElementById('offline-queue-section');
+        const list = document.getElementById('offline-queue-list');
+        if (!pending.length) { section.style.display = 'none'; return; }
+        section.style.display = 'block';
+        list.innerHTML = pending.map(item => {
+            const [y, m, d] = item.fecha.split('-');
+            const fecha = `${d} ${MESES_CORTO[parseInt(m)-1]} ${y}`;
+            const prods = (item.productos || []).map(p => p.nombre || p.product_id).filter(Boolean).join(', ');
+            return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+                <i class="bi bi-clock-fill" style="color:#fbbf24;font-size:0.85rem;flex-shrink:0;"></i>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:0.82rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.casa_nombre}</div>
+                    <div style="font-size:0.68rem;color:rgba(255,255,255,0.5);">${fecha}${prods ? ' · ' + prods : ''}</div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    async function doSync() {
+        const btn = document.getElementById('btn-sync');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Sincronizando...';
+        const result = await syncPendingVisits().catch(() => ({ synced: 0, errors: 1, total: 0 }));
+        await renderOfflineQueue();
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Sincronizar';
+        if (result.synced > 0) location.reload();
+    }
+
+    // Auto-sync si hay conexión al cargar
+    window.addEventListener('load', async () => {
+        await renderOfflineQueue();
+        if (navigator.onLine) {
+            const pending = await getPendingVisits().catch(() => []);
+            if (pending.length) doSync();
+        }
+    });
+
+    window.addEventListener('online', () => doSync());
 </script>
 {% endblock %}
