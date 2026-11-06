@@ -488,25 +488,24 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function _swNotify(title, body) {
-        if (!('serviceWorker' in navigator) || Notification.permission !== 'granted') return;
-        navigator.serviceWorker.ready.then(reg => {
-            reg.showNotification(title, {
-                body,
-                icon: '/static/icons/icon-192.png',
-                badge: '/static/icons/icon-192.png',
-                tag: 'offline-status',
-                renotify: true,
-            });
-        });
+    function _showNetToast(icon, msg, color) {
+        const t = document.createElement('div');
+        t.className = 'flash-toast';
+        t.style.background = color;
+        t.innerHTML = `<span class="flash-toast-ic">${icon}</span><span class="flash-toast-msg">${msg}</span><div class="flash-toast-bar"></div>`;
+        document.body.appendChild(t);
+        setTimeout(() => {
+            t.classList.add('hide');
+            setTimeout(() => t.remove(), 400);
+        }, 4000);
     }
 
     window.addEventListener('offline', () => {
-        _swNotify('Sin conexión', 'Las visitas se sincronizarán automáticamente cuando recuperes internet.');
+        _showNetToast('📡', 'Sin conexión — las visitas se guardarán en cola', '#1e3a5f');
     });
 
     window.addEventListener('online', () => {
-        _swNotify('Conexión restaurada', 'Sincronizando visitas pendientes...');
+        _showNetToast('✅', 'Conexión restaurada — sincronizando visitas...', '#14532d');
     });
     
     document.addEventListener("DOMContentLoaded", function(){
