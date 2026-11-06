@@ -70,14 +70,26 @@ self.addEventListener('fetch', e => {
   }
 });
 
-// ── Message handler (cache on demand) ────────────────────────────────────────
+// ── Message handler ───────────────────────────────────────────────────────────
 self.addEventListener('message', e => {
-  if (e.data && e.data.type === 'CACHE_PAGE') {
+  if (!e.data) return;
+
+  if (e.data.type === 'CACHE_PAGE') {
     caches.open(CACHE_PAGES).then(c =>
       fetch(e.data.url, { credentials: 'include' })
         .then(r => { if (r.ok) c.put(e.data.url, r); })
         .catch(() => {})
     );
+  }
+
+  if (e.data.type === 'CACHE_ALL') {
+    caches.open(CACHE_PAGES).then(c => {
+      e.data.urls.forEach(url => {
+        fetch(url, { credentials: 'include' })
+          .then(r => { if (r.ok) c.put(url, r); })
+          .catch(() => {});
+      });
+    });
   }
 });
 

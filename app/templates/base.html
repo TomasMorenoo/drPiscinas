@@ -481,9 +481,24 @@ document.addEventListener('DOMContentLoaded', function() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
             navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then(function(registration) {
-                console.log('App instalable lista (ServiceWorker registrado)');
-            }, function(err) {
-                console.log('Error en ServiceWorker: ', err);
+                if (navigator.onLine) {
+                    const sw = registration.active || registration.installing || registration.waiting;
+                    if (sw) {
+                        const _doCache = function() {
+                            sw.postMessage({ type: 'CACHE_ALL', urls: [
+                                '/', '/visits/', '/visits/create',
+                                '/casas/', '/dashboard/', '/estadisticas/', '/stock/'
+                            ]});
+                        };
+                        if (sw.state === 'activated') {
+                            _doCache();
+                        } else {
+                            sw.addEventListener('statechange', function() {
+                                if (sw.state === 'activated') _doCache();
+                            });
+                        }
+                    }
+                }
             });
         });
     }
