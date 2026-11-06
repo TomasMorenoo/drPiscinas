@@ -487,6 +487,27 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
+    function _swNotify(title, body) {
+        if (!('serviceWorker' in navigator) || Notification.permission !== 'granted') return;
+        navigator.serviceWorker.ready.then(reg => {
+            reg.showNotification(title, {
+                body,
+                icon: '/static/icons/icon-192.png',
+                badge: '/static/icons/icon-192.png',
+                tag: 'offline-status',
+                renotify: true,
+            });
+        });
+    }
+
+    window.addEventListener('offline', () => {
+        _swNotify('Sin conexión', 'Las visitas se sincronizarán automáticamente cuando recuperes internet.');
+    });
+
+    window.addEventListener('online', () => {
+        _swNotify('Conexión restaurada', 'Sincronizando visitas pendientes...');
+    });
     
     document.addEventListener("DOMContentLoaded", function(){
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
