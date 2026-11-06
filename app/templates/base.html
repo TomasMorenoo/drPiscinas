@@ -385,6 +385,12 @@
         <a class="drawer-cell" href="{{ url_for('estadisticas.index') }}"><i class="bi bi-bar-chart"></i>Estadísticas</a>
         <a class="drawer-cell" href="{{ url_for('stock.index') }}"><i class="bi bi-boxes"></i>Stock</a>
         <a class="drawer-cell" href="{{ url_for('users.listar_usuarios') }}"><i class="bi bi-person-badge-fill"></i>Empleados</a>
+        <a class="drawer-cell" href="{{ url_for('products.listar_products') }}"><i class="bi bi-box-seam-fill"></i>Productos</a>
+        <a class="drawer-cell" href="{{ url_for('promo.listar_promos') }}"><i class="bi bi-tag-fill"></i>Promociones</a>
+        <a class="drawer-cell" href="{{ url_for('grupos.listar_grupos') }}"><i class="bi bi-collection-fill"></i>Grupos</a>
+        <a class="drawer-cell" href="{{ url_for('country.listar_countries') }}"><i class="bi bi-geo-alt-fill"></i>Countries</a>
+        <a class="drawer-cell" href="{{ url_for('barrio.listar_barrios') }}"><i class="bi bi-map-fill"></i>Barrios</a>
+        <a class="drawer-cell" href="{{ url_for('config.extras_masivos') }}"><i class="bi bi-boxes"></i>Extras</a>
         <a class="drawer-cell" href="{{ url_for('config.listar_plantillas') }}"><i class="bi bi-gear"></i>Config</a>
         <a class="drawer-cell" href="{{ url_for('dashboard.auditoria') }}"><i class="bi bi-shield-check"></i>Auditoría</a>
         {% endif %}
