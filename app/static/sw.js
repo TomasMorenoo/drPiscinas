@@ -1,22 +1,40 @@
-const CACHE_STATIC = 'drp-static-v1';
-const CACHE_PAGES  = 'drp-pages-v1';
+const CACHE_STATIC = 'drp-static-v2';
+const CACHE_PAGES  = 'drp-pages-v2';
 
-const PRECACHE_STATIC = [
+const STATIC_ASSETS = [
+  '/static/offline-visits.js',
   '/static/DRPiscinas2.png',
   '/static/manifest.json',
-  '/static/offline-visits.js',
+  'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
+  'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css',
+  'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
 ];
 
-// ── Install: precache static assets ──────────────────────────────────────────
+const KEY_PAGES = [
+  '/visits/',
+  '/visits/create',
+];
+
+// ── Install ───────────────────────────────────────────────────────────────────
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE_STATIC)
-      .then(c => c.addAll(PRECACHE_STATIC))
-      .then(() => self.skipWaiting())
-  );
+  e.waitUntil((async () => {
+    // Cachear assets estáticos (siempre funcionan)
+    const staticCache = await caches.open(CACHE_STATIC);
+    await staticCache.addAll(STATIC_ASSETS).catch(() => {});
+
+    // Cachear páginas clave (requieren estar logueado)
+    const pagesCache = await caches.open(CACHE_PAGES);
+    await Promise.all(KEY_PAGES.map(url =>
+      fetch(url, { credentials: 'include' })
+        .then(r => { if (r.ok) pagesCache.put(url, r); })
+        .catch(() => {})
+    ));
+
+    self.skipWaiting();
+  })());
 });
 
-// ── Activate: clean old caches ────────────────────────────────────────────────
+// ── Activate ──────────────────────────────────────────────────────────────────
 self.addEventListener('activate', e => {
   const keep = [CACHE_STATIC, CACHE_PAGES];
   e.waitUntil(
@@ -31,8 +49,8 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
 
-  // CDN assets → cache-first (Bootstrap, icons)
-  if (url.hostname.includes('jsdelivr') || url.hostname.includes('cdn.')) {
+  // CDN y assets estáticos → cache-first
+  if (url.hostname.includes('jsdelivr') || url.pathname.startsWith('/static/')) {
     e.respondWith(
       caches.match(e.request).then(cached => cached || fetch(e.request).then(r => {
         if (r.ok) caches.open(CACHE_STATIC).then(c => c.put(e.request, r.clone()));
@@ -42,8 +60,8 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Local static files → cache-first
-  if (url.pathname.startsWith('/static/')) {
+  // Íconos de Bootstrap (font CDN) → cache-first
+  if (url.hostname.includes('bootstrapcdn') || url.pathname.includes('/font/')) {
     e.respondWith(
       caches.match(e.request).then(cached => cached || fetch(e.request).then(r => {
         if (r.ok) caches.open(CACHE_STATIC).then(c => c.put(e.request, r.clone()));
@@ -53,11 +71,13 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // HTML pages → network-first, fallback to cache
+  // Páginas HTML → network-first, guardar en cache, fallback a cache
   if (e.request.mode === 'navigate' || e.request.headers.get('Accept')?.includes('text/html')) {
     e.respondWith(
-      fetch(e.request).then(r => {
-        if (r.ok) caches.open(CACHE_PAGES).then(c => c.put(e.request, r.clone()));
+      fetch(e.request, { credentials: 'include' }).then(r => {
+        if (r.ok) {
+          caches.open(CACHE_PAGES).then(c => c.put(e.request, r.clone()));
+        }
         return r;
       }).catch(() => caches.match(e.request))
     );
@@ -65,7 +85,7 @@ self.addEventListener('fetch', e => {
   }
 });
 
-// ── Push notifications (existing) ────────────────────────────────────────────
+// ── Push notifications ────────────────────────────────────────────────────────
 self.addEventListener('push', e => {
   let data = { title: 'Dr. Piscinas', body: 'Nueva novedad' };
   try { data = e.data.json(); } catch (_) {}
