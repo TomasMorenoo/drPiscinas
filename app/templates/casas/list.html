@@ -3,7 +3,7 @@
 {% block content %}
 
 {# --- TARJETA DE FILTROS --- #}
-<div class="card border-0 shadow-sm mb-4 bg-light">
+<div class="card border-0 shadow-sm mb-4 bg-light mt-2 mt-sm-0">
     {# Mobile: header colapsable #}
     <div class="d-flex d-md-none align-items-center justify-content-between px-3 py-2"
          style="cursor:pointer;" onclick="toggleFiltros()">
@@ -186,7 +186,7 @@ function toggleFiltros() {
                         </a>
                     </td>
 
-                    <td class="text-end font-monospace text-secondary">
+                    <td class="text-end font-monospace text-secondary" style="white-space:nowrap;">
                         $ {{ casa.precio_base | pesos }}
                     </td>
 
