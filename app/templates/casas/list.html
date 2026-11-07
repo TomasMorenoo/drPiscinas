@@ -40,31 +40,31 @@
         {# Mobile #}
         <div class="d-flex d-sm-none flex-column gap-2">
             <div class="d-flex gap-2">
-                <a href="{{ url_for('casas.herramienta_aumento') }}" class="btn btn-outline-dark btn-sm fw-bold flex-fill" title="Actualizar precios masivamente">
+                <div class="flex-fill text-center rounded-3 py-2" style="background:#f0fdf4;border:1px solid #bbf7d0;">
+                    <div class="fw-bold" style="font-size:1.15rem;color:#15803d;">{{ activos_count }}</div>
+                    <div style="font-size:0.65rem;color:#16a34a;text-transform:uppercase;letter-spacing:0.5px;">Activos</div>
+                </div>
+                <div class="flex-fill text-center rounded-3 py-2" style="background:#fef2f2;border:1px solid #fecaca;">
+                    <div class="fw-bold" style="font-size:1.15rem;color:#dc2626;">{{ inactivos_count }}</div>
+                    <div style="font-size:0.65rem;color:#ef4444;text-transform:uppercase;letter-spacing:0.5px;">Inactivos</div>
+                </div>
+                {% if pausados_count > 0 %}
+                <div class="flex-fill text-center rounded-3 py-2" style="background:#fefce8;border:1px solid #fde68a;">
+                    <div class="fw-bold" style="font-size:1.15rem;color:#ca8a04;">{{ pausados_count }}</div>
+                    <div style="font-size:0.65rem;color:#d97706;text-transform:uppercase;letter-spacing:0.5px;">Pausados</div>
+                </div>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('casas.herramienta_aumento') }}" class="btn btn-outline-dark btn-sm fw-bold flex-fill">
                     <i class="bi bi-currency-dollar me-1"></i> Precios
                 </a>
-                <a href="{{ url_for('casas.exportar_casas_csv', buscar=buscar_actual, estado=estado_actual, country_id=country_actual, barrio_id=barrio_actual) }}" class="btn btn-outline-success btn-sm fw-bold flex-fill" title="Exportar lista a Excel">
+                <a href="{{ url_for('casas.exportar_casas_csv', buscar=buscar_actual, estado=estado_actual, country_id=country_actual, barrio_id=barrio_actual) }}" class="btn btn-outline-success btn-sm fw-bold flex-fill">
                     <i class="bi bi-file-earmark-excel me-1"></i> Excel
                 </a>
                 <a href="{{ url_for('casas.form_crear_casa') }}" class="btn btn-dark btn-sm fw-bold flex-fill">
                     <i class="bi bi-plus-lg me-1"></i> Nuevo
                 </a>
-            </div>
-            <div class="d-flex align-items-center justify-content-around flex-wrap gap-2 pt-1 border-top">
-                <span class="text-uppercase small fw-bold text-muted">
-                    <i class="bi bi-person-check-fill me-1 text-success"></i> Activos:
-                    <span class="badge bg-success ms-1" style="font-size: 0.85rem;">{{ activos_count }}</span>
-                </span>
-                <span class="text-uppercase small fw-bold text-muted">
-                    <i class="bi bi-person-dash-fill me-1 text-danger"></i> Inactivos:
-                    <span class="badge bg-danger ms-1" style="font-size: 0.85rem;">{{ inactivos_count }}</span>
-                </span>
-                {% if pausados_count > 0 %}
-                <span class="text-uppercase small fw-bold text-muted">
-                    <i class="bi bi-pause-circle-fill me-1"></i> Pausados:
-                    <span class="badge bg-secondary ms-1" style="font-size: 0.85rem;">{{ pausados_count }}</span>
-                </span>
-                {% endif %}
             </div>
         </div>
 
@@ -104,7 +104,7 @@
                 </select>
             </div>
 
-            <div class="col-6 col-md-3">
+            <div class="col-12 col-md-3">
                 <label class="form-label fw-bold text-secondary small text-uppercase">Barrio</label>
                 <select name="barrio_id" id="filtroBarrio" class="form-select border-0 shadow-sm" {% if not country_actual %}disabled{% endif %}>
                     <option value="">Todos los Barrios</option>
@@ -114,11 +114,11 @@
                 </select>
             </div>
 
-            <div class="col-6 col-md-2 d-grid gap-2 d-md-flex justify-content-md-end">
+            <div class="col-12 col-md-2 d-flex gap-2 justify-content-md-end">
                 <a href="{{ url_for('casas.listar_casas') }}" class="btn btn-outline-secondary shadow-sm" title="Limpiar Filtros">
                     <i class="bi bi-eraser"></i>
                 </a>
-                <button type="submit" class="btn btn-primary shadow-sm fw-bold w-100">
+                <button type="submit" class="btn btn-primary shadow-sm fw-bold flex-fill">
                     Filtrar
                 </button>
             </div>
