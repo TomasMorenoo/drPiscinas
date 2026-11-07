@@ -41,27 +41,35 @@ async function deletePendingVisit(id) {
   });
 }
 
+let _syncInProgress = false;
+
 async function syncPendingVisits() {
-  const pending = await getPendingVisits();
-  if (!pending.length) return { synced: 0, errors: 0, total: 0 };
-  let synced = 0, errors = 0;
-  for (const item of pending) {
-    try {
-      const r = await fetch('/visits/sync-offline', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': item.csrf_token },
-        body: JSON.stringify(item)
-      });
-      const json = await r.json().catch(() => ({}));
-      if (r.ok && json.ok) {
-        await deletePendingVisit(item.id);
-        synced++;
-      } else {
+  if (_syncInProgress) return { synced: 0, errors: 0, total: 0, skipped: true };
+  _syncInProgress = true;
+  try {
+    const pending = await getPendingVisits();
+    if (!pending.length) return { synced: 0, errors: 0, total: 0 };
+    let synced = 0, errors = 0;
+    for (const item of pending) {
+      try {
+        const r = await fetch('/visits/sync-offline', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': item.csrf_token },
+          body: JSON.stringify(item)
+        });
+        const json = await r.json().catch(() => ({}));
+        if (r.ok && json.ok) {
+          await deletePendingVisit(item.id);
+          synced++;
+        } else {
+          errors++;
+        }
+      } catch {
         errors++;
       }
-    } catch {
-      errors++;
     }
+    return { synced, errors, total: pending.length };
+  } finally {
+    _syncInProgress = false;
   }
-  return { synced, errors, total: pending.length };
 }

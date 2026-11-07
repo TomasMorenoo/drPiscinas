@@ -375,6 +375,17 @@ def sync_offline():
     if is_mes_cerrado(fecha_obj.month, fecha_obj.year):
         return jsonify({"ok": False, "error": "mes_cerrado"}), 409
 
+    # Idempotency: si ya existe una visita para esta casa/fecha/usuario, la devolvemos
+    existente = Visit.query.filter_by(
+        casa_id=casa_id,
+        fecha=fecha_obj,
+        usuario_id=current_user.id
+    ).filter(
+        db.or_(Visit.observaciones == None, ~Visit.observaciones.in_(['[EXTRA_MANUAL]', '[DEUDA_ANTERIOR]']))
+    ).first()
+    if existente:
+        return jsonify({"ok": True, "visit_id": existente.id, "duplicate": True})
+
     visit = Visit(
         casa_id=casa_id,
         fecha=fecha_obj,
