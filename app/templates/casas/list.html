@@ -73,58 +73,93 @@
 
 {# --- TARJETA DE FILTROS --- #}
 <div class="card border-0 shadow-sm mb-4 bg-light">
-    <div class="card-body">
-        <form method="GET" action="{{ url_for('casas.listar_casas') }}" class="row g-3 align-items-end">
-            
-            <div class="col-12 col-md-2">
-                <label class="form-label fw-bold text-secondary small text-uppercase">Buscar Lote</label>
-                <div class="input-group shadow-sm">
-                    <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-search"></i></span>
-                    <input type="text" name="buscar" class="form-control border-0" placeholder="Ej: Acacias 43" value="{{ buscar_actual }}">
+    {# Mobile: header colapsable #}
+    <div class="d-flex d-md-none align-items-center justify-content-between px-3 py-2"
+         style="cursor:pointer;" onclick="toggleFiltros()">
+        <span class="fw-bold text-secondary small text-uppercase">
+            <i class="bi bi-funnel me-1"></i> Filtros
+            {% if buscar_actual or estado_actual != 'todo' or country_actual or barrio_actual %}
+            <span class="badge bg-primary ms-1" style="font-size:0.7rem;">activos</span>
+            {% endif %}
+        </span>
+        <i class="bi bi-chevron-down text-muted" id="filtros-chevron"></i>
+    </div>
+    <div id="filtros-body" class="d-md-block" style="display:none!important;">
+        <div class="card-body {% if buscar_actual or estado_actual != 'todo' or country_actual or barrio_actual %}pt-0{% endif %}">
+            <form method="GET" action="{{ url_for('casas.listar_casas') }}" class="row g-3 align-items-end">
+
+                <div class="col-12 col-md-2">
+                    <label class="form-label fw-bold text-secondary small text-uppercase">Buscar Lote</label>
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-search"></i></span>
+                        <input type="text" name="buscar" class="form-control border-0" placeholder="Ej: Acacias 43" value="{{ buscar_actual }}">
+                    </div>
                 </div>
-            </div>
 
-            <div class="col-6 col-md-2">
-                <label class="form-label fw-bold text-secondary small text-uppercase">Estado</label>
-                <select name="estado" class="form-select border-0 shadow-sm">
-                    <option value="todo" {% if estado_actual == 'todo' %}selected{% endif %}>Todos</option>
-                    <option value="activos" {% if estado_actual == 'activos' %}selected{% endif %}>Activos</option>
-                    <option value="inactivos" {% if estado_actual == 'inactivos' %}selected{% endif %}>Inactivos</option>
-                    <option value="pausados" {% if estado_actual == 'pausados' %}selected{% endif %}>Pausados</option>
-                </select>
-            </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label fw-bold text-secondary small text-uppercase">Estado</label>
+                    <select name="estado" class="form-select border-0 shadow-sm">
+                        <option value="todo" {% if estado_actual == 'todo' %}selected{% endif %}>Todos</option>
+                        <option value="activos" {% if estado_actual == 'activos' %}selected{% endif %}>Activos</option>
+                        <option value="inactivos" {% if estado_actual == 'inactivos' %}selected{% endif %}>Inactivos</option>
+                        <option value="pausados" {% if estado_actual == 'pausados' %}selected{% endif %}>Pausados</option>
+                    </select>
+                </div>
 
-            <div class="col-6 col-md-3">
-                <label class="form-label fw-bold text-secondary small text-uppercase">Country</label>
-                <select name="country_id" id="filtroCountry" class="form-select border-0 shadow-sm">
-                    <option value="">Todos los Countries</option>
-                    {% for c in countries %}
-                    <option value="{{ c.id }}" {% if country_actual == c.id|string %}selected{% endif %}>{{ c.nombre }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label fw-bold text-secondary small text-uppercase">Country</label>
+                    <select name="country_id" id="filtroCountry" class="form-select border-0 shadow-sm">
+                        <option value="">Todos los Countries</option>
+                        {% for c in countries %}
+                        <option value="{{ c.id }}" {% if country_actual == c.id|string %}selected{% endif %}>{{ c.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-            <div class="col-12 col-md-3">
-                <label class="form-label fw-bold text-secondary small text-uppercase">Barrio</label>
-                <select name="barrio_id" id="filtroBarrio" class="form-select border-0 shadow-sm" {% if not country_actual %}disabled{% endif %}>
-                    <option value="">Todos los Barrios</option>
-                    {% for b in barrios %}
-                    <option value="{{ b.id }}" {% if barrio_actual == b.id|string %}selected{% endif %}>{{ b.nombre }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label fw-bold text-secondary small text-uppercase">Barrio</label>
+                    <select name="barrio_id" id="filtroBarrio" class="form-select border-0 shadow-sm" {% if not country_actual %}disabled{% endif %}>
+                        <option value="">Todos los Barrios</option>
+                        {% for b in barrios %}
+                        <option value="{{ b.id }}" {% if barrio_actual == b.id|string %}selected{% endif %}>{{ b.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-            <div class="col-12 col-md-2 d-flex gap-2 justify-content-md-end">
-                <a href="{{ url_for('casas.listar_casas') }}" class="btn btn-outline-secondary shadow-sm" title="Limpiar Filtros">
-                    <i class="bi bi-eraser"></i>
-                </a>
-                <button type="submit" class="btn btn-primary shadow-sm fw-bold flex-fill">
-                    Filtrar
-                </button>
-            </div>
-        </form>
+                <div class="col-12 col-md-2 d-flex gap-2 justify-content-md-end">
+                    <a href="{{ url_for('casas.listar_casas') }}" class="btn btn-outline-secondary shadow-sm" title="Limpiar Filtros">
+                        <i class="bi bi-eraser"></i>
+                    </a>
+                    <button type="submit" class="btn btn-primary shadow-sm fw-bold flex-fill">
+                        Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
+<script>
+(function() {
+    var hasFilter = {{ 'true' if (buscar_actual or estado_actual != 'todo' or country_actual or barrio_actual) else 'false' }};
+    if (hasFilter) {
+        var body = document.getElementById('filtros-body');
+        body.style.removeProperty('display');
+        document.getElementById('filtros-chevron').classList.replace('bi-chevron-down', 'bi-chevron-up');
+    }
+})();
+function toggleFiltros() {
+    var body = document.getElementById('filtros-body');
+    var icon = document.getElementById('filtros-chevron');
+    var open = body.style.display !== 'none' && body.style.getPropertyPriority('display') !== 'important';
+    if (open) {
+        body.style.setProperty('display', 'none', 'important');
+        icon.classList.replace('bi-chevron-up', 'bi-chevron-down');
+    } else {
+        body.style.removeProperty('display');
+        icon.classList.replace('bi-chevron-down', 'bi-chevron-up');
+    }
+}
+</script>
 
 {# --- TABLA DE CLIENTES --- #}
 <div class="card border-0 shadow-sm">
