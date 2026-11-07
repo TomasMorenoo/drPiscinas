@@ -404,6 +404,13 @@ def sync_offline():
     registrar_auditoria(current_user.username, 'CREAR_VISITA_OFFLINE',
         f"{visit.casa.nombre_formateado()} — {fecha_obj.strftime('%d/%m/%Y')}")
 
+    if visit.observaciones:
+        from app.push_utils import enviar_push_novedades
+        enviar_push_novedades(
+            f"Nueva novedad: {visit.casa.nombre_formateado()}",
+            visit.observaciones
+        )
+
     return jsonify({"ok": True, "visit_id": visit.id})
 
 
