@@ -135,6 +135,15 @@ def crear_visit():
                     flash(f"❌ No podés cargar visitas anteriores al inicio del cliente ({desde}).", "error")
                     return redirect(url_for("visits.crear_visit"))
 
+        # Punto 2 Opción A: Detectar si ya existía una visita previa para esta casa y fecha
+        existente_previa = Visit.query.filter_by(
+            casa_id=casa_id,
+            fecha=fecha_obj
+        ).filter(
+            db.or_(Visit.observaciones == None, ~Visit.observaciones.in_(['[EXTRA_MANUAL]', '[DEUDA_ANTERIOR]']))
+        ).first()
+        es_doble_visita = existente_previa is not None
+
         # Crear la visita principal
         visit = Visit(
             casa_id=casa_id,
@@ -160,10 +169,29 @@ def crear_visit():
                     db.session.add(vp)
                     mover_stock(prod.id, -float(cant), 'visita', current_user.username, visit_id=visit.id)
 
-        registrar_auditoria(
-            current_user.username, 'CREAR_VISITA',
-            f"{visit.casa.nombre_formateado()} — {fecha_obj.strftime('%d/%m/%Y')}"
-        )
+        if es_doble_visita:
+            if existente_previa.usuario_id == current_user.id:
+                msg_usuario = f"cargada 2 veces por {current_user.username}"
+                push_detalle = f"Cargada 2 veces por {current_user.username}."
+            else:
+                otro_nombre = existente_previa.usuario.username if (existente_previa.usuario and existente_previa.usuario.username) else "otro empleado"
+                msg_usuario = f"cargada por {current_user.username} (ya visitada hoy por {otro_nombre})"
+                push_detalle = f"Cargada por {current_user.username}. Ya existía visita de {otro_nombre}."
+
+            registrar_auditoria(
+                current_user.username, 'DOBLE_VISITA_REGISTRADA',
+                f"Doble visita en {visit.casa.nombre_formateado()} el {fecha_obj.strftime('%d/%m/%Y')}: {msg_usuario}"
+            )
+            from app.push_utils import enviar_push_novedades
+            enviar_push_novedades(
+                f"⚠️ Doble visita: {visit.casa.nombre_formateado()}",
+                push_detalle
+            )
+        else:
+            registrar_auditoria(
+                current_user.username, 'CREAR_VISITA',
+                f"{visit.casa.nombre_formateado()} — {fecha_obj.strftime('%d/%m/%Y')}"
+            )
         db.session.commit()
 
         archivos_subidos = [f for f in request.files.getlist('archivos') if f and f.filename]
@@ -380,25 +408,14 @@ def sync_offline():
     if is_mes_cerrado(fecha_obj.month, fecha_obj.year):
         return jsonify({"ok": False, "error": "mes_cerrado"}), 409
 
-    # Idempotency: si ya existe una visita para esta casa/fecha/usuario, la devolvemos
-    existente_mismo_usuario = Visit.query.filter_by(
-        casa_id=casa_id,
-        fecha=fecha_obj,
-        usuario_id=current_user.id
-    ).filter(
-        db.or_(Visit.observaciones == None, ~Visit.observaciones.in_(['[EXTRA_MANUAL]', '[DEUDA_ANTERIOR]']))
-    ).first()
-    if existente_mismo_usuario:
-        return jsonify({"ok": True, "visit_id": existente_mismo_usuario.id, "duplicate": True})
-
-    # Punto 2 Opción A: Detectar si otro usuario ya cargó visita para esta casa y fecha
-    existente_otro = Visit.query.filter_by(
+    # Punto 2 Opción A: Detectar si ya existe visita previa para esta casa y fecha (sea del mismo usuario o de otro)
+    existente_previa = Visit.query.filter_by(
         casa_id=casa_id,
         fecha=fecha_obj
     ).filter(
         db.or_(Visit.observaciones == None, ~Visit.observaciones.in_(['[EXTRA_MANUAL]', '[DEUDA_ANTERIOR]']))
     ).first()
-    es_doble_visita = existente_otro is not None
+    es_doble_visita = existente_previa is not None
 
     visit = Visit(
         casa_id=casa_id,
@@ -428,16 +445,23 @@ def sync_offline():
     db.session.commit()
 
     if es_doble_visita:
-        otro_user_nombre = existente_otro.usuario.username if (existente_otro.usuario and existente_otro.usuario.username) else "otro empleado"
+        if existente_previa.usuario_id == current_user.id:
+            msg_usuario = f"cargada 2 veces por {current_user.username}"
+            push_detalle = f"Cargada 2 veces por {current_user.username}."
+        else:
+            otro_user_nombre = existente_previa.usuario.username if (existente_previa.usuario and existente_previa.usuario.username) else "otro empleado"
+            msg_usuario = f"cargada por {current_user.username} (ya visitada hoy por {otro_user_nombre})"
+            push_detalle = f"Cargada por {current_user.username}. Ya existía visita de {otro_user_nombre}."
+
         registrar_auditoria(
             current_user.username,
             'DOBLE_VISITA_REGISTRADA',
-            f"Doble visita en {visit.casa.nombre_formateado()} el {fecha_obj.strftime('%d/%m/%Y')}: cargada por {current_user.username} (ya visitada hoy por {otro_user_nombre})"
+            f"Doble visita en {visit.casa.nombre_formateado()} el {fecha_obj.strftime('%d/%m/%Y')}: {msg_usuario}"
         )
         from app.push_utils import enviar_push_novedades
         enviar_push_novedades(
             f"⚠️ Doble visita: {visit.casa.nombre_formateado()}",
-            f"Cargada por {current_user.username}. Ya existía visita de {otro_user_nombre}."
+            push_detalle
         )
     else:
         registrar_auditoria(current_user.username, 'CREAR_VISITA_OFFLINE',
