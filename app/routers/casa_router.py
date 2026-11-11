@@ -13,7 +13,7 @@ from app.models.abono_historico import AbonoHistorico
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_, and_, case
 from sqlalchemy.orm import joinedload, selectinload
-from app.utils import nombre_mes, registrar_auditoria, mover_stock
+from app.utils import nombre_mes, registrar_auditoria, mover_stock, proporcional_aplica
 from app.greenville import (
     codigo_barrio_greenville,
     es_greenville,
