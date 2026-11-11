@@ -306,9 +306,11 @@
                                                 </a>
                                             </td>
                                             <td class="font-monospace fw-bold text-dark text-nowrap">
-                                                ${{ d.abono | pesos }}
                                                 {% if d.proporcional_anterior > 0 %}
-                                                <br><small class="text-warning fw-normal" style="white-space: normal;">incl. prop. mes ant.: ${{ d.proporcional_anterior | pesos }}</small>
+                                                    ${{ (d.abono - d.proporcional_anterior) | pesos }}
+                                                    <span class="text-warning fw-bold ms-1" title="Proporcional mes anterior">+${{ d.proporcional_anterior | pesos }}</span>
+                                                {% else %}
+                                                    ${{ d.abono | pesos }}
                                                 {% endif %}
                                             </td>
                                             <td class="font-monospace text-nowrap">${{ d.producto | pesos }}</td>
