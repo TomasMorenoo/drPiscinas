@@ -223,6 +223,17 @@
     </div>
 </div>{# /segunda fila desktop #}
 
+{% if duplicadas_ids %}
+<div class="alert alert-warning py-2 px-3 mb-3 d-flex align-items-center justify-content-between rounded-3 border-warning shadow-sm">
+    <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-exclamation-triangle-fill fs-5 text-warning"></i>
+        <div style="font-size:0.85rem;">
+            <strong>Atención:</strong> Se detectaron <strong>{{ duplicadas_ids | length }}</strong> visitas en casas con doble carga en el mismo día. Revisá los casos marcados con <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle-fill"></i> Doble visita</span>.
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="card border-0 shadow-sm">
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -247,9 +258,21 @@
                         <td class="ps-4">{{ visit.fecha.strftime('%d/%m/%Y') }}</td>
 
                         <td class="fw-bold text-dark">
-                            <a href="{{ url_for('casas.perfil', id=visit.casa.id) }}" class="text-reset text-decoration-none" onclick="event.stopPropagation();">
-                                {{ visit.casa.nombre_formateado() }}
-                            </a>
+                            <div class="d-flex align-items-center flex-wrap gap-1">
+                                <a href="{{ url_for('casas.perfil', id=visit.casa.id) }}" class="text-reset text-decoration-none" onclick="event.stopPropagation();">
+                                    {{ visit.casa.nombre_formateado() }}
+                                </a>
+                                {% if visit.id in duplicadas_ids %}
+                                <span class="badge bg-warning text-dark border border-warning" style="font-size:0.65rem;" title="Atención: Esta casa tiene más de una visita registrada en esta fecha" data-bs-toggle="tooltip">
+                                    <i class="bi bi-exclamation-triangle-fill"></i> Doble visita
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% if visit.usuario %}
+                            <div class="text-muted fw-normal" style="font-size:0.7rem;">
+                                <i class="bi bi-person"></i> {{ visit.usuario.username }}
+                            </div>
+                            {% endif %}
                         </td>
 
                         <td>

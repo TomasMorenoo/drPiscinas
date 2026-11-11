@@ -44,12 +44,15 @@ def listar_visits():
     total_mes = sum(v.calcular_total() for v in visits)
     total_visitas = len(visits)
 
-    from collections import defaultdict
+    from collections import defaultdict, Counter
     _vpd = defaultdict(int)
     for v in visits:
         _vpd[v.fecha.day] += 1
     visitas_por_dia = sorted(_vpd.items())
     max_vpd = max(_vpd.values()) if _vpd else 1
+
+    conteos_casa_dia = Counter((v.casa_id, v.fecha) for v in visits)
+    duplicadas_ids = {v.id for v in visits if conteos_casa_dia[(v.casa_id, v.fecha)] > 1}
 
     # --- 2. OCULTAMOS LOS EXTRAS DEL TOP PRODUCTOS ---
     top_productos = db.session.query(
@@ -75,7 +78,8 @@ def listar_visits():
         top_productos=top_productos,
         mes_sel=mes_sel,
         anio_sel=anio_sel,
-        mes_congelado=mes_congelado
+        mes_congelado=mes_congelado,
+        duplicadas_ids=duplicadas_ids
     )
     
     
@@ -377,15 +381,24 @@ def sync_offline():
         return jsonify({"ok": False, "error": "mes_cerrado"}), 409
 
     # Idempotency: si ya existe una visita para esta casa/fecha/usuario, la devolvemos
-    existente = Visit.query.filter_by(
+    existente_mismo_usuario = Visit.query.filter_by(
         casa_id=casa_id,
         fecha=fecha_obj,
         usuario_id=current_user.id
     ).filter(
         db.or_(Visit.observaciones == None, ~Visit.observaciones.in_(['[EXTRA_MANUAL]', '[DEUDA_ANTERIOR]']))
     ).first()
-    if existente:
-        return jsonify({"ok": True, "visit_id": existente.id, "duplicate": True})
+    if existente_mismo_usuario:
+        return jsonify({"ok": True, "visit_id": existente_mismo_usuario.id, "duplicate": True})
+
+    # Punto 2 Opción A: Detectar si otro usuario ya cargó visita para esta casa y fecha
+    existente_otro = Visit.query.filter_by(
+        casa_id=casa_id,
+        fecha=fecha_obj
+    ).filter(
+        db.or_(Visit.observaciones == None, ~Visit.observaciones.in_(['[EXTRA_MANUAL]', '[DEUDA_ANTERIOR]']))
+    ).first()
+    es_doble_visita = existente_otro is not None
 
     visit = Visit(
         casa_id=casa_id,
@@ -413,17 +426,31 @@ def sync_offline():
                 mover_stock(product.id, -float(cant), 'visita', current_user.username, visit_id=visit.id)
 
     db.session.commit()
-    registrar_auditoria(current_user.username, 'CREAR_VISITA_OFFLINE',
-        f"{visit.casa.nombre_formateado()} — {fecha_obj.strftime('%d/%m/%Y')}")
 
-    if visit.observaciones:
+    if es_doble_visita:
+        otro_user_nombre = existente_otro.usuario.username if (existente_otro.usuario and existente_otro.usuario.username) else "otro empleado"
+        registrar_auditoria(
+            current_user.username,
+            'DOBLE_VISITA_REGISTRADA',
+            f"Doble visita en {visit.casa.nombre_formateado()} el {fecha_obj.strftime('%d/%m/%Y')}: cargada por {current_user.username} (ya visitada hoy por {otro_user_nombre})"
+        )
+        from app.push_utils import enviar_push_novedades
+        enviar_push_novedades(
+            f"⚠️ Doble visita: {visit.casa.nombre_formateado()}",
+            f"Cargada por {current_user.username}. Ya existía visita de {otro_user_nombre}."
+        )
+    else:
+        registrar_auditoria(current_user.username, 'CREAR_VISITA_OFFLINE',
+            f"{visit.casa.nombre_formateado()} — {fecha_obj.strftime('%d/%m/%Y')}")
+
+    if visit.observaciones and not es_doble_visita:
         from app.push_utils import enviar_push_novedades
         enviar_push_novedades(
             f"Nueva novedad: {visit.casa.nombre_formateado()}",
             visit.observaciones
         )
 
-    return jsonify({"ok": True, "visit_id": visit.id})
+    return jsonify({"ok": True, "visit_id": visit.id, "doble_visita": es_doble_visita})
 
 
 @visit_bp.route("/check_duplicate")

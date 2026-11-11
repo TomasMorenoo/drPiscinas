@@ -569,25 +569,58 @@
     let bypassDuplicateCheck = false;
 
 
-    function verificarDuplicado() {
+    async function verificarDuplicadoOffline(casaId, fecha) {
+        if (!casaId || !fecha) return null;
+        const pending = await getPendingVisits().catch(() => []);
+        return pending.find(p => String(p.casa_id) === String(casaId) && p.fecha === fecha);
+    }
+
+    function mostrarModalDuplicado(mensajeDetalles, onAceptar, onCancelar) {
+        document.getElementById('detalle-duplicado').innerText = mensajeDetalles;
+        const modalEl = document.getElementById('modalDuplicado');
+        const modalObj = new bootstrap.Modal(modalEl);
+        modalObj.show();
+        document.getElementById('btn-cancelar-duplicado').onclick = function() {
+            modalObj.hide();
+            if (onCancelar) onCancelar();
+        };
+        document.getElementById('btn-aceptar-duplicado').onclick = function() {
+            modalObj.hide();
+            bypassDuplicateCheck = true;
+            if (onAceptar) onAceptar();
+        };
+    }
+
+    async function verificarDuplicado() {
         const casaId = hiddenInput.value;
         const fecha = fechaInput.value;
         if (!casaId || !fecha) return;
-        fetch(`/visits/check_duplicate?casa_id=${casaId}&fecha=${fecha}`)
-            .then(r => r.json())
-            .then(data => {
+
+        // 1. Chequeo local en la cola de IndexedDB (offline)
+        const enCola = await verificarDuplicadoOffline(casaId, fecha);
+        if (enCola) {
+            const prods = (enCola.productos || []).map(p => `${p.cantidad} ${p.nombre || p.product_id}`).join(', ') || 'Sin productos';
+            const msg = `⚠️ Ya tenés esta casa guardada en la cola offline de tu celular para esta fecha.\nProductos: ${prods}\nObservaciones: ${enCola.observaciones || 'Ninguna'}`;
+            mostrarModalDuplicado(msg, null, function() {
+                searchInput.value = ""; hiddenInput.value = "";
+                casaOkIcon.classList.add('d-none');
+            });
+            return;
+        }
+
+        // 2. Si hay conexión, consultar también al servidor
+        if (navigator.onLine) {
+            try {
+                const r = await fetch(`/visits/check_duplicate?casa_id=${casaId}&fecha=${fecha}`);
+                const data = await r.json();
                 if (data.exists) {
-                    document.getElementById('detalle-duplicado').innerText = data.detalles.replace("Productos:", "\nProductos:");
-                    const modalObj = new bootstrap.Modal(document.getElementById('modalDuplicado'));
-                    modalObj.show();
-                    document.getElementById('btn-cancelar-duplicado').onclick = function() {
+                    mostrarModalDuplicado(data.detalles.replace("Productos:", "\nProductos:"), null, function() {
                         searchInput.value = ""; hiddenInput.value = "";
                         casaOkIcon.classList.add('d-none');
-                        modalObj.hide();
-                    };
-                    document.getElementById('btn-aceptar-duplicado').onclick = function() { bypassDuplicateCheck = true; modalObj.hide(); };
+                    });
                 }
-            });
+            } catch(e) {}
+        }
     }
 
     // ── Productos ──
@@ -809,6 +842,20 @@
 
         // ── OFFLINE: guardar en cola ──────────────────────────────────────────
         if (!navigator.onLine) {
+            if (!bypassDuplicateCheck) {
+                const enCola = await verificarDuplicadoOffline(hiddenInput.value, fechaInput.value);
+                if (enCola) {
+                    const prods = (enCola.productos || []).map(p => `${p.cantidad} ${p.nombre || p.product_id}`).join(', ') || 'Sin productos';
+                    const msg = `⚠️ Ya tenés esta casa guardada en la cola offline de tu celular para esta fecha.\nProductos: ${prods}\nObservaciones: ${enCola.observaciones || 'Ninguna'}`;
+                    mostrarModalDuplicado(msg, async function() {
+                        await guardarVisitaOffline();
+                    }, function() {
+                        searchInput.value = ""; hiddenInput.value = "";
+                        casaOkIcon.classList.add('d-none');
+                    });
+                    return;
+                }
+            }
             await guardarVisitaOffline();
             return;
         }
@@ -843,25 +890,31 @@
                 const data = await r.json();
 
                 if (data.exists) {
-                    document.getElementById('detalle-duplicado').innerText = data.detalles.replace("Productos:", "\nProductos:");
-                    const modalEl = document.getElementById('modalDuplicado');
-                    const modalObj = new bootstrap.Modal(modalEl);
-                    modalObj.show();
-                    document.getElementById('btn-cancelar-duplicado').onclick = function() {
+                    mostrarModalDuplicado(data.detalles.replace("Productos:", "\nProductos:"), function() {
+                        enviarFormulario();
+                    }, function() {
                         searchInput.value = ""; hiddenInput.value = "";
                         casaOkIcon.classList.add('d-none');
-                        modalObj.hide();
-                    };
-                    document.getElementById('btn-aceptar-duplicado').onclick = function() {
-                        modalObj.hide();
-                        bypassDuplicateCheck = true;
-                        enviarFormulario();
-                    };
+                    });
                     return;
                 }
                 enviarFormulario();
             } catch(err) {
                 console.warn('Sin conexión para verificar duplicado, guardando offline:', err);
+                if (!bypassDuplicateCheck) {
+                    const enCola = await verificarDuplicadoOffline(casaId, fecha);
+                    if (enCola) {
+                        const prods = (enCola.productos || []).map(p => `${p.cantidad} ${p.nombre || p.product_id}`).join(', ') || 'Sin productos';
+                        const msg = `⚠️ Ya tenés esta casa guardada en la cola offline de tu celular para esta fecha.\nProductos: ${prods}\nObservaciones: ${enCola.observaciones || 'Ninguna'}`;
+                        mostrarModalDuplicado(msg, async function() {
+                            await guardarVisitaOffline();
+                        }, function() {
+                            searchInput.value = ""; hiddenInput.value = "";
+                            casaOkIcon.classList.add('d-none');
+                        });
+                        return;
+                    }
+                }
                 await guardarVisitaOffline();
             }
         } else {
