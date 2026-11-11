@@ -413,12 +413,12 @@
             {# Buscador + filtro #}
             <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:22px;padding:8px 14px;display:flex;align-items:center;gap:8px;margin-bottom:7px;">
                 <i class="bi bi-search" style="color:rgba(255,255,255,0.3);font-size:0.9rem;"></i>
-                <input type="text" id="busquedaRealTime" placeholder="Filtrar por lote o barrio..."
+                <input type="text" id="busquedaRealTime" class="input-busqueda-realtime" placeholder="Filtrar por lote o barrio..."
                        style="background:transparent;border:none;outline:none;color:#fff;font-size:0.85rem;flex:1;width:100%;"
                        autocomplete="off">
             </div>
             <div style="display:flex;gap:7px;align-items:center;">
-                <select id="filtroEstado" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:22px;padding:7px 12px;color:rgba(255,255,255,0.75);font-size:0.8rem;outline:none;appearance:none;-webkit-appearance:none;">
+                <select id="filtroEstado" class="select-filtro-estado" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:22px;padding:7px 12px;color:rgba(255,255,255,0.75);font-size:0.8rem;outline:none;appearance:none;-webkit-appearance:none;">
                     <option value="todos" style="color:#111;">— Todos los estados</option>
                     <option value="pagado" style="color:#111;">✅ Pagados</option>
                     <option value="no_pagado" style="color:#111;">❌ No pagados</option>
@@ -585,11 +585,11 @@
             <div class="col-12 col-md-8">
                 <div class="input-group">
                     <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
-                    <input type="text" id="busquedaRealTime" class="form-control border-start-0" placeholder="Filtrar por lote, barrio o country...">
+                    <input type="text" id="busquedaRealTimeDesktop" class="form-control border-start-0 input-busqueda-realtime" placeholder="Filtrar por lote, barrio o country...">
                 </div>
             </div>
             <div class="col-12 col-md-3">
-                <select id="filtroEstado" class="form-select fw-semibold" style="color: #495057; border-color: #dee2e6;">
+                <select id="filtroEstadoDesktop" class="form-select fw-semibold select-filtro-estado" style="color: #495057; border-color: #dee2e6;">
                     <option value="todos">— Todos los estados</option>
                     <option value="pagado">✅ Pagados</option>
                     <option value="no_pagado">❌ No pagados</option>
@@ -1746,9 +1746,31 @@ function toggleKpis() {
    UTILIDADES (Buscador, Modal, Scroll)
    ============================================================ */
 
+function _normDashboardText(s) {
+    return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
 function filtrarDashboard() {
-    let texto = document.getElementById('busquedaRealTime').value.toLowerCase();
-    let estado = document.getElementById('filtroEstado').value;
+    // Tomar el texto del buscador activo (desktop o mobile)
+    let texto = '';
+    const buscadores = document.querySelectorAll('.input-busqueda-realtime, #busquedaRealTime, #busquedaRealTimeDesktop');
+    for (const b of buscadores) {
+        if (b && b.value && b.value.trim() !== '') {
+            texto = _normDashboardText(b.value);
+            break;
+        }
+    }
+
+    // Tomar el estado seleccionado
+    let estado = 'todos';
+    const filtros = document.querySelectorAll('.select-filtro-estado, #filtroEstado, #filtroEstadoDesktop');
+    for (const f of filtros) {
+        if (f && f.value && f.value !== 'todos') {
+            estado = f.value;
+            break;
+        }
+    }
+
     let ocultas = 0;
 
     document.querySelectorAll('.fila-busqueda').forEach(fila => {
@@ -1756,12 +1778,17 @@ function filtrarDashboard() {
         let esGrupo = fila.classList.contains('card');
 
         if (esGrupo) {
+            // Nombre del grupo o header del grupo
+            const headerGrupo = fila.querySelector('.card-header, .grupo-header-mobile, h6, .fw-bold');
+            const txtHeaderGrupo = headerGrupo ? _normDashboardText(headerGrupo.textContent) : '';
+            const grupoCoincideTexto = (texto !== '' && txtHeaderGrupo.includes(texto));
+
             // Filtrar filas internas del grupo
             let casasGrupo = fila.querySelectorAll('tr.fila-casa-grupo');
             let algunaVisible = false;
             casasGrupo.forEach(tr => {
-                let txt = tr.textContent.toLowerCase();
-                let visible = texto === '' || txt.includes(texto);
+                let txtCasa = _normDashboardText(tr.textContent);
+                let visible = texto === '' || grupoCoincideTexto || txtCasa.includes(texto);
                 if (visible && estado !== 'todos') {
                     let estCasa = tr.getAttribute('data-estado');
                     if (estado === 'no_pagado') visible = estCasa !== 'pagado';
@@ -1770,6 +1797,7 @@ function filtrarDashboard() {
                 tr.style.display = visible ? '' : 'none';
                 if (visible) algunaVisible = true;
             });
+
             // Si no hay texto ni filtro de estado, mostrar siempre el grupo
             if (texto === '' && estado === 'todos') {
                 fila.style.display = '';
@@ -1784,7 +1812,7 @@ function filtrarDashboard() {
                 if (!grupoVisible) ocultas++;
             }
         } else {
-            let txt = fila.textContent.toLowerCase();
+            let txt = _normDashboardText(fila.textContent);
             let visible = texto === '' || txt.includes(texto);
             if (visible && estado !== 'todos') {
                 if (estado === 'no_pagado') visible = est !== 'pagado';
@@ -1807,14 +1835,42 @@ function filtrarDashboard() {
 }
 
 function verTodos() {
-    document.getElementById('filtroEstado').value = 'todos';
+    document.querySelectorAll('.select-filtro-estado, #filtroEstado, #filtroEstadoDesktop').forEach(sel => {
+        sel.value = 'todos';
+    });
     filtrarDashboard();
 }
 
-const buscador = document.getElementById('busquedaRealTime');
-const filtroEstado = document.getElementById('filtroEstado');
-if(buscador) buscador.addEventListener('keyup', filtrarDashboard);
-if(filtroEstado) filtroEstado.addEventListener('change', filtrarDashboard);
+// Vinculación bidireccional y eventos en tiempo real
+const buscadoresDashboard = document.querySelectorAll('.input-busqueda-realtime, #busquedaRealTime, #busquedaRealTimeDesktop');
+const filtrosEstadoDashboard = document.querySelectorAll('.select-filtro-estado, #filtroEstado, #filtroEstadoDesktop');
+
+buscadoresDashboard.forEach(input => {
+    ['input', 'keyup', 'search', 'change'].forEach(evt => {
+        input.addEventListener(evt, function () {
+            // Sincronizar el otro input sin disparar eventos en bucle
+            buscadoresDashboard.forEach(other => {
+                if (other !== input && other.value !== input.value) {
+                    other.value = input.value;
+                }
+            });
+            filtrarDashboard();
+        });
+    });
+});
+
+filtrosEstadoDashboard.forEach(select => {
+    select.addEventListener('change', function () {
+        // Sincronizar el otro select
+        filtrosEstadoDashboard.forEach(other => {
+            if (other !== select && other.value !== select.value) {
+                other.value = select.value;
+            }
+        });
+        filtrarDashboard();
+    });
+});
+
 filtrarDashboard();
 
 /* ── Formato del input de monto (ARS: puntos / USD: dígitos limpios) ── */
