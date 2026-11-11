@@ -423,12 +423,15 @@ def sync_offline():
         if audit:
             return jsonify({"ok": True, "already_synced": True})
 
-    # Deduplicación contra ráfagas o reintentos rápidos (< 15 segundos)
+    # Deduplicación contra ráfagas o reintentos rápidos (< 30 segundos)
     ahora_ts = time.time()
     key_reciente = (current_user.id, int(casa_id), fecha_str)
     if key_reciente in _PROCESSED_OFFLINE_RECENT:
-        if ahora_ts - _PROCESSED_OFFLINE_RECENT[key_reciente] < 15:
+        if ahora_ts - _PROCESSED_OFFLINE_RECENT[key_reciente] < 30:
             return jsonify({"ok": True, "already_synced": True})
+
+    # Reservamos el timestamp inmediatamente para evitar condiciones de carrera concurrentes
+    _PROCESSED_OFFLINE_RECENT[key_reciente] = ahora_ts
 
     # Punto 2 Opción A: Detectar si ya existe visita previa para esta casa y fecha (sea del mismo usuario o de otro)
     existente_previa = Visit.query.filter_by(
