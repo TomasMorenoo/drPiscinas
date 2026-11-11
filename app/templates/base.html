@@ -451,16 +451,20 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     if (!('Notification' in window) || Notification.permission === 'granted') return;
+    if (localStorage.getItem('notif_banner_visto')) return;
+    localStorage.setItem('notif_banner_visto', '1');
+
     const banner = document.createElement('div');
     banner.style.cssText = 'position:fixed;bottom:80px;left:16px;right:16px;max-width:420px;margin:0 auto;background:#1e293b;border-radius:14px;padding:12px 14px;box-shadow:0 4px 20px rgba(0,0,0,0.35);z-index:3000;display:flex;align-items:center;gap:10px;';
     banner.innerHTML = `
         <span style="font-size:1.3rem;flex-shrink:0;">🔔</span>
         <span style="flex:1;font-size:0.85rem;font-weight:600;color:#f1f5f9;">Activá las notificaciones para recibir alertas de novedades</span>
         <button id="btn-activar-notif" style="background:#3b82f6;color:#fff;border:none;border-radius:9px;padding:7px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;white-space:nowrap;">Activar</button>
-        <button onclick="this.closest('div').remove()" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:1.2rem;cursor:pointer;padding:0;line-height:1;">×</button>
+        <button onclick="localStorage.setItem('notif_banner_visto', '1'); this.closest('div').remove();" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:1.2rem;cursor:pointer;padding:0;line-height:1;">×</button>
     `;
     document.body.appendChild(banner);
     document.getElementById('btn-activar-notif').addEventListener('click', function() {
+        localStorage.setItem('notif_banner_visto', '1');
         Notification.requestPermission().then(function(perm) {
             if (perm === 'granted') banner.remove();
             else banner.querySelector('span:nth-child(2)').textContent = 'Permiso denegado. Habilitalo desde la configuración del navegador.';
