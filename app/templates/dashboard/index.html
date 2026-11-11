@@ -664,9 +664,6 @@
                             {# 2. ABONO #}
                             <td class="text-end font-monospace text-muted">
                                 ${{ item.abono | pesos }}
-                                {% if item.proporcional_preview > 0 %}
-                                    <span class="badge bg-warning text-dark font-monospace ms-1" title="Proporcional mes anterior">+${{ item.proporcional_preview | pesos }}</span>
-                                {% endif %}
                             </td>
 
                             {# 3. PRODUCTOS #}
@@ -692,9 +689,6 @@
                                     <div class="monto-item">
                                         <span class="monto-label">Abono</span>
                                         <span class="monto-valor">${{ item.abono | pesos }}</span>
-                                        {% if item.proporcional_preview > 0 %}
-                                            <span class="badge bg-warning text-dark font-monospace ms-1">+${{ item.proporcional_preview | pesos }}</span>
-                                        {% endif %}
                                     </div>
                                     <div class="monto-item">
                                         <span class="monto-label">Productos</span>
@@ -1145,9 +1139,6 @@
                                 {# Montos desktop #}
                                 <td class="text-end font-monospace text-muted">
                                     ${{ item.abono | pesos }}
-                                    {% if item.proporcional_preview > 0 %}
-                                        <span class="badge bg-warning text-dark font-monospace ms-1" title="Proporcional mes anterior">+${{ item.proporcional_preview | pesos }}</span>
-                                    {% endif %}
                                 </td>
                                 <td class="text-end font-monospace text-muted">
                                     ${{ item.extras | pesos }}
@@ -1168,9 +1159,6 @@
                                         <div class="monto-item">
                                             <span class="monto-label">Abono</span>
                                             <span class="monto-valor">${{ item.abono | pesos }}</span>
-                                            {% if item.proporcional_preview > 0 %}
-                                                <span class="badge bg-warning text-dark font-monospace ms-1">+${{ item.proporcional_preview | pesos }}</span>
-                                            {% endif %}
                                         </div>
                                         <div class="monto-item">
                                             <span class="monto-label">Productos</span>
@@ -2468,4 +2456,4 @@ document.addEventListener('click', function(e) {
 });
 </script>
 
-{% endblock %}         
+{% endblock %}
