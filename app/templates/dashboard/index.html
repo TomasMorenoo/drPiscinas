@@ -273,20 +273,34 @@
 /* Resaltado de casa al navegar desde Estado de Cuenta */
 @keyframes highlightCasaPulse {
     0% {
-        background-color: #fef08a !important;
-        box-shadow: 0 0 0 3px #eab308 inset;
+        background-color: rgba(254, 240, 138, 0.65) !important;
+        border-color: #eab308 !important;
     }
-    30% {
-        background-color: #fef08a !important;
-        box-shadow: 0 0 0 3px #eab308 inset;
+    40% {
+        background-color: rgba(254, 240, 138, 0.4) !important;
+        border-color: #eab308 !important;
     }
     100% {
         background-color: inherit;
-        box-shadow: none;
+        border-color: transparent !important;
     }
 }
-.casa-focuseada, .casa-focuseada > td, .casa-focuseada > th {
+.casa-focuseada > td {
+    background-color: rgba(254, 240, 138, 0.45) !important;
+    border-top: 2.5px solid #eab308 !important;
+    border-bottom: 2.5px solid #eab308 !important;
+    border-left: none !important;
+    border-right: none !important;
+    box-shadow: inset 0 2.5px 4px -2px rgba(234, 179, 8, 0.6), inset 0 -2.5px 4px -2px rgba(234, 179, 8, 0.6);
     animation: highlightCasaPulse 3s ease-out forwards !important;
+}
+.casa-focuseada > td:first-child {
+    border-left: 3.5px solid #eab308 !important;
+    box-shadow: inset 3.5px 0 4px -2px rgba(234, 179, 8, 0.6), inset 0 2.5px 4px -2px rgba(234, 179, 8, 0.6), inset 0 -2.5px 4px -2px rgba(234, 179, 8, 0.6);
+}
+.casa-focuseada > td:last-child {
+    border-right: 3.5px solid #eab308 !important;
+    box-shadow: inset -3.5px 0 4px -2px rgba(234, 179, 8, 0.6), inset 0 2.5px 4px -2px rgba(234, 179, 8, 0.6), inset 0 -2.5px 4px -2px rgba(234, 179, 8, 0.6);
 }
 </style>
 

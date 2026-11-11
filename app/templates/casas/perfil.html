@@ -301,9 +301,8 @@
                                             title="Ver {{ casa.nombre_formateado() }} en el Dashboard de {{ d.periodo }}">
                                             <td class="fw-bold text-dark text-uppercase text-nowrap">
                                                 <a href="{{ url_for('dashboard.index', mes=d.mes, anio=d.anio, focus=casa.id, ver_inactivas='1' if not casa.activo else none) }}#casa-{{ casa.id }}"
-                                                   class="text-decoration-none text-dark d-inline-flex align-items-center gap-1 link-mes-dashboard">
-                                                    <span>{{ d.periodo }}</span>
-                                                    <i class="bi bi-box-arrow-up-right text-muted small ms-1 icono-link-dashboard" style="font-size: 0.72rem;"></i>
+                                                   class="text-decoration-none text-dark link-mes-dashboard">
+                                                    {{ d.periodo }}
                                                 </a>
                                             </td>
                                             <td class="font-monospace fw-bold text-dark text-nowrap">
@@ -623,9 +622,6 @@
     }
     .fila-mes-clickable:hover {
         background-color: #f1f5f9 !important;
-    }
-    .fila-mes-clickable:hover .icono-link-dashboard {
-        color: #0d6efd !important;
     }
     .link-mes-dashboard {
         transition: color 0.15s ease-in-out;
