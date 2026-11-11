@@ -3,6 +3,13 @@
 {% block content %}
 
 {# --- TARJETA DE FILTROS --- #}
+<style>
+@media (max-width: 767.98px) {
+    #filtros-body.filtros-mobile-collapsed {
+        display: none !important;
+    }
+}
+</style>
 <div class="card border-0 shadow-sm mb-4 bg-light mt-2 mt-sm-0">
     {# Mobile: header colapsable #}
     <div class="d-flex d-md-none align-items-center justify-content-between px-3 py-2"
@@ -13,10 +20,10 @@
             <span class="badge bg-primary ms-1" style="font-size:0.7rem;">activos</span>
             {% endif %}
         </span>
-        <i class="bi bi-chevron-down text-muted" id="filtros-chevron"></i>
+        <i class="bi {% if buscar_actual or estado_actual != 'todo' or country_actual or barrio_actual %}bi-chevron-up{% else %}bi-chevron-down{% endif %} text-muted" id="filtros-chevron"></i>
     </div>
-    <div id="filtros-body" class="d-md-block" style="display:none!important;">
-        <div class="card-body {% if buscar_actual or estado_actual != 'todo' or country_actual or barrio_actual %}pt-0{% endif %}">
+    <div id="filtros-body" class="{% if not (buscar_actual or estado_actual != 'todo' or country_actual or barrio_actual) %}filtros-mobile-collapsed{% endif %}">
+        <div class="card-body pt-0 pt-md-3">
             <form method="GET" action="{{ url_for('casas.listar_casas') }}" class="row g-3 align-items-end">
 
                 <div class="col-12 col-md-2">
@@ -70,23 +77,13 @@
     </div>
 </div>
 <script>
-(function() {
-    var hasFilter = {{ 'true' if (buscar_actual or estado_actual != 'todo' or country_actual or barrio_actual) else 'false' }};
-    if (hasFilter) {
-        var body = document.getElementById('filtros-body');
-        body.style.removeProperty('display');
-        document.getElementById('filtros-chevron').classList.replace('bi-chevron-down', 'bi-chevron-up');
-    }
-})();
 function toggleFiltros() {
     var body = document.getElementById('filtros-body');
     var icon = document.getElementById('filtros-chevron');
-    var open = body.style.display !== 'none' && body.style.getPropertyPriority('display') !== 'important';
-    if (open) {
-        body.style.setProperty('display', 'none', 'important');
+    var isCollapsed = body.classList.toggle('filtros-mobile-collapsed');
+    if (isCollapsed) {
         icon.classList.replace('bi-chevron-up', 'bi-chevron-down');
     } else {
-        body.style.removeProperty('display');
         icon.classList.replace('bi-chevron-down', 'bi-chevron-up');
     }
 }
