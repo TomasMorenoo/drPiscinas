@@ -2501,6 +2501,29 @@ function enfocarCasaTarget() {
 
     if (!targetId) return;
 
+    // Limpiar inmediatamente el hash y el parámetro focus de la URL
+    // para que NO persista si el usuario luego cambia de mes en el selector
+    try {
+        var cleanUrl = new URL(window.location.href);
+        var changed = false;
+        if (cleanUrl.searchParams.has('focus')) {
+            cleanUrl.searchParams.delete('focus');
+            changed = true;
+        }
+        if (cleanUrl.hash) {
+            cleanUrl.hash = '';
+            changed = true;
+        }
+        if (changed) {
+            var searchStr = cleanUrl.searchParams.toString();
+            window.history.replaceState(null, '', cleanUrl.pathname + (searchStr ? '?' + searchStr : ''));
+        }
+    } catch (e) {
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', window.location.pathname + window.location.search.replace(/[?&]focus=[^&]+/, '').replace(/^&/, '?'));
+        }
+    }
+
     var el = document.getElementById(targetId);
     if (!el) return;
 
