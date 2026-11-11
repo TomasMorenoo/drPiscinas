@@ -402,15 +402,30 @@
         }).join('');
     }
 
+    let _isSyncing = false;
     async function doSync() {
+        if (_isSyncing) return;
+        _isSyncing = true;
         const btn = document.getElementById('btn-sync');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Sincronizando...';
-        const result = await syncPendingVisits().catch(() => ({ synced: 0, errors: 1, total: 0 }));
-        await renderOfflineQueue();
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Sincronizar';
-        if (result.synced > 0) location.reload();
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Sincronizando...';
+        }
+        try {
+            const result = await syncPendingVisits().catch(() => ({ synced: 0, errors: 1, total: 0 }));
+            await renderOfflineQueue();
+            if (result.synced > 0) {
+                // Breve pausa para asegurar commit de transacciones IndexedDB antes de recargar
+                setTimeout(() => { location.reload(); }, 350);
+                return;
+            }
+        } finally {
+            _isSyncing = false;
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Sincronizar';
+            }
+        }
     }
 
     // Auto-sync si hay conexión al cargar
@@ -418,7 +433,11 @@
         await renderOfflineQueue();
         if (navigator.onLine) {
             const pending = await getPendingVisits().catch(() => []);
-            if (pending.length) doSync();
+            if (pending && pending.length && !sessionStorage.getItem('just_synced')) {
+                sessionStorage.setItem('just_synced', '1');
+                await doSync();
+                setTimeout(() => sessionStorage.removeItem('just_synced'), 2000);
+            }
         }
     });
 

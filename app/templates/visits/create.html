@@ -789,6 +789,12 @@
     }
 
     async function guardarVisitaOffline() {
+        const submitBtn = document.querySelector('#visitForm button[type=submit]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...';
+        }
+
         const productos = [];
         document.querySelectorAll('.producto-row').forEach(row => {
             const pid = row.querySelector('.product-select').value;
@@ -796,7 +802,11 @@
             const nombre = row.querySelector('.product-pick-label')?.textContent?.trim() || '';
             if (pid && cant) productos.push({ product_id: pid, cantidad: cant, nombre });
         });
+
+        const clientUuid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('off_' + Date.now() + '_' + Math.random().toString(36).slice(2, 11));
+
         await savePendingVisit({
+            client_uuid: clientUuid,
             casa_id: hiddenInput.value,
             casa_nombre: searchInput.value,
             fecha: fechaInput.value,
@@ -816,7 +826,7 @@
         toast.style.background = '#1e3a5f';
         toast.innerHTML = '<div style="font-weight:700;margin-bottom:4px;color:#93c5fd;"><i class="bi bi-cloud-upload me-1"></i>Sin conexión — visita guardada en cola</div><div style="color:rgba(255,255,255,0.7);font-size:0.78rem;">Se subirá automáticamente cuando recuperes internet.</div>';
         toast.style.display = 'block';
-        setTimeout(() => { window.location.href = '/visits/'; }, 1000);
+        setTimeout(() => { window.location.href = '/visits/'; }, 800);
     }
 
     document.getElementById('visitForm').addEventListener('submit', async function(e) {
@@ -861,6 +871,11 @@
         }
 
         const enviarFormulario = () => {
+            const submitBtn = document.querySelector('#visitForm button[type=submit]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...';
+            }
             if (_camaraFiles.length) {
                 const dt = new DataTransfer();
                 _camaraFiles.forEach(f => dt.items.add(f));

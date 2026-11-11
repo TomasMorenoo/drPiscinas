@@ -32,11 +32,26 @@ async function getPendingVisits() {
 }
 
 async function deletePendingVisit(id) {
+  if (id === undefined || id === null) return;
   const db = await _openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(_IDB_STORE, 'readwrite');
-    tx.objectStore(_IDB_STORE).delete(id);
-    tx.oncomplete = () => resolve();
+    const store = tx.objectStore(_IDB_STORE);
+    store.delete(id);
+    if (typeof id === 'string' && !isNaN(Number(id))) store.delete(Number(id));
+    if (typeof id === 'number') store.delete(String(id));
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('Transaction aborted'));
+  });
+}
+
+async function clearPendingVisits() {
+  const db = await _openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(_IDB_STORE, 'readwrite');
+    tx.objectStore(_IDB_STORE).clear();
+    tx.oncomplete = () => resolve(true);
     tx.onerror = () => reject(tx.error);
   });
 }

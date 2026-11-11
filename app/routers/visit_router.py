@@ -11,9 +11,14 @@ from app.models.abono_historico import AbonoHistorico
 from app.models.cierre_mes import CierreMes  # <-- IMPORTAMOS EL CANDADO
 from app.models.movimiento_stock import MovimientoStock
 from app.models.visit_media import VisitMedia
+from app.models.auditoria import AuditoriaLog
 from sqlalchemy import extract, func, case
 from sqlalchemy.orm import selectinload
-from datetime import datetime
+from datetime import datetime, timedelta
+import time
+
+_PROCESSED_OFFLINE_UUIDS = {}   # {client_uuid: visit_id}
+_PROCESSED_OFFLINE_RECENT = {}  # {(user_id, casa_id, fecha_str): timestamp}
 
 visit_bp = Blueprint(
     "visits",
@@ -408,6 +413,23 @@ def sync_offline():
     if is_mes_cerrado(fecha_obj.month, fecha_obj.year):
         return jsonify({"ok": False, "error": "mes_cerrado"}), 409
 
+    client_uuid = data.get("client_uuid")
+    if client_uuid:
+        if client_uuid in _PROCESSED_OFFLINE_UUIDS:
+            return jsonify({"ok": True, "visit_id": _PROCESSED_OFFLINE_UUIDS[client_uuid], "already_synced": True})
+        audit = AuditoriaLog.query.filter(
+            AuditoriaLog.detalle.contains(f"[uuid:{client_uuid}]")
+        ).first()
+        if audit:
+            return jsonify({"ok": True, "already_synced": True})
+
+    # Deduplicación contra ráfagas o reintentos rápidos (< 15 segundos)
+    ahora_ts = time.time()
+    key_reciente = (current_user.id, int(casa_id), fecha_str)
+    if key_reciente in _PROCESSED_OFFLINE_RECENT:
+        if ahora_ts - _PROCESSED_OFFLINE_RECENT[key_reciente] < 15:
+            return jsonify({"ok": True, "already_synced": True})
+
     # Punto 2 Opción A: Detectar si ya existe visita previa para esta casa y fecha (sea del mismo usuario o de otro)
     existente_previa = Visit.query.filter_by(
         casa_id=casa_id,
@@ -444,6 +466,11 @@ def sync_offline():
 
     db.session.commit()
 
+    _PROCESSED_OFFLINE_RECENT[key_reciente] = ahora_ts
+    if client_uuid:
+        _PROCESSED_OFFLINE_UUIDS[client_uuid] = visit.id
+
+    uuid_tag = f" [uuid:{client_uuid}]" if client_uuid else ""
     if es_doble_visita:
         if existente_previa.usuario_id == current_user.id:
             msg_usuario = f"cargada 2 veces por {current_user.username}"
@@ -456,7 +483,7 @@ def sync_offline():
         registrar_auditoria(
             current_user.username,
             'DOBLE_VISITA_REGISTRADA',
-            f"Doble visita en {visit.casa.nombre_formateado()} el {fecha_obj.strftime('%d/%m/%Y')}: {msg_usuario}"
+            f"Doble visita en {visit.casa.nombre_formateado()} el {fecha_obj.strftime('%d/%m/%Y')}: {msg_usuario}{uuid_tag}"
         )
         from app.push_utils import enviar_push_novedades
         enviar_push_novedades(
@@ -465,7 +492,7 @@ def sync_offline():
         )
     else:
         registrar_auditoria(current_user.username, 'CREAR_VISITA_OFFLINE',
-            f"{visit.casa.nombre_formateado()} — {fecha_obj.strftime('%d/%m/%Y')}")
+            f"{visit.casa.nombre_formateado()} — {fecha_obj.strftime('%d/%m/%Y')}{uuid_tag}")
 
     if visit.observaciones and not es_doble_visita:
         from app.push_utils import enviar_push_novedades
