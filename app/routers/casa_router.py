@@ -1075,6 +1075,7 @@ def toggle_casa(id):
         casa.activo = False
         casa.inactivado_por = current_user.username
         casa.fecha_inactivacion = datetime.now()
+        casa.proporcional_pendiente = None
         # Si estaba pausada, cerrar la pausa al dar de baja
         if casa.pausado:
             from app.models.pausa import Pausa
