@@ -172,6 +172,26 @@ def migrar_base_de_datos():
         print("Novedad vista en visits...")
         _run("ALTER TABLE visits ADD COLUMN IF NOT EXISTS novedad_vista BOOLEAN NOT NULL DEFAULT FALSE;")
 
+        print("Limpieza de proporcionales huerfanos ya cerrados en meses pasados...")
+        _run("""
+            UPDATE casas
+            SET proporcional_pendiente = NULL
+            WHERE proporcional_pendiente IS NOT NULL
+              AND id IN (
+                  SELECT c.id FROM casas c
+                  WHERE (
+                      (c.fecha_reactivacion IS NOT NULL AND c.fecha_reactivacion < '2026-11-01')
+                      OR (c.fecha_reactivacion IS NULL AND c.fecha_creacion IS NOT NULL AND c.fecha_creacion < '2026-11-01')
+                  )
+                  AND EXISTS (
+                      SELECT 1 FROM cierres_mes cm
+                      WHERE (cm.anio > EXTRACT(YEAR FROM COALESCE(c.fecha_reactivacion, c.fecha_creacion))
+                             OR (cm.anio = EXTRACT(YEAR FROM COALESCE(c.fecha_reactivacion, c.fecha_creacion))
+                                 AND cm.mes > EXTRACT(MONTH FROM COALESCE(c.fecha_reactivacion, c.fecha_creacion))))
+                  )
+              );
+        """)
+
         print("Listo.")
 
 if __name__ == "__main__":

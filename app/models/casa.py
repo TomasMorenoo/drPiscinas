@@ -99,7 +99,17 @@ class Casa(db.Model):
                 abono_final = 0.0
                 total_extras = 0.0
             else:
-                abono_final = float(hist.monto) if hist else 0.0
+                if hist:
+                    abono_final = float(hist.monto)
+                elif self.proporcional_pendiente is not None and float(self.proporcional_pendiente) > 0:
+                    abono_final = float(self.proporcional_pendiente)
+                else:
+                    _dia = _fref.day
+                    _sem = 1 if _dia <= 7 else 2
+                    _dias = [int(d) for d in (self.dia_visita or '').split(',') if d.strip().isdigit()]
+                    if _dias and max(_dias) < _fref.weekday():
+                        _sem += 1
+                    abono_final = round(float(self.precio_base or 0) / 4 * max(0, 5 - _sem), 2)
         elif hist:
             abono_final = float(hist.monto)
         else:
@@ -206,7 +216,17 @@ class Casa(db.Model):
                 abono_final = 0.0
                 total_extras = 0.0
             else:
-                abono_final = float(hist.monto) if hist else 0.0
+                if hist:
+                    abono_final = float(hist.monto)
+                elif self.proporcional_pendiente is not None and float(self.proporcional_pendiente) > 0:
+                    abono_final = float(self.proporcional_pendiente)
+                else:
+                    _dia = _fref.day
+                    _sem = 1 if _dia <= 7 else 2
+                    _dias = [int(d) for d in (self.dia_visita or '').split(',') if d.strip().isdigit()]
+                    if _dias and max(_dias) < _fref.weekday():
+                        _sem += 1
+                    abono_final = round(float(self.precio_base or 0) / 4 * max(0, 5 - _sem), 2)
         elif hist:
             abono_final = float(hist.monto)
         else:

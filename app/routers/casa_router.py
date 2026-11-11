@@ -164,7 +164,19 @@ def actualizar_historial_futuro(casa, nuevo_precio, mes_desde, anio_desde, preci
         AbonoHistorico.pagado == False,
         AbonoHistorico.monto_pagado == 0  # No tocar meses con pagos ya registrados
     ).all()
+    _fref = casa.fecha_reactivacion or casa.fecha_creacion
     for f in futuros:
+        es_mes_alta = bool(_fref and _fref.month == f.mes and _fref.year == f.anio)
+        if es_mes_alta and _fref.day > 14:
+            f.monto = 0.0
+            continue
+        elif es_mes_alta and _fref.day <= 14:
+            if precio_viejo and precio_viejo > 0:
+                f.monto = round(float(f.monto) * nuevo_precio / precio_viejo, 2)
+            else:
+                f.monto = _calcular_proporcional(_fref, casa.dia_visita, nuevo_precio)
+            continue
+
         prop_ant = float(f.proporcional_anterior or 0)
         if prop_ant > 0 and precio_viejo and precio_viejo > 0:
             new_prop = round(prop_ant * nuevo_precio / precio_viejo)
@@ -173,6 +185,9 @@ def actualizar_historial_futuro(casa, nuevo_precio, mes_desde, anio_desde, preci
             f.proporcional_anterior = new_prop
         else:
             f.monto = nuevo_precio
+
+    if casa.proporcional_pendiente and precio_viejo and precio_viejo > 0:
+        casa.proporcional_pendiente = round(float(casa.proporcional_pendiente) * nuevo_precio / precio_viejo, 2)
 
 # ==========================================
 # LISTADO
@@ -874,12 +889,28 @@ def perfil(id):
 
         baja = getattr(h, 'cobrado_por', None) == 'BAJA'
 
+        _has_pend = casa.proporcional_pendiente is not None and float(casa.proporcional_pendiente or 0) > 0
+        _fref_h = None
+        if casa.fecha_reactivacion and (proporcional_aplica(casa.fecha_reactivacion) or _has_pend):
+            _fref_h = casa.fecha_reactivacion
+        elif casa.fecha_creacion and (proporcional_aplica(casa.fecha_creacion) or _has_pend):
+            _fref_h = casa.fecha_creacion
+
         prop_pend = 0.0
-        if (casa.proporcional_pendiente and float(casa.proporcional_pendiente) > 0
-                and casa.fecha_reactivacion
-                and h.mes == casa.fecha_reactivacion.month
-                and h.anio == casa.fecha_reactivacion.year):
-            prop_pend = float(casa.proporcional_pendiente)
+        es_prop_diferido = False
+        if _fref_h and _fref_h.month == h.mes and _fref_h.year == h.anio and _fref_h.day > 14:
+            es_prop_diferido = True
+            if casa.proporcional_pendiente and float(casa.proporcional_pendiente) > 0:
+                prop_pend = float(casa.proporcional_pendiente)
+            else:
+                next_m = 1 if h.mes == 12 else h.mes + 1
+                next_y = h.anio + 1 if h.mes == 12 else h.anio
+                h_next = next((x for x in historial_asc if x.mes == next_m and x.anio == next_y), None)
+                if h_next and getattr(h_next, 'proporcional_anterior', None):
+                    prop_pend = float(h_next.proporcional_anterior)
+                else:
+                    _pb_val = float(str(casa.precio_base or 0).replace('.', '').replace(',', '.'))
+                    prop_pend = _calcular_proporcional(_fref_h, casa.dia_visita, _pb_val)
 
         detalles_pagos.append({
             "periodo": f"{nombre_mes(h.mes)} {h.anio}",
@@ -894,6 +925,7 @@ def perfil(id):
             "pausada": pausada,
             "baja": baja,
             "prop_pendiente": prop_pend,
+            "es_prop_diferido": es_prop_diferido,
             "proporcional_anterior": float(getattr(h, 'proporcional_anterior', 0) or 0),
         })
         

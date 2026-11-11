@@ -664,6 +664,9 @@
                             {# 2. ABONO #}
                             <td class="text-end font-monospace text-muted">
                                 ${{ item.abono | pesos }}
+                                {% if item.proporcional_preview > 0 %}
+                                    <span class="badge bg-warning text-dark font-monospace ms-1" title="Proporcional mes anterior">+${{ item.proporcional_preview | pesos }}</span>
+                                {% endif %}
                             </td>
 
                             {# 3. PRODUCTOS #}
@@ -844,12 +847,12 @@
                                             {% elif item.es_proporcional_diferido %}
                                                 <i class="bi bi-arrow-right-circle-fill fs-4 mb-1" id="icon-bloqueo-{{ item.id_historial }}"></i>
                                                 <small class="fw-bold" style="font-size: 0.65rem; line-height: 1.2;">PROPORCIONAL<br>→ MES SIG.</small>
+                                                {% if item.prop_pendiente > 0 %}
+                                                    <span class="badge bg-warning text-dark mt-1" style="font-size:0.6rem;" title="Proporcional diferido al próximo mes: ${{ item.prop_pendiente | pesos }}">${{ item.prop_pendiente | pesos }}</span>
+                                                {% endif %}
                                             {% else %}
                                                 <i class="bi bi-check-circle-fill fs-4 mb-1" id="icon-bloqueo-{{ item.id_historial }}"></i>
                                                 <small class="fw-bold" style="font-size: 0.7rem;">PAGADO</small>
-                                                {% if item.prop_pendiente > 0 %}
-                                                    <span class="badge bg-warning text-dark mt-1" style="font-size:0.6rem;" title="Proporcional diferido al próximo mes: ${{ item.prop_pendiente | pesos }}">Prop →</span>
-                                                {% endif %}
                                             {% endif %}
                                         </button>
                                     </div>
@@ -1142,6 +1145,9 @@
                                 {# Montos desktop #}
                                 <td class="text-end font-monospace text-muted">
                                     ${{ item.abono | pesos }}
+                                    {% if item.proporcional_preview > 0 %}
+                                        <span class="badge bg-warning text-dark font-monospace ms-1" title="Proporcional mes anterior">+${{ item.proporcional_preview | pesos }}</span>
+                                    {% endif %}
                                 </td>
                                 <td class="text-end font-monospace text-muted">
                                     ${{ item.extras | pesos }}
@@ -1214,7 +1220,20 @@
                                                title="Entregó: ${{ item.pagos_en_este_dashboard | pesos }}"></i>
                                         </div>
                                     {% elif item.pagado %}
-                                        <span class="total-valor text-success"{% if item.monto_pagado <= 0 %} title="Marcado como pagado, sin importe recibido registrado"{% endif %}>${{ item.monto_pagado | pesos }}</span>
+                                        <span class="total-valor text-success"{% if item.monto_pagado <= 0 %} title="Marcado como pagado, sin importe recibido registrado"{% endif %}>
+                                            ${{ item.monto_pagado | pesos }}
+                                            {% if tiene_desglose %}
+                                            <i class="bi bi-info-circle ms-1 js-desglose-icon"
+                                               style="font-size:0.85rem; cursor:pointer; color:#f0a500;"
+                                               title="Click para ver detalle"
+                                               data-abono="{{ item.abono }}"
+                                               data-prop="{{ item.proporcional_preview }}"
+                                               data-extras="{{ item.extras }}"
+                                               data-extdif="{{ item.extras_diferidos }}"
+                                               data-deuda="{{ item.saldo_anterior }}"
+                                               data-total="{{ item.total_mes + item.saldo_anterior + item.proporcional_preview }}"></i>
+                                            {% endif %}
+                                        </span>
                                     {% else %}
                                         <span class="total-valor">
                                             ${{ (item.total_mes + item.saldo_anterior + item.proporcional_preview) | pesos }}
@@ -1242,7 +1261,7 @@
                                             {% if item.pagado %}
                                                 <button onclick="togglePagoSimple({{ item.id_historial }}, this)" class="btn btn-sm {% if pagado_atrasado %}btn-secondary{% elif item.es_proporcional_diferido %}btn-warning text-dark{% else %}btn-success{% endif %}" title="{% if item.es_proporcional_diferido %}Proporcional diferido al mes siguiente{% else %}Deshacer estado{% endif %}">
                                                     <i class="bi {% if pagado_atrasado %}bi-clock-history{% elif item.es_proporcional_diferido %}bi-arrow-right-circle-fill{% else %}bi-check-circle-fill{% endif %}"></i>
-                                                    {% if item.prop_pendiente > 0 %}<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem;">Prop →</span>{% endif %}
+                                                    {% if item.prop_pendiente > 0 %}<span class="badge bg-dark text-warning ms-1" style="font-size:0.6rem;" title="Proporcional diferido: ${{ item.prop_pendiente | pesos }}">${{ item.prop_pendiente | pesos }}</span>{% endif %}
                                                 </button>
                                             {% else %}
                                                 {% if item.monto_pagado > 0 or item.pagos_en_este_dashboard > 0 %}
@@ -1300,11 +1319,11 @@
                                                         <i class="bi bi-clock-history"></i>
                                                     {% elif item.es_proporcional_diferido %}
                                                         <i class="bi bi-arrow-right-circle-fill"></i> Prop →
+                                                        {% if item.prop_pendiente > 0 %}
+                                                            <span class="badge bg-dark text-warning ms-1" style="font-size:0.65rem;" title="Proporcional diferido al próximo mes: ${{ item.prop_pendiente | pesos }}">${{ item.prop_pendiente | pesos }}</span>
+                                                        {% endif %}
                                                     {% else %}
                                                         <i class="bi bi-check-circle-fill"></i>
-                                                    {% endif %}
-                                                    {% if item.prop_pendiente > 0 %}
-                                                        <span class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;" title="Proporcional diferido al próximo mes: ${{ item.prop_pendiente | pesos }}">Prop →</span>
                                                     {% endif %}
                                                 </button>
                                             {% else %}

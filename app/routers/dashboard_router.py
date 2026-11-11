@@ -862,6 +862,25 @@ def index():
         else:
             estado_item = "pendiente"
 
+        prop_pendiente_val = 0.0
+        es_prop_diferido_disp = bool(_es_mes_alta_disp and _fref_disp is not None and _fref_disp.day > 14)
+        if es_prop_diferido_disp:
+            if casa.proporcional_pendiente and float(casa.proporcional_pendiente) > 0:
+                prop_pendiente_val = float(casa.proporcional_pendiente)
+            else:
+                _next_m = 1 if mes == 12 else mes + 1
+                _next_a = anio + 1 if mes == 12 else anio
+                _h_next = AbonoHistorico.query.filter_by(casa_id=casa.id, mes=_next_m, anio=_next_a).first()
+                if _h_next and getattr(_h_next, 'proporcional_anterior', None):
+                    prop_pendiente_val = float(_h_next.proporcional_anterior)
+                else:
+                    _dia_calc = _fref_disp.day
+                    _sem_calc = 3 if _dia_calc <= 21 else 4
+                    _dias_calc = [int(d) for d in (casa.dia_visita or '').split(',') if d.strip().isdigit()]
+                    if _dias_calc and max(_dias_calc) < _fref_disp.weekday():
+                        _sem_calc += 1
+                    prop_pendiente_val = round(float(casa.precio_base or 0) / 4 * max(0, 5 - _sem_calc), 2)
+
         _txn = historial.transaccion_id if historial else None
         item_casa = {
             "id_historial": historial.id if historial else None,
@@ -885,8 +904,8 @@ def index():
             "tiene_telefono": bool(casa.telefono),
             "pausado": pausado_mes,
             "pagado_atrasado": bool(_txn and (casa.id, _txn) in _cascade_txns),
-            "prop_pendiente": float(casa.proporcional_pendiente) if (casa.proporcional_pendiente and float(casa.proporcional_pendiente) > 0 and casa.fecha_reactivacion and casa.fecha_reactivacion.month == mes and casa.fecha_reactivacion.year == anio) else 0.0,
-            "es_proporcional_diferido": bool(_es_mes_alta_disp and _fref_disp is not None and _fref_disp.day > 14),
+            "prop_pendiente": prop_pendiente_val,
+            "es_proporcional_diferido": es_prop_diferido_disp,
         }
 
         _skip_pausada = pausado_mes and total_mes <= 0.01 and saldo_anterior_visual <= 0.01
@@ -1273,8 +1292,6 @@ def sync_abonos():
 
     for casa in casas_sync:
         hist = hist_sync_dict.get(casa.id)
-        if hist is not None:
-            continue
         datos_v = casa.obtener_gastos_mensuales(mes, anio, hist=hist)
         extras_v = float(datos_v.get("extras", 0))
 
@@ -1329,14 +1346,23 @@ def sync_abonos():
 
         extras_dif_sync, _ = _calcular_extras_diferidos(casa, mes, anio, _prop_cfg_sync)
 
-        if not hist:
-            nuevo = AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=abono_a_guardar + prop + extras_dif_sync)
+        if hist is not None:
             if prop > 0:
-                nuevo.proporcional_anterior = prop
+                if not getattr(hist, 'proporcional_anterior', None):
+                    hist.proporcional_anterior = prop
+                    hist.monto = float(hist.monto or 0) + prop
                 casa.proporcional_pendiente = None
             elif _es_mes_alta and _fref_sync and _fref_sync.day <= 14:
                 casa.proporcional_pendiente = None
-            db.session.add(nuevo)
+            continue
+
+        nuevo = AbonoHistorico(casa_id=casa.id, mes=mes, anio=anio, monto=abono_a_guardar + prop + extras_dif_sync)
+        if prop > 0:
+            nuevo.proporcional_anterior = prop
+            casa.proporcional_pendiente = None
+        elif _es_mes_alta and _fref_sync and _fref_sync.day <= 14:
+            casa.proporcional_pendiente = None
+        db.session.add(nuevo)
 
     mes_nombre_s = nombre_mes(mes)
     registrar_auditoria(current_user.username, 'CERRAR_MES', f"{mes_nombre_s} {anio}")

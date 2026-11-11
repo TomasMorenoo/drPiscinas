@@ -346,12 +346,12 @@
                                                     <span class="badge bg-secondary fs-6 w-100 py-2 text-uppercase shadow-sm">
                                                         <i class="bi bi-pause-circle me-1"></i>PAUSADA
                                                     </span>
-                                                {% elif d.prop_pendiente > 0 %}
+                                                {% elif d.es_prop_diferido or d.prop_pendiente > 0 %}
                                                     <span class="badge bg-warning text-dark fs-6 w-100 py-2 text-uppercase shadow-sm"
                                                         style="cursor: help;"
                                                         data-bs-toggle="tooltip"
                                                         data-bs-placement="top"
-                                                        title="Proporcional diferido al mes siguiente: ${{ d.prop_pendiente | pesos }}">
+                                                        title="Proporcional diferido al mes siguiente{% if d.prop_pendiente > 0 %}: ${{ d.prop_pendiente | pesos }}{% endif %}">
                                                         <i class="bi bi-arrow-right me-1"></i>PROPORCIONAL
                                                     </span>
                                                 {% else %}
