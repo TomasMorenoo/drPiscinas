@@ -295,9 +295,16 @@
                                     <tbody>
                                         {% for anio, filas in detalles_pagos | groupby('anio') %}
                                         {% for d in filas %}
-                                        <tr data-anio="{{ anio }}">
+                                        <tr data-anio="{{ anio }}"
+                                            class="fila-mes-clickable"
+                                            data-href="{{ url_for('dashboard.index', mes=d.mes, anio=d.anio, focus=casa.id, ver_inactivas='1' if not casa.activo else none) }}#casa-{{ casa.id }}"
+                                            title="Ver {{ casa.nombre_formateado() }} en el Dashboard de {{ d.periodo }}">
                                             <td class="fw-bold text-dark text-uppercase text-nowrap">
-                                                {{ d.periodo }}
+                                                <a href="{{ url_for('dashboard.index', mes=d.mes, anio=d.anio, focus=casa.id, ver_inactivas='1' if not casa.activo else none) }}#casa-{{ casa.id }}"
+                                                   class="text-decoration-none text-dark d-inline-flex align-items-center gap-1 link-mes-dashboard">
+                                                    <span>{{ d.periodo }}</span>
+                                                    <i class="bi bi-box-arrow-up-right text-muted small ms-1 icono-link-dashboard" style="font-size: 0.72rem;"></i>
+                                                </a>
                                             </td>
                                             <td class="font-monospace fw-bold text-dark text-nowrap">
                                                 ${{ d.abono | pesos }}
@@ -610,6 +617,22 @@
         color: #343a40;
         border-bottom: 3px solid #dee2e6 !important;
     }
+    .fila-mes-clickable {
+        cursor: pointer;
+        transition: background-color 0.15s ease-in-out;
+    }
+    .fila-mes-clickable:hover {
+        background-color: #f1f5f9 !important;
+    }
+    .fila-mes-clickable:hover .icono-link-dashboard {
+        color: #0d6efd !important;
+    }
+    .link-mes-dashboard {
+        transition: color 0.15s ease-in-out;
+    }
+    .fila-mes-clickable:hover .link-mes-dashboard {
+        color: #0d6efd !important;
+    }
 </style>
 
 <script>
@@ -672,6 +695,17 @@
     document.getElementById('cuentaAnioPrev').addEventListener('click', function() { mostrarAnio(idx - 1); });
     document.getElementById('cuentaAnioNext').addEventListener('click', function() { mostrarAnio(idx + 1); });
     mostrarAnio(0);
+
+    // Navegación al dashboard al hacer clic en cualquier parte de la fila del mes
+    document.querySelectorAll('.fila-mes-clickable').forEach(function(row) {
+        row.addEventListener('click', function(e) {
+            if (e.target.closest('button')) return;
+            var href = this.getAttribute('data-href');
+            if (href) {
+                window.location.href = href;
+            }
+        });
+    });
 })();
 </script>
 

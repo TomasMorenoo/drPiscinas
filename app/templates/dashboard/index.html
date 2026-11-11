@@ -269,6 +269,25 @@
 @media (min-width: 400px) {
     .btn-cerrar-mes-texto { display: inline; }
 }
+
+/* Resaltado de casa al navegar desde Estado de Cuenta */
+@keyframes highlightCasaPulse {
+    0% {
+        background-color: #fef08a !important;
+        box-shadow: 0 0 0 3px #eab308 inset;
+    }
+    30% {
+        background-color: #fef08a !important;
+        box-shadow: 0 0 0 3px #eab308 inset;
+    }
+    100% {
+        background-color: inherit;
+        box-shadow: none;
+    }
+}
+.casa-focuseada, .casa-focuseada > td, .casa-focuseada > th {
+    animation: highlightCasaPulse 3s ease-out forwards !important;
+}
 </style>
 
 
@@ -645,7 +664,7 @@
                         {% set estado_clase = item.estado %}
                         {% set pagado_atrasado = item.pagado_atrasado %}
                         
-                        <tr class="fila-busqueda {% if item.pausado %}table-secondary{% endif %}" data-estado="{{ estado_clase }}" data-pago-parcial="{{ 'true' if item.pagos_en_este_dashboard > 0 and not item.pagado else 'false' }}">
+                        <tr id="casa-{{ item.casa.id }}" class="fila-busqueda {% if item.pausado %}table-secondary{% endif %}" data-estado="{{ estado_clase }}" data-pago-parcial="{{ 'true' if item.pagos_en_este_dashboard > 0 and not item.pagado else 'false' }}">
 
                             {# 1. NOMBRE #}
                             <td class="ps-3 td-nombre" style="max-width: 200px;">
@@ -1121,7 +1140,7 @@
                         <tbody>
                             {% for item in g.casas %}
                                 {% set pagado_atrasado = item.pagado_atrasado %}
-                            <tr class="fila-casa-grupo {% if item.pausado %}table-secondary{% endif %}" data-estado="{{ item.estado }}">
+                            <tr id="casa-{{ item.casa.id }}" class="fila-casa-grupo {% if item.pausado %}table-secondary{% endif %}" data-estado="{{ item.estado }}">
 
                                 {# Nombre #}
                                 <td class="ps-3 ps-md-4 td-nombre fw-bold" style="max-width: 180px;">
@@ -2454,6 +2473,50 @@ document.addEventListener('click', function(e) {
     const modalEl = document.getElementById('modalDesglose');
     (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).show();
 });
+
+// Auto-scroll y foco en la casa si viene desde Estado de Cuenta u otro enlace
+function enfocarCasaTarget() {
+    var params = new URLSearchParams(window.location.search);
+    var focusVal = params.get('focus');
+    var targetId = null;
+    if (focusVal) {
+        targetId = focusVal.startsWith('casa-') ? focusVal : 'casa-' + focusVal;
+    } else if (window.location.hash && window.location.hash.startsWith('#casa-')) {
+        targetId = window.location.hash.substring(1);
+    }
+
+    if (!targetId) return;
+
+    var el = document.getElementById(targetId);
+    if (!el) return;
+
+    // Si la casa está dentro de un acordeón o colapsable cerrado, expandirlo
+    var parentCollapse = el.closest('.collapse');
+    if (parentCollapse && !parentCollapse.classList.contains('show')) {
+        try {
+            var bsCollapse = bootstrap.Collapse.getOrCreateInstance(parentCollapse);
+            bsCollapse.show();
+        } catch(e) {
+            parentCollapse.classList.add('show');
+        }
+    }
+
+    // Scroll suave al centro y destello de resaltado
+    setTimeout(function() {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('casa-focuseada');
+        setTimeout(function() {
+            el.classList.remove('casa-focuseada');
+        }, 3200);
+    }, 350);
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', enfocarCasaTarget);
+} else {
+    enfocarCasaTarget();
+}
+window.addEventListener('hashchange', enfocarCasaTarget);
 </script>
 
 {% endblock %}

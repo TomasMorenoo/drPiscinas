@@ -914,6 +914,7 @@ def perfil(id):
 
         detalles_pagos.append({
             "periodo": f"{nombre_mes(h.mes)} {h.anio}",
+            "mes": h.mes,
             "anio": h.anio,
             "saldo_anterior": saldo_anterior_iter,
             "costo_mes": total_mes,
