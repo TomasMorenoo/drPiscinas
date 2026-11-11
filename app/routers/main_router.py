@@ -87,3 +87,82 @@ def sw():
     response.headers['Content-Type'] = 'application/javascript'
     response.headers['Cache-Control'] = 'no-cache'
     return response
+
+
+@main_bp.route('/manifest.json')
+@main_bp.route('/manifest.webmanifest')
+def manifest():
+    from app.utils import es_entorno_local
+    is_local = es_entorno_local()
+
+    if is_local:
+        data = {
+            "id": "/drpiscinas-local/",
+            "name": "Local",
+            "short_name": "Local",
+            "description": "Dr. Piscinas - Local",
+            "start_url": "/",
+            "scope": "/",
+            "display": "standalone",
+            "background_color": "#1a1d20",
+            "theme_color": "#dc3545",
+            "orientation": "portrait",
+            "icons": [
+                {
+                    "src": "/static/drpiscina-local-192.png",
+                    "sizes": "192x192",
+                    "type": "image/png",
+                    "purpose": "any"
+                },
+                {
+                    "src": "/static/drpiscina-local-192.png",
+                    "sizes": "192x192",
+                    "type": "image/png",
+                    "purpose": "maskable"
+                },
+                {
+                    "src": "/static/drpiscina-local-512.png",
+                    "sizes": "512x512",
+                    "type": "image/png",
+                    "purpose": "any"
+                },
+                {
+                    "src": "/static/drpiscina-local-512.png",
+                    "sizes": "512x512",
+                    "type": "image/png",
+                    "purpose": "maskable"
+                }
+            ]
+        }
+    else:
+        data = {
+            "id": "/drpiscinas-app/",
+            "name": "DrPiscinas",
+            "short_name": "DrPiscinas",
+            "description": "Gestión de mantenimiento de piscinas",
+            "start_url": "/",
+            "scope": "/",
+            "display": "standalone",
+            "background_color": "#0d1a2e",
+            "theme_color": "#212529",
+            "orientation": "portrait",
+            "icons": [
+                {
+                    "src": "/static/drpiscina-192.png",
+                    "sizes": "192x192",
+                    "type": "image/png",
+                    "purpose": "any maskable"
+                },
+                {
+                    "src": "/static/drpiscina-512.png",
+                    "sizes": "512x512",
+                    "type": "image/png",
+                    "purpose": "any maskable"
+                }
+            ]
+        }
+
+    response = make_response(jsonify(data))
+    response.headers['Content-Type'] = 'application/manifest+json'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response

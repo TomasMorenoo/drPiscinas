@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
-from app import db
+from app import db, csrf
 from app.models.visit import Visit
 from app.models.visit_product import VisitProduct
 from app.utils import registrar_auditoria, mover_stock
@@ -356,6 +356,7 @@ def delete_media(visit_id, media_id):
     return redirect(url_for("visits.detalle_visit", id=visit_id))
 
 @visit_bp.route("/sync-offline", methods=["POST"])
+@csrf.exempt
 @login_required
 def sync_offline():
     data = request.get_json(force=True, silent=True)

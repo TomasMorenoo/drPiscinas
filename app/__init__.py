@@ -164,8 +164,9 @@ def create_app():
             )
             cache.set("_cfg_data", cfg_data, timeout=300)
 
+        from app.utils import es_entorno_local
         cfg = SimpleNamespace(**cfg_data)
-        return dict(cfg=cfg, now=datetime.now())
+        return dict(cfg=cfg, now=datetime.now(), is_local=es_entorno_local())
 
     # --- MODO MANTENIMIENTO ---
     _maint_cache = {"v": False, "t": 0.0}

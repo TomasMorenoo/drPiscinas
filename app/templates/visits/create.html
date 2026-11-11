@@ -755,7 +755,40 @@
         toast._t = setTimeout(() => { toast.style.display = 'none'; }, 4000);
     }
 
+    async function guardarVisitaOffline() {
+        const productos = [];
+        document.querySelectorAll('.producto-row').forEach(row => {
+            const pid = row.querySelector('.product-select').value;
+            const cant = row.querySelector('.qty-input').value;
+            const nombre = row.querySelector('.product-pick-label')?.textContent?.trim() || '';
+            if (pid && cant) productos.push({ product_id: pid, cantidad: cant, nombre });
+        });
+        await savePendingVisit({
+            casa_id: hiddenInput.value,
+            casa_nombre: searchInput.value,
+            fecha: fechaInput.value,
+            promo_id: promoSelect.value || null,
+            promo_nombre: promoSelect.value ? promoDisplay.textContent : '',
+            observaciones: document.querySelector('[name=observaciones]').value,
+            productos,
+            csrf_token: document.querySelector('[name=csrf_token]').value
+        });
+        let toast = document.getElementById('cv-toast-error');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'cv-toast-error';
+            toast.style.cssText = 'position:fixed;bottom:80px;left:16px;right:16px;z-index:4000;border-radius:14px;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-size:0.85rem;';
+            document.body.appendChild(toast);
+        }
+        toast.style.background = '#1e3a5f';
+        toast.innerHTML = '<div style="font-weight:700;margin-bottom:4px;color:#93c5fd;"><i class="bi bi-cloud-upload me-1"></i>Sin conexión — visita guardada en cola</div><div style="color:rgba(255,255,255,0.7);font-size:0.78rem;">Se subirá automáticamente cuando recuperes internet.</div>';
+        toast.style.display = 'block';
+        setTimeout(() => { window.location.href = '/visits/'; }, 1000);
+    }
+
     document.getElementById('visitForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
         // validación client-side — no pierde datos
         const errores = [];
         if (!hiddenInput.value) errores.push('Seleccioná una casa');
@@ -772,59 +805,43 @@
                 row.querySelector('.producto-confirmado').style.display = 'none';
             }
         }
-        if (errores.length) { e.preventDefault(); mostrarToastError(errores); return; }
+        if (errores.length) { mostrarToastError(errores); return; }
 
         // ── OFFLINE: guardar en cola ──────────────────────────────────────────
         if (!navigator.onLine) {
-            e.preventDefault();
-            const productos = [];
-            document.querySelectorAll('.producto-row').forEach(row => {
-                const pid = row.querySelector('.product-select').value;
-                const cant = row.querySelector('.qty-input').value;
-                const nombre = row.querySelector('.product-pick-label')?.textContent?.trim() || '';
-                if (pid && cant) productos.push({ product_id: pid, cantidad: cant, nombre });
-            });
-            await savePendingVisit({
-                casa_id: hiddenInput.value,
-                casa_nombre: searchInput.value,
-                fecha: fechaInput.value,
-                promo_id: promoSelect.value || null,
-                promo_nombre: promoSelect.value ? promoDisplay.textContent : '',
-                observaciones: document.querySelector('[name=observaciones]').value,
-                productos,
-                csrf_token: document.querySelector('[name=csrf_token]').value
-            });
-            let toast = document.getElementById('cv-toast-error');
-            if (!toast) {
-                toast = document.createElement('div');
-                toast.id = 'cv-toast-error';
-                toast.style.cssText = 'position:fixed;bottom:80px;left:16px;right:16px;z-index:4000;border-radius:14px;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-size:0.85rem;';
-                document.body.appendChild(toast);
-            }
-            toast.style.background = '#1e3a5f';
-            toast.innerHTML = '<div style="font-weight:700;margin-bottom:4px;color:#93c5fd;"><i class="bi bi-cloud-upload me-1"></i>Sin conexión — visita guardada en cola</div><div style="color:rgba(255,255,255,0.7);font-size:0.78rem;">Se subirá automáticamente cuando recuperes internet.</div>';
-            toast.style.display = 'block';
-            setTimeout(() => { window.location.href = '/visits'; }, 1200);
+            await guardarVisitaOffline();
             return;
         }
 
-        // inyectar fotos de cámara
-        if (_camaraFiles.length) {
-            const dt = new DataTransfer();
-            _camaraFiles.forEach(f => dt.items.add(f));
-            const extra = document.createElement('input');
-            extra.type = 'file'; extra.name = 'archivos'; extra.style.display = 'none';
-            extra.files = dt.files;
-            this.appendChild(extra);
+        const enviarFormulario = () => {
+            if (_camaraFiles.length) {
+                const dt = new DataTransfer();
+                _camaraFiles.forEach(f => dt.items.add(f));
+                const extra = document.createElement('input');
+                extra.type = 'file'; extra.name = 'archivos'; extra.style.display = 'none';
+                extra.files = dt.files;
+                document.getElementById('visitForm').appendChild(extra);
+            }
+            document.getElementById('visitForm').submit();
+        };
+
+        if (bypassDuplicateCheck) {
+            enviarFormulario();
+            return;
         }
-        if (bypassDuplicateCheck) return;
+
         const casaId = hiddenInput.value;
         const fecha = fechaInput.value;
         if (casaId && fecha) {
-            e.preventDefault();
             try {
-                const r = await fetch(`/visits/check_duplicate?casa_id=${casaId}&fecha=${fecha}`);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2500);
+                const r = await fetch(`/visits/check_duplicate?casa_id=${casaId}&fecha=${fecha}`, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                if (!r.ok) throw new Error('Servidor inalcanzable');
                 const data = await r.json();
+
                 if (data.exists) {
                     document.getElementById('detalle-duplicado').innerText = data.detalles.replace("Productos:", "\nProductos:");
                     const modalEl = document.getElementById('modalDuplicado');
@@ -838,14 +855,17 @@
                     document.getElementById('btn-aceptar-duplicado').onclick = function() {
                         modalObj.hide();
                         bypassDuplicateCheck = true;
-                        document.getElementById('visitForm').submit();
+                        enviarFormulario();
                     };
-                } else {
-                    this.submit();
+                    return;
                 }
+                enviarFormulario();
             } catch(err) {
-                this.submit();
+                console.warn('Sin conexión para verificar duplicado, guardando offline:', err);
+                await guardarVisitaOffline();
             }
+        } else {
+            enviarFormulario();
         }
     });
 
@@ -875,5 +895,14 @@
             alerta.classList.add('d-none');
         }
     });
+
+    if (navigator.onLine && 'serviceWorker' in navigator) {
+        const _swMsg = { type: 'CACHE_PAGE', url: location.href };
+        if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage(_swMsg);
+        } else {
+            navigator.serviceWorker.ready.then(reg => { if (reg.active) reg.active.postMessage(_swMsg); }).catch(() => {});
+        }
+    }
 </script>
 {% endblock %}

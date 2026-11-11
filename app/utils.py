@@ -46,3 +46,28 @@ def registrar_auditoria(usuario, accion, detalle):
     ahora_ar = datetime.now(tz_ar).replace(tzinfo=None)
     log = AuditoriaLog(fecha=ahora_ar, usuario=usuario, accion=accion, detalle=detalle)
     db.session.add(log)
+
+def es_entorno_local():
+    """Retorna True si estamos en entorno local, False si producción."""
+    import os
+    from flask import has_request_context, request
+
+    app_env = os.getenv('APP_ENV', '').strip().lower()
+    if app_env == 'local':
+        return True
+    if app_env == 'production':
+        return False
+    if os.getenv('FLASK_DEBUG', '').strip().lower() in {'1', 'true', 'yes', 'on'}:
+        return True
+    if os.getenv('FLASK_ENV', '').strip().lower() == 'development':
+        return True
+
+    if has_request_context():
+        try:
+            host = request.host.split(':')[0]
+            if host in ('localhost', '127.0.0.1') or host.startswith('192.168.') or host.startswith('10.') or host.startswith('172.'):
+                return True
+        except Exception:
+            pass
+
+    return False

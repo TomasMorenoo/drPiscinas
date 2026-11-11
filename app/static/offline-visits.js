@@ -52,9 +52,10 @@ async function syncPendingVisits() {
     let synced = 0, errors = 0;
     for (const item of pending) {
       try {
+        const csrfToken = document.querySelector('[name=csrf_token]')?.value || item.csrf_token || '';
         const r = await fetch('/visits/sync-offline', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': item.csrf_token },
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
           body: JSON.stringify(item)
         });
         const json = await r.json().catch(() => ({}));

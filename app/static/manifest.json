@@ -1,7 +1,7 @@
 {
   "id": "/drpiscinas-app/",
-  "name": "Dr. Piscinas",
-  "short_name": "Dr. Piscinas",
+  "name": "DrPiscinas",
+  "short_name": "DrPiscinas",
   "description": "Gestión de mantenimiento de piscinas",
   "start_url": "/",
   "scope": "/",
