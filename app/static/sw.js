@@ -1,5 +1,5 @@
-const CACHE_STATIC = 'drp-static-v4';
-const CACHE_PAGES  = 'drp-pages-v4';
+const CACHE_STATIC = 'drp-static-v6';
+const CACHE_PAGES  = 'drp-pages-v6';
 
 const STATIC_ASSETS = [
   '/static/offline-visits.js',
@@ -37,6 +37,22 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
+
+  // Script de lógica offline → network-first con fallback a cache (permite actualizar lógica sin desinstalar PWA)
+  if (url.pathname.includes('offline-visits.js')) {
+    e.respondWith(
+      fetch(e.request)
+        .then(r => {
+          if (r.ok) {
+            const clone = r.clone();
+            caches.open(CACHE_STATIC).then(c => c.put(e.request, clone));
+          }
+          return r;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
 
   // CDN y assets estáticos → cache-first
   if (url.hostname.includes('jsdelivr') || url.pathname.startsWith('/static/')) {
@@ -83,8 +99,11 @@ self.addEventListener('fetch', e => {
         cached = await pagesCache.match(altPath, { ignoreSearch: true });
         if (cached) return cached;
 
-        // 3. Fallback: si es algo de visitas, devolver /visits/ o /visits/create
-        if (reqUrl.pathname.startsWith('/visits')) {
+        // 3. Fallback inteligente según la sub-ruta de visitas
+        if (reqUrl.pathname.includes('/create')) {
+          cached = await pagesCache.match('/visits/create', { ignoreSearch: true });
+          if (cached) return cached;
+        } else if (reqUrl.pathname.startsWith('/visits')) {
           cached = await pagesCache.match('/visits/', { ignoreSearch: true });
           if (cached) return cached;
           cached = await pagesCache.match('/visits', { ignoreSearch: true });

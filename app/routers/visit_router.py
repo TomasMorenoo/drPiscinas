@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from app import db, csrf
 from app.models.visit import Visit
 from app.models.visit_product import VisitProduct
-from app.utils import registrar_auditoria, mover_stock
+from app.utils import registrar_auditoria, mover_stock, natural_sort_key
 from app.models.casa import Casa
 from app.models.products import Product
 from app.models.promo import Promo
@@ -13,9 +13,10 @@ from app.models.movimiento_stock import MovimientoStock
 from app.models.visit_media import VisitMedia
 from app.models.auditoria import AuditoriaLog
 from sqlalchemy import extract, func, case
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from datetime import datetime, timedelta
 import time
+import json
 
 _PROCESSED_OFFLINE_UUIDS = {}   # {client_uuid: visit_id}
 _PROCESSED_OFFLINE_RECENT = {}  # {(user_id, casa_id, fecha_str): timestamp}
@@ -226,7 +227,8 @@ def crear_visit():
     # no sea anterior al inicio del cliente (fecha_creacion).
     casas = Casa.query.filter_by(activo=True).options(
         selectinload(Casa.historial_pausas)
-    ).order_by(Casa.numero).all()
+    ).all()
+    casas.sort(key=natural_sort_key)
 
     q = Product.query.filter_by(activo=True)
     if current_user.username != 'root':
@@ -245,7 +247,40 @@ def crear_visit():
 
     ultima_visita = Visit.query.filter_by(usuario_id=current_user.id).order_by(Visit.id.desc()).first()
 
-    return render_template("visits/create.html", casas=casas, products=products, promos=promos, ultima_visita=ultima_visita)
+    # Precarga de visitas recientes (hoy y últimos 2 días) para caché offline y chequeo rápido
+    desde_recientes = datetime.now() - timedelta(days=2)
+    visitas_recientes = Visit.query.filter(
+        Visit.fecha >= desde_recientes.date()
+    ).filter(
+        db.or_(Visit.observaciones == None, ~Visit.observaciones.in_(['[EXTRA_MANUAL]', '[DEUDA_ANTERIOR]']))
+    ).options(
+        joinedload(Visit.usuario),
+        joinedload(Visit.casa),
+        selectinload(Visit.productos).joinedload(VisitProduct.product)
+    ).order_by(Visit.fecha.desc(), Visit.id.desc()).all()
+
+    visitas_cache_data = []
+    for v in visitas_recientes:
+        detalles_prod = ", ".join([f"{vp.cantidad:g} {vp.product.nombre}" for vp in v.productos if vp.product])
+        usuario_nom = v.usuario.username if (v.usuario and v.usuario.username) else "otro empleado"
+        visitas_cache_data.append({
+            "id": v.id,
+            "casa_id": str(v.casa_id),
+            "casa_nombre": v.casa.nombre_formateado() if v.casa else f"Casa #{v.casa_id}",
+            "fecha": v.fecha.strftime("%Y-%m-%d"),
+            "usuario": usuario_nom,
+            "productos": detalles_prod or "Sin productos",
+            "observaciones": v.observaciones or ""
+        })
+
+    return render_template(
+        "visits/create.html",
+        casas=casas,
+        products=products,
+        promos=promos,
+        ultima_visita=ultima_visita,
+        visitas_recientes_json=json.dumps(visitas_cache_data)
+    )
 
 @visit_bp.route("/delete/<int:id>", methods=["POST"])
 @login_required
@@ -328,6 +363,7 @@ def editar_visit(id):
         return redirect(url_for("visits.listar_visits"))
         
     casas = Casa.query.filter_by(activo=True).all()
+    casas.sort(key=natural_sort_key)
     q_edit = Product.query.filter_by(activo=True)
     if current_user.username != 'root':
         q_edit = q_edit.filter(db.func.lower(Product.nombre) != 'deuda')
@@ -521,14 +557,52 @@ def check_duplicate():
     # ya que eso sí podría convivir con una visita real.
     existente = Visit.query.filter_by(casa_id=casa_id, fecha=fecha).filter(
         db.or_(Visit.observaciones == None, ~Visit.observaciones.in_(['[EXTRA_MANUAL]', '[DEUDA_ANTERIOR]']))
+    ).options(
+        joinedload(Visit.usuario),
+        selectinload(Visit.productos).joinedload(VisitProduct.product)
     ).first()
 
     if existente:
-        # Preparamos el detalle de lo que ya se cargó para el cartel
-        detalles_prod = ", ".join([f"{vp.cantidad} {vp.product.nombre}" for vp in existente.productos])
+        detalles_prod = ", ".join([f"{vp.cantidad:g} {vp.product.nombre}" for vp in existente.productos if vp.product])
+        usuario_nom = existente.usuario.username if (existente.usuario and existente.usuario.username) else "otro empleado"
+        detalles_txt = f"Cargada por: {usuario_nom}\nProductos: {detalles_prod or 'Sin productos'}\nObservaciones: {existente.observaciones or 'Ninguna'}"
         return jsonify({
             "exists": True,
-            "detalles": f"Observaciones: {existente.observaciones or 'Ninguna'}. Productos: {detalles_prod or 'Sin productos'}."
+            "detalles": detalles_txt,
+            "usuario": usuario_nom,
+            "productos": detalles_prod or "Sin productos",
+            "observaciones": existente.observaciones or ""
         })
     
     return jsonify({"exists": False})
+
+
+@visit_bp.route("/api/recent-today")
+@login_required
+def api_recent_today():
+    desde = datetime.now() - timedelta(days=2)
+    visitas = Visit.query.filter(
+        Visit.fecha >= desde.date()
+    ).filter(
+        db.or_(Visit.observaciones == None, ~Visit.observaciones.in_(['[EXTRA_MANUAL]', '[DEUDA_ANTERIOR]']))
+    ).options(
+        joinedload(Visit.usuario),
+        joinedload(Visit.casa),
+        selectinload(Visit.productos).joinedload(VisitProduct.product)
+    ).order_by(Visit.fecha.desc(), Visit.id.desc()).all()
+
+    data = []
+    for v in visitas:
+        detalles_prod = ", ".join([f"{vp.cantidad:g} {vp.product.nombre}" for vp in v.productos if vp.product])
+        usuario_nom = v.usuario.username if (v.usuario and v.usuario.username) else "otro empleado"
+        data.append({
+            "id": v.id,
+            "casa_id": str(v.casa_id),
+            "casa_nombre": v.casa.nombre_formateado() if v.casa else f"Casa #{v.casa_id}",
+            "fecha": v.fecha.strftime("%Y-%m-%d"),
+            "usuario": usuario_nom,
+            "productos": detalles_prod or "Sin productos",
+            "observaciones": v.observaciones or ""
+        })
+
+    return jsonify({"ok": True, "visitas": data})

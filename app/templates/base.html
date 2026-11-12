@@ -372,7 +372,7 @@
             {% endif %}
         </span>
         {% if cfg.footer_contacto %}
-        <span class="text-end">{{ cfg.footer_contacto }}</span>
+        <span class="text-end text-secondary">{{ cfg.footer_contacto }}</span>
         {% endif %}
     </div>
 </footer>
@@ -512,9 +512,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     if ('serviceWorker' in navigator) {
+        let _refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!_refreshing) {
+                _refreshing = true;
+                window.location.reload();
+            }
+        });
+
         window.addEventListener('load', function() {
             navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then(function(registration) {
                 if (navigator.onLine) {
+                    registration.update().catch(() => {});
                     const sw = registration.active || registration.installing || registration.waiting;
                     if (sw) {
                         const _doCache = function() {
@@ -616,5 +625,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
+{% if current_user.is_authenticated %}
+<script src="{{ url_for('static', filename='offline-visits.js') }}?v=7"></script>
+{% endif %}
 </body>
 </html>

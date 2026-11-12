@@ -383,7 +383,7 @@
     });
 </script>
 
-<script src="{{ url_for('static', filename='offline-visits.js') }}"></script>
+<script src="{{ url_for('static', filename='offline-visits.js') }}?v=7"></script>
 <script>
     const MESES_CORTO = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 
@@ -438,6 +438,12 @@
             const result = await syncPendingVisits().catch(() => ({ synced: 0, errors: 1, total: 0 }));
             await renderOfflineQueue();
             if (result.synced > 0) {
+                if (result.dobles > 0) {
+                    sessionStorage.setItem('sync_dobles_aviso', JSON.stringify({
+                        dobles: result.dobles,
+                        casas: result.doblesList || []
+                    }));
+                }
                 // Breve pausa para asegurar commit de transacciones IndexedDB antes de recargar
                 setTimeout(() => { location.reload(); }, 350);
                 return;
@@ -454,8 +460,23 @@
 
     // Auto-sync si hay conexión al cargar
     window.addEventListener('load', async () => {
+        const avisoDoble = sessionStorage.getItem('sync_dobles_aviso');
+        if (avisoDoble) {
+            sessionStorage.removeItem('sync_dobles_aviso');
+            try {
+                const info = JSON.parse(avisoDoble);
+                if (info && info.dobles > 0) {
+                    const casasStr = (info.casas || []).join('\n• ');
+                    alert(`⚠️ ¡Atención! Se sincronizaron las visitas pendientes, pero se detectó doble visita en:\n• ${casasStr}\n\nRevisá los registros marcados con "Doble visita".`);
+                }
+            } catch(e) {}
+        }
+
         await renderOfflineQueue();
         if (navigator.onLine) {
+            if (typeof fetchAndCacheTodayVisits === 'function') {
+                fetchAndCacheTodayVisits().catch(() => {});
+            }
             const pending = await getPendingVisits().catch(() => []);
             if (pending && pending.length && !sessionStorage.getItem('just_synced')) {
                 sessionStorage.setItem('just_synced', '1');

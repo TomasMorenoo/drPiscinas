@@ -397,7 +397,21 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='offline-visits.js') }}"></script>
+<script src="{{ url_for('static', filename='offline-visits.js') }}?v=7"></script>
+{% if visitas_recientes_json %}
+<script>
+    try {
+        const _initVisitas = {{ visitas_recientes_json | safe }};
+        if (Array.isArray(_initVisitas)) {
+            if (typeof mergeCachedTodayVisits === 'function') {
+                mergeCachedTodayVisits(_initVisitas);
+            } else if (typeof setCachedTodayVisits === 'function') {
+                setCachedTodayVisits(_initVisitas);
+            }
+        }
+    } catch(e) {}
+</script>
+{% endif %}
 <script>
     // ── Fecha display ──
     const fechaInput = document.getElementById('fecha_visita');
@@ -596,7 +610,7 @@
         const fecha = fechaInput.value;
         if (!casaId || !fecha) return;
 
-        // 1. Chequeo local en la cola de IndexedDB (offline)
+        // 1. Chequeo local en la cola de IndexedDB (offline pendientes de este celular)
         const enCola = await verificarDuplicadoOffline(casaId, fecha);
         if (enCola) {
             const prods = (enCola.productos || []).map(p => `${p.cantidad} ${p.nombre || p.product_id}`).join(', ') || 'Sin productos';
@@ -608,13 +622,26 @@
             return;
         }
 
-        // 2. Si hay conexión, consultar también al servidor
+        // 2. Chequeo local en el caché de visitas del sistema (funciona 100% sin conexión)
+        if (typeof getCachedTodayVisit === 'function') {
+            const cached = getCachedTodayVisit(casaId, fecha);
+            if (cached) {
+                const msg = `⚠️ Ya existe una visita registrada en el sistema para esta fecha.\nCargada por: ${cached.usuario || 'otro empleado'}\nProductos: ${cached.productos || 'Sin productos'}\nObservaciones: ${cached.observaciones || 'Ninguna'}`;
+                mostrarModalDuplicado(msg, null, function() {
+                    searchInput.value = ""; hiddenInput.value = "";
+                    casaOkIcon.classList.add('d-none');
+                });
+                return;
+            }
+        }
+
+        // 3. Si hay conexión, consultar también al servidor en tiempo real
         if (navigator.onLine) {
             try {
                 const r = await fetch(`/visits/check_duplicate?casa_id=${casaId}&fecha=${fecha}`);
                 const data = await r.json();
                 if (data.exists) {
-                    mostrarModalDuplicado(data.detalles.replace("Productos:", "\nProductos:"), null, function() {
+                    mostrarModalDuplicado(data.detalles, null, function() {
                         searchInput.value = ""; hiddenInput.value = "";
                         casaOkIcon.classList.add('d-none');
                     });
@@ -865,6 +892,19 @@
                     });
                     return;
                 }
+                if (typeof getCachedTodayVisit === 'function') {
+                    const cached = getCachedTodayVisit(hiddenInput.value, fechaInput.value);
+                    if (cached) {
+                        const msg = `⚠️ Ya existe una visita registrada en el sistema para esta fecha.\nCargada por: ${cached.usuario || 'otro empleado'}\nProductos: ${cached.productos || 'Sin productos'}\nObservaciones: ${cached.observaciones || 'Ninguna'}`;
+                        mostrarModalDuplicado(msg, async function() {
+                            await guardarVisitaOffline();
+                        }, function() {
+                            searchInput.value = ""; hiddenInput.value = "";
+                            casaOkIcon.classList.add('d-none');
+                        });
+                        return;
+                    }
+                }
             }
             await guardarVisitaOffline();
             return;
@@ -905,7 +945,7 @@
                 const data = await r.json();
 
                 if (data.exists) {
-                    mostrarModalDuplicado(data.detalles.replace("Productos:", "\nProductos:"), function() {
+                    mostrarModalDuplicado(data.detalles, function() {
                         enviarFormulario();
                     }, function() {
                         searchInput.value = ""; hiddenInput.value = "";
@@ -928,6 +968,19 @@
                             casaOkIcon.classList.add('d-none');
                         });
                         return;
+                    }
+                    if (typeof getCachedTodayVisit === 'function') {
+                        const cached = getCachedTodayVisit(casaId, fecha);
+                        if (cached) {
+                            const msg = `⚠️ Ya existe una visita registrada en el sistema para esta fecha.\nCargada por: ${cached.usuario || 'otro empleado'}\nProductos: ${cached.productos || 'Sin productos'}\nObservaciones: ${cached.observaciones || 'Ninguna'}`;
+                            mostrarModalDuplicado(msg, async function() {
+                                await guardarVisitaOffline();
+                            }, function() {
+                                searchInput.value = ""; hiddenInput.value = "";
+                                casaOkIcon.classList.add('d-none');
+                            });
+                            return;
+                        }
                     }
                 }
                 await guardarVisitaOffline();
