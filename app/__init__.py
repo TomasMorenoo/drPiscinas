@@ -138,6 +138,7 @@ def create_app():
 
                 app_name        = Configuracion.get('app_name', 'Dr. Piscinas')
                 app_description = Configuracion.get('app_description', 'Sistema de gestión de piletas')
+                app_version     = Configuracion.get('app_version', 'V2.1.1')
                 footer_texto    = Configuracion.get('footer_texto', '')
                 footer_contacto = Configuracion.get('footer_contacto', '')
                 wa_numero_error = Configuracion.get('wa_numero_error', '')
@@ -147,6 +148,7 @@ def create_app():
                 login_image     = False
                 app_name        = 'Dr. Piscinas'
                 app_description = 'Sistema de gestión de piletas'
+                app_version     = 'V2.1.1'
                 footer_texto    = ''
                 footer_contacto = ''
                 wa_numero_error = ''
@@ -155,6 +157,7 @@ def create_app():
             cfg_data = dict(
                 app_name=app_name,
                 app_description=app_description,
+                app_version=app_version,
                 app_icon_192=app_icon_192,
                 login_image=login_image,
                 footer_texto=footer_texto,

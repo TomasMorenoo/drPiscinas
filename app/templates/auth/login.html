@@ -348,7 +348,10 @@
             </form>
 
             <div class="form-footer">
-                {{ cfg.app_name }} &mdash; Acceso restringido
+                <div>{{ cfg.app_name }} &mdash; Acceso restringido</div>
+                {% if cfg.app_version %}
+                <div class="mt-1 font-monospace text-muted" style="font-size: 0.62rem; opacity: 0.45; letter-spacing: 0.5px;">{{ cfg.app_version }}</div>
+                {% endif %}
             </div>
         </div>
 

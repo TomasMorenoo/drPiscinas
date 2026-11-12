@@ -656,8 +656,11 @@ def set_wa_error():
 def set_footer():
     texto    = request.form.get("footer_texto", "").strip()
     contacto = request.form.get("footer_contacto", "").strip()
+    version  = request.form.get("app_version", "").strip()
     Configuracion.set("footer_texto", texto)
     Configuracion.set("footer_contacto", contacto)
+    if version:
+        Configuracion.set("app_version", version)
     db.session.commit()
     cache.delete("_cfg_data")
     flash("✅ Footer actualizado.", "success")
