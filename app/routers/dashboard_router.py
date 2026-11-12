@@ -18,15 +18,11 @@ import uuid
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
+from app.utils import natural_sort_key
+
 # ==========================================
 # UTILIDADES Y FORMATOS
 # ==========================================
-
-def natural_sort_key(casa):
-    k_country = casa.country.nombre.lower() if casa.country else "zzz"
-    k_barrio = casa.barrio.nombre.lower() if casa.barrio else ""
-    k_numero = [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', str(casa.numero))]
-    return (k_country, k_barrio, k_numero)
 
 def format_money(value):
     return f"{value:,.0f}".replace(",", ".")

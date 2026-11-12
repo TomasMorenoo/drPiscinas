@@ -1,5 +1,27 @@
+import re
+
 MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 MESES_LARGO = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
+def natural_sort_key(casa):
+    """Clave de ordenamiento natural para objetos Casa.
+    Ordena por:
+    1. Country (alfabético, insensible a mayúsculas)
+    2. Barrio (alfabético, insensible a mayúsculas)
+    3. Número de casa de forma natural (ej: '6' antes de '120', '12A' antes de '12B')
+    """
+    k_country = casa.country.nombre.lower() if getattr(casa, 'country', None) and casa.country else "zzz"
+    k_barrio = casa.barrio.nombre.lower() if getattr(casa, 'barrio', None) and casa.barrio else ""
+    num_str = str(getattr(casa, 'numero', '') or '')
+    k_numero = []
+    for text in re.split(r'(\d+)', num_str):
+        if not text:
+            continue
+        if text.isdigit():
+            k_numero.append((0, int(text)))
+        else:
+            k_numero.append((1, text.lower()))
+    return (k_country, k_barrio, k_numero)
 
 def nombre_mes(n, largo=False):
     return (MESES_LARGO if largo else MESES_CORTO)[n - 1]

@@ -13,7 +13,7 @@ from app.models.abono_historico import AbonoHistorico
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_, and_, case
 from sqlalchemy.orm import joinedload, selectinload
-from app.utils import nombre_mes, registrar_auditoria, mover_stock, proporcional_aplica
+from app.utils import nombre_mes, registrar_auditoria, mover_stock, proporcional_aplica, natural_sort_key
 from app.greenville import (
     codigo_barrio_greenville,
     es_greenville,
@@ -97,15 +97,6 @@ def log_aumento_txt(cliente, p_i, aumento, p_f, mes_num):
         if escribir_encabezado:
             f.write("CLIENTE | P.I | AUMENTO | P.F | a partir\n")
         f.write(linea)
-
-# ==========================================
-# LÓGICA DE ORDENAMIENTO (NATURAL)
-# ==========================================
-def natural_sort_key(casa):
-    k_country = casa.country.nombre.lower() if casa.country else "zzz"
-    k_barrio = casa.barrio.nombre.lower() if casa.barrio else ""
-    k_numero = [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', str(casa.numero))]
-    return (k_country, k_barrio, k_numero)
 
 # ==========================================
 # MAGIA DE REDONDEO Y LINEA DE TIEMPO
@@ -947,7 +938,8 @@ def migrar_greenville():
     )
     filas = []
     if greenville:
-        casas = Casa.query.filter_by(country_id=greenville.id).order_by(Casa.numero).all()
+        casas = Casa.query.filter_by(country_id=greenville.id).all()
+        casas.sort(key=natural_sort_key)
         for casa in casas:
             sector_numero, lote_sugerido = separar_sector_lote(casa.numero)
             sector_barrio = codigo_barrio_greenville(casa.barrio.nombre) if casa.barrio else None

@@ -10,8 +10,7 @@ from app.models.casa import Casa
 from app.models.products import Product
 from app.models.visit import Visit
 from app.models.visit_product import VisitProduct
-from app.utils import mover_stock
-from app.routers.dashboard_router import natural_sort_key
+from app.utils import mover_stock, natural_sort_key
 
 config_bp = Blueprint("config", __name__, url_prefix="/config")
 

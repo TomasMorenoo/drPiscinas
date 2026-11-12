@@ -7,7 +7,7 @@ from app.models.grupo import GrupoCliente
 from app.models.visit import Visit
 from app.models.visit_product import VisitProduct
 from sqlalchemy.orm import selectinload
-from app.utils import nombre_mes
+from app.utils import nombre_mes, natural_sort_key
 
 grupo_bp = Blueprint("grupos", __name__, url_prefix="/grupos")
 
@@ -87,7 +87,7 @@ def perfil(id):
         selectinload(Casa.visitas).selectinload(Visit.productos).joinedload(VisitProduct.product),
         selectinload(Casa.visitas).joinedload(Visit.promo)
     ).all()
-    casas.sort(key=lambda c: c.nombre_formateado().lower())
+    casas.sort(key=natural_sort_key)
     filas = estado_cuenta_grupo(grupo, casas)
     anios = sorted({f['anio'] for f in filas}, reverse=True)
     anio = request.args.get('anio', type=int)
@@ -131,7 +131,10 @@ def crear_grupo():
         return redirect(url_for("grupos.listar_grupos"))
         
     # ESTO ES LO NUEVO: Le pasamos las casas sueltas al HTML para el select manual
-    casas_libres = Casa.query.filter_by(grupo_id=None, activo=True).order_by(Casa.country_id).all()
+    casas_libres = Casa.query.filter_by(grupo_id=None, activo=True).options(
+        selectinload(Casa.country), selectinload(Casa.barrio)
+    ).all()
+    casas_libres.sort(key=natural_sort_key)
     return render_template("grupos/create.html", casas_libres=casas_libres)
 
 @grupo_bp.route("/editar/<int:id>", methods=["GET", "POST"])
@@ -149,7 +152,10 @@ def editar_grupo(id):
             flash("Nombres del grupo actualizados.", "success")
         return redirect(url_for("grupos.editar_grupo", id=grupo.id))
         
-    casas_libres = Casa.query.filter_by(grupo_id=None, activo=True).order_by(Casa.country_id).all()
+    casas_libres = Casa.query.filter_by(grupo_id=None, activo=True).options(
+        selectinload(Casa.country), selectinload(Casa.barrio)
+    ).all()
+    casas_libres.sort(key=natural_sort_key)
     return render_template("grupos/edit.html", grupo=grupo, casas_libres=casas_libres)
 
 @grupo_bp.route("/agregar_casa/<int:grupo_id>", methods=["POST"])
@@ -194,6 +200,9 @@ def buscar_por_telefono():
     telefono = request.args.get("telefono", "").strip()
     if not telefono:
         return jsonify([])
-    casas = Casa.query.filter(Casa.telefono.ilike(f"%{telefono}%"), Casa.grupo_id == None).all()
+    casas = Casa.query.filter(Casa.telefono.ilike(f"%{telefono}%"), Casa.grupo_id == None).options(
+        selectinload(Casa.country), selectinload(Casa.barrio)
+    ).all()
+    casas.sort(key=natural_sort_key)
     resultados = [{"id": c.id, "nombre": c.nombre_formateado(), "cliente": c.nombre_cliente or "Sin nombre", "abono": float(c.precio_base)} for c in casas]
     return jsonify(resultados)
